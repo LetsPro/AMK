@@ -21,3 +21,12 @@ npm run dev
 ```
 
 See [Deployment Guide](docs/deployment-guide.md).
+
+## Seeded Admin
+
+After applying the Supabase migration:
+
+- Email: `admin@amkarchitects.com`
+- Password: `AMK@Admin#2026`
+
+Change this password before production use.

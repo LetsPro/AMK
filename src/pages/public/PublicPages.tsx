@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { motion } from "framer-motion";
-import { ArrowRight, CheckCircle2, MapPin, Send, UserPlus } from "lucide-react";
+import { ArrowRight, CheckCircle2, ClipboardCheck, Layers3, MapPin, Ruler, Send, ShieldCheck, UserPlus } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Input, Textarea } from "@/components/ui/Input";
@@ -12,10 +12,40 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   return <section className="mx-auto max-w-7xl px-4 py-14"><h2 className="mb-6 text-3xl font-bold tracking-tight">{title}</h2>{children}</section>;
 }
 
+const demoServices = [
+  { id: "demo-service-1", name: "Architectural Design", slug: "architectural-design", description: "Concept planning, elevations, working drawings, and design coordination for Mysuru homes and commercial spaces.", image_url: "https://images.unsplash.com/photo-1503387762-592deb58ef4e?auto=format&fit=crop&w=1200&q=80" },
+  { id: "demo-service-2", name: "Approval Drawings", slug: "approval-drawings", description: "Submission-ready approval drawings and documentation support for Mysuru and Karnataka projects.", image_url: "https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?auto=format&fit=crop&w=1200&q=80" },
+  { id: "demo-service-3", name: "Structural Engineering", slug: "structural-engineering", description: "Structural coordination and construction-ready technical documentation for residential and commercial work.", image_url: "https://images.unsplash.com/photo-1494526585095-c41746248156?auto=format&fit=crop&w=1200&q=80" }
+];
+
+const demoProjects = [
+  { id: "demo-project-1", name: "Chamundi Hill Residence", slug: "chamundi-hill-residence", description: "A contemporary family residence planned for natural ventilation, framed views, and warm material finishes.", category: "Residential", location: "Chamundi Hill Road, Mysuru, Karnataka, India", cover_image_url: "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1400&q=80" },
+  { id: "demo-project-2", name: "Vijayanagar Courtyard Home", slug: "vijayanagar-courtyard-home", description: "A courtyard-led home with shaded transitions, efficient planning, and indoor-outdoor living.", category: "Residential", location: "Vijayanagar, Mysuru, Karnataka, India", cover_image_url: "https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?auto=format&fit=crop&w=1400&q=80" },
+  { id: "demo-project-3", name: "Hebbal Workspace Studio", slug: "hebbal-workspace-studio", description: "A compact commercial studio designed for flexible workstations, client meetings, and daylight.", category: "Commercial", location: "Hebbal Industrial Area, Mysuru, Karnataka, India", cover_image_url: "https://images.unsplash.com/photo-1497366754035-f200968a6e72?auto=format&fit=crop&w=1400&q=80" }
+];
+
+const demoGallery = [
+  { id: "demo-gallery-1", title: "Chamundi Hill Residence - Front Elevation", category: "Residential", image_url: "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1400&q=80" },
+  { id: "demo-gallery-2", title: "Vijayanagar Courtyard Home - Living Court", category: "Residential", image_url: "https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?auto=format&fit=crop&w=1400&q=80" },
+  { id: "demo-gallery-3", title: "Hebbal Workspace Studio - Open Office", category: "Commercial", image_url: "https://images.unsplash.com/photo-1497366754035-f200968a6e72?auto=format&fit=crop&w=1400&q=80" },
+  { id: "demo-gallery-4", title: "Saraswathipuram Interior Upgrade - Dining", category: "Interior", image_url: "https://images.unsplash.com/photo-1600210492486-724fe5c67fb0?auto=format&fit=crop&w=1400&q=80" },
+  { id: "demo-gallery-5", title: "Mysuru Material Palette Study", category: "Materials", image_url: "https://images.unsplash.com/photo-1618220179428-22790b461013?auto=format&fit=crop&w=1400&q=80" },
+  { id: "demo-gallery-6", title: "Approval Drawing Review", category: "Documentation", image_url: "https://images.unsplash.com/photo-1503387762-592deb58ef4e?auto=format&fit=crop&w=1400&q=80" }
+];
+
+const demoTestimonials = [
+  { id: "demo-testimonial-1", name: "Raghavendra Rao", company: "Chamundi Hill Residence", quote: "AMK translated our requirements into a practical, elegant home design and kept every drawing revision clearly documented." },
+  { id: "demo-testimonial-2", name: "Nandini Prakash", company: "Vijayanagar Courtyard Home", quote: "The team handled design, approvals, and site coordination with a professional process. Communication was consistent from start to finish." },
+  { id: "demo-testimonial-3", name: "Mohammed Irfan", company: "Hebbal Workspace Studio", quote: "Our workspace plan was delivered with clear cost visibility and fast revisions. The Mysuru site constraints were handled well." }
+];
+
 export function HomePage() {
   const { data: services = [] } = useTable("services", { limit: 6, orderBy: "created_at", eq: { status: "published" } });
   const { data: projects = [] } = useTable("projects", { limit: 6, orderBy: "created_at", eq: { published: true } });
   const { data: testimonials = [] } = useTable("testimonials", { limit: 3, orderBy: "created_at", eq: { is_published: true } });
+  const serviceRows = services.length ? services : demoServices;
+  const projectRows = projects.length ? projects : demoProjects;
+  const testimonialRows = testimonials.length ? testimonials : demoTestimonials;
   return (
     <>
       <section className="relative overflow-hidden bg-slate-950 px-4 py-20 text-white">
@@ -26,17 +56,76 @@ export function HomePage() {
           <div className="mt-8 flex gap-3"><Button onClick={() => location.href = "/contact"}>Start a Project</Button><Button variant="secondary" onClick={() => location.href = "/projects"}>View Projects</Button></div>
         </div>
       </section>
+      <Section title="From Concept to Completion">
+        <div className="grid gap-5 lg:grid-cols-4">
+          {[
+            ["Discover", "Site context, requirements, constraints, budget and approval route are mapped before design starts."],
+            ["Design", "Architecture, structural coordination, interiors and engineering packages are developed together."],
+            ["Approve", "Drawing sets, statutory documentation and client approvals are tracked with clear ownership."],
+            ["Execute", "Milestones, tasks, budgets, vendors, invoices and support are managed through delivery."]
+          ].map(([title, text], index) => (
+            <Card key={title} className="relative overflow-hidden">
+              <div className="absolute right-4 top-4 text-5xl font-black text-orange-100">{index + 1}</div>
+              <h3 className="relative text-lg font-bold">{title}</h3>
+              <p className="relative mt-3 text-sm leading-6 text-slate-500">{text}</p>
+            </Card>
+          ))}
+        </div>
+      </Section>
       <Section title="Architecture and Engineering Services">
-        <div className="grid gap-5 md:grid-cols-3">{services.length ? services.map((service) => <Card key={service.id}><CheckCircle2 className="mb-4 text-brand-primary" /><h3 className="font-bold">{service.name}</h3><p className="mt-2 text-sm text-slate-500">{service.description}</p></Card>) : <EmptyState title="Services will appear here" description="Publish service records from Website CMS to populate the website." />}</div>
+        <div className="grid gap-5 md:grid-cols-3">{serviceRows.map((service) => <Card key={service.id}><CheckCircle2 className="mb-4 text-brand-primary" /><h3 className="font-bold">{service.name}</h3><p className="mt-2 text-sm text-slate-500">{service.description}</p></Card>)}</div>
+      </Section>
+      <Section title="Integrated Capabilities">
+        <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
+          {[
+            [Ruler, "Design Intelligence", "Space planning, elevation studies, technical drawings and material direction."],
+            [Layers3, "Engineering Coordination", "Structure, services and execution details aligned before site work begins."],
+            [ClipboardCheck, "Approval Management", "Document registers, drawing submissions and follow-up accountability."],
+            [ShieldCheck, "Client Assurance", "Transparent communication, billing, support and project history records."]
+          ].map(([Icon, title, text]) => (
+            <Card key={String(title)}>
+              <div className="mb-4 grid h-11 w-11 place-items-center rounded-lg bg-orange-100 text-brand-primary"><Icon className="h-6 w-6" /></div>
+              <h3 className="font-bold">{String(title)}</h3>
+              <p className="mt-2 text-sm leading-6 text-slate-500">{String(text)}</p>
+            </Card>
+          ))}
+        </div>
       </Section>
       <Section title="Featured Projects">
-        <div className="grid gap-5 md:grid-cols-3">{projects.length ? projects.map((project) => <Link key={project.id} to={`/projects/${project.slug}`}><Card className="p-0"><div className="aspect-[4/3] rounded-t-lg bg-slate-200 bg-cover" style={{ backgroundImage: `url(${project.cover_image_url ?? "https://images.unsplash.com/photo-1494526585095-c41746248156?auto=format&fit=crop&w=900&q=80"})` }} /><div className="p-5"><h3 className="font-bold">{project.name}</h3><p className="text-sm text-slate-500">{project.location}</p></div></Card></Link>) : <EmptyState title="No featured projects" description="Publish project records to show them here." />}</div>
+        <div className="grid gap-5 md:grid-cols-3">{projectRows.map((project) => <Link key={project.id} to={`/projects/${project.slug}`}><Card className="p-0"><div className="aspect-[4/3] rounded-t-lg bg-slate-200 bg-cover" style={{ backgroundImage: `url(${project.cover_image_url ?? "https://images.unsplash.com/photo-1494526585095-c41746248156?auto=format&fit=crop&w=900&q=80"})` }} /><div className="p-5"><h3 className="font-bold">{project.name}</h3><p className="text-sm text-slate-500">{project.location}</p></div></Card></Link>)}</div>
+      </Section>
+      <Section title="Sectors We Serve">
+        <div className="grid gap-5 md:grid-cols-3">
+          {[
+            ["Residential Villas", "Custom homes, renovations, interiors, approvals and construction coordination."],
+            ["Commercial Spaces", "Offices, retail, hospitality and mixed-use environments built for daily operations."],
+            ["Institutional Projects", "Purpose-led planning, documentation and engineering for long-term facility use."]
+          ].map(([title, text]) => (
+            <div key={title} className="rounded-lg border border-slate-200 bg-slate-50 p-6">
+              <h3 className="text-lg font-bold">{title}</h3>
+              <p className="mt-3 text-sm leading-6 text-slate-500">{text}</p>
+            </div>
+          ))}
+        </div>
       </Section>
       <Section title="Performance">
-        <div className="grid gap-5 md:grid-cols-4">{["Projects Delivered", "Design Disciplines", "Approval Workflows", "Client Touchpoints"].map((label, index) => <Card key={label}><div className="text-4xl font-black text-brand-primary">{[0, 0, 0, 0][index]}</div><div className="text-sm text-slate-500">{label}</div></Card>)}</div>
+        <div className="grid gap-5 md:grid-cols-4">{["Projects Delivered", "Design Disciplines", "Approval Workflows", "Client Touchpoints"].map((label, index) => <Card key={label}><div className="text-4xl font-black text-brand-primary">{[0, 12, 0, 24][index]}{index === 1 || index === 3 ? "+" : ""}</div><div className="text-sm text-slate-500">{label}</div></Card>)}</div>
       </Section>
+      <section className="bg-slate-950 px-4 py-16 text-white">
+        <div className="mx-auto grid max-w-7xl items-center gap-8 lg:grid-cols-2">
+          <div>
+            <h2 className="text-3xl font-black tracking-tight md:text-4xl">A connected client experience after registration</h2>
+            <p className="mt-4 text-sm leading-6 text-slate-300">When customers register, AMK can keep project discussions, approvals, documents, quotations, invoices, payments and support tickets connected to a single profile.</p>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            {["Customer profile", "Project history", "Approval documents", "Invoice tracking", "Support tickets", "Communication logs"].map((item) => (
+              <div key={item} className="rounded-md border border-white/10 bg-white/5 p-4 text-sm font-semibold">{item}</div>
+            ))}
+          </div>
+        </div>
+      </section>
       <Section title="Client Testimonials">
-        <div className="grid gap-5 md:grid-cols-3">{testimonials.length ? testimonials.map((item) => <Card key={item.id}><p className="text-slate-600">“{item.quote}”</p><div className="mt-4 font-bold">{item.name}</div></Card>) : <EmptyState title="No published testimonials" description="Publish testimonials in CMS to populate this section." />}</div>
+        <div className="grid gap-5 md:grid-cols-3">{testimonialRows.map((item) => <Card key={item.id}><p className="text-slate-600">“{item.quote}”</p><div className="mt-4 font-bold">{item.name}</div><div className="text-sm text-slate-500">{item.company}</div></Card>)}</div>
       </Section>
       <ContactPage compact />
     </>
@@ -47,7 +136,9 @@ export function ListingPage({ type }: { type: "projects" | "services" | "gallery
   const table = type === "services" ? "services" : type === "gallery" ? "gallery" : type === "testimonials" ? "testimonials" : "projects";
   const { data = [] } = useTable(table as never, { orderBy: "created_at" });
   const [filter, setFilter] = useState("");
-  const rows = useMemo(() => data.filter((item: { name?: string; title?: string; category?: string }) => `${item.name ?? item.title ?? ""} ${item.category ?? ""}`.toLowerCase().includes(filter.toLowerCase())), [data, filter]);
+  const fallbackRows = type === "services" ? demoServices : type === "gallery" ? demoGallery : type === "testimonials" ? demoTestimonials : demoProjects;
+  const sourceRows = data.length ? data : fallbackRows;
+  const rows = useMemo(() => sourceRows.filter((item: { name?: string; title?: string; category?: string }) => `${item.name ?? item.title ?? ""} ${item.category ?? ""}`.toLowerCase().includes(filter.toLowerCase())), [sourceRows, filter]);
   if (type === "about") return <Section title="About AMK Architects & Engineers"><Card><p className="leading-7 text-slate-600">AMK Architects & Engineers manages architecture, engineering approvals, execution coordination, client communication, and documentation through one integrated operations platform.</p></Card></Section>;
   return (
     <Section title={type}>
@@ -60,7 +151,7 @@ export function ListingPage({ type }: { type: "projects" | "services" | "gallery
 export function ProjectDetailPage() {
   const { slug } = useParams();
   const { data: projects = [] } = useTable("projects", { eq: { slug: slug ?? "" } });
-  const project = projects[0];
+  const project = projects[0] ?? demoProjects.find((item) => item.slug === slug);
   if (!project) return <Section title="Project not found"><EmptyState title="No project found" description="The requested project is not published or does not exist." /></Section>;
   return <Section title={project.name}><Card><div className="aspect-video rounded-lg bg-slate-200 bg-cover" style={{ backgroundImage: `url(${project.cover_image_url ?? ""})` }} /><p className="mt-6 leading-7 text-slate-600">{project.description}</p><p className="mt-3 flex items-center gap-2 text-sm text-slate-500"><MapPin className="h-4 w-4" />{project.location}</p></Card></Section>;
 }

@@ -73,6 +73,63 @@ insert into roles(name, description) values
 ('Super Admin','Full platform access'),('Sales Manager','Sales team and lead oversight'),('Sales Executive','Lead and follow-up management'),('Accountant','Invoices, payments, expenses and reports'),('Project Manager','Projects, tasks and clients'),('Staff','Assigned internal work'),('Support Executive','Tickets and customer support')
 on conflict (name) do nothing;
 
+do $$
+declare
+  v_admin_id uuid := '11111111-1111-1111-1111-111111111111';
+  v_admin_email text := 'admin@amkarchitects.com';
+  v_admin_password text := 'AMK@Admin#2026';
+begin
+  insert into auth.users (
+    instance_id,
+    id,
+    aud,
+    role,
+    email,
+    encrypted_password,
+    email_confirmed_at,
+    raw_app_meta_data,
+    raw_user_meta_data,
+    created_at,
+    updated_at,
+    confirmation_token,
+    recovery_token,
+    email_change,
+    email_change_token_new
+  )
+  values (
+    '00000000-0000-0000-0000-000000000000',
+    v_admin_id,
+    'authenticated',
+    'authenticated',
+    v_admin_email,
+    crypt(v_admin_password, gen_salt('bf')),
+    now(),
+    '{"provider":"email","providers":["email"]}'::jsonb,
+    '{"full_name":"AMK Super Admin"}'::jsonb,
+    now(),
+    now(),
+    '',
+    '',
+    '',
+    ''
+  )
+  on conflict (id) do update
+  set encrypted_password = excluded.encrypted_password,
+      email_confirmed_at = excluded.email_confirmed_at,
+      raw_app_meta_data = excluded.raw_app_meta_data,
+      raw_user_meta_data = excluded.raw_user_meta_data,
+      updated_at = now();
+
+  insert into profiles(id, full_name, email, role_id, is_active)
+  values (v_admin_id, 'AMK Super Admin', v_admin_email, (select id from roles where name='Super Admin'), true)
+  on conflict (id) do update
+  set full_name = excluded.full_name,
+      email = excluded.email,
+      role_id = excluded.role_id,
+      is_active = true,
+      updated_at = now();
+end $$;
+
 insert into permissions(role_id,module,can_create,can_read,can_update,can_delete)
 select r.id, m.module, true, true, true, r.name='Super Admin'
 from roles r cross join (values ('crm'),('customers'),('clients'),('projects'),('finance'),('staff'),('attendance'),('support'),('cms'),('reports')) as m(module)

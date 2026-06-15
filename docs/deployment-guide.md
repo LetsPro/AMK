@@ -18,8 +18,16 @@ Or paste `supabase/migrations/202606150001_amk_architects_platform.sql` into the
 2. Add site URL for production and local development:
    - `http://localhost:5173`
    - your production domain
-3. Create the first user in Supabase Auth.
-4. In SQL editor, assign Super Admin:
+3. The migration seeds a bootstrap Super Admin:
+
+```text
+Email: admin@amkarchitects.com
+Password: AMK@Admin#2026
+```
+
+Rotate this password before production use.
+
+4. To assign another user as Super Admin:
 
 ```sql
 update profiles
