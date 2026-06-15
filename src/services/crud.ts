@@ -59,3 +59,8 @@ export async function uploadFile(bucket: string, path: string, file: File) {
   if (error) throw error;
   return supabase.storage.from(bucket).getPublicUrl(data.path).data.publicUrl;
 }
+
+export async function removeStoredFile(bucket: string, path: string) {
+  const { error } = await supabase.storage.from(bucket).remove([path]);
+  if (error) throw error;
+}

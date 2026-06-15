@@ -52,6 +52,7 @@ export type Database = {
       ticket_comments: { Row: Base & { ticket_id: string; author_id: string | null; comment: string; is_internal: boolean }; Insert: Partial<Base> & { ticket_id: string; comment: string }; Update: Partial<Database["public"]["Tables"]["ticket_comments"]["Row"]> };
       notifications: { Row: Base & { user_id: string | null; title: string; message: string; module: string; entity_id: string | null; is_read: boolean }; Insert: Partial<Base> & { title: string; message: string; module: string }; Update: Partial<Database["public"]["Tables"]["notifications"]["Row"]> };
       activity_logs: { Row: Base & { user_id: string | null; module: string; action: string; entity_id: string | null; metadata: Json }; Insert: Partial<Base> & { module: string; action: string; metadata?: Json }; Update: Partial<Database["public"]["Tables"]["activity_logs"]["Row"]> };
+      media_assets: { Row: Base & { bucket: string; path: string; url: string; file_name: string; mime_type: string | null; size: number | null; alt_text: string | null; created_by: string | null }; Insert: Partial<Base> & { bucket: string; path: string; url: string; file_name: string; mime_type?: string | null; size?: number | null; alt_text?: string | null; created_by?: string | null }; Update: Partial<Database["public"]["Tables"]["media_assets"]["Row"]> };
     };
     Views: Record<string, never>;
     Functions: Record<string, never>;

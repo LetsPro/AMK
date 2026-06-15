@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   BarChart3, Bell, BriefcaseBusiness, Building2, Calculator, CalendarCheck, ChevronLeft, ChevronRight,
-  CreditCard, FileText, GalleryHorizontal, LayoutDashboard, LogOut, Menu, Moon, Plus, ReceiptText,
+  CreditCard, FileText, GalleryHorizontal, Image, LayoutDashboard, LogOut, Menu, Moon, Plus, ReceiptText,
   Search, Settings, ShieldCheck, Sun, Ticket, Users
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
@@ -26,6 +26,7 @@ const nav = [
   { to: "/app/expenses", label: "Expenses", icon: ReceiptText },
   { to: "/app/tickets", label: "Support", icon: Ticket },
   { to: "/app/cms", label: "Website CMS", icon: GalleryHorizontal },
+  { to: "/app/media", label: "Media", icon: Image },
   { to: "/app/reports", label: "Reports", icon: BarChart3 },
   { to: "/app/activity", label: "Activity Logs", icon: Settings }
 ];

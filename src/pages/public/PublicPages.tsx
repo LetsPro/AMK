@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { motion } from "framer-motion";
 import { ArrowRight, CheckCircle2, ClipboardCheck, Layers3, MapPin, Ruler, Send, ShieldCheck, UserPlus } from "lucide-react";
@@ -39,21 +39,75 @@ const demoTestimonials = [
   { id: "demo-testimonial-3", name: "Mohammed Irfan", company: "Hebbal Workspace Studio", quote: "Our workspace plan was delivered with clear cost visibility and fast revisions. The Mysuru site constraints were handled well." }
 ];
 
+const demoBanners = [
+  {
+    id: "demo-banner-1",
+    title: "AMK Architects & Engineers",
+    subtitle: "Integrated architecture, approvals, engineering, project execution, and client operations for residential and commercial developments in Mysuru.",
+    image_url: "https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=1800&q=80",
+    cta_label: "Start a Project",
+    cta_url: "/contact"
+  },
+  {
+    id: "demo-banner-2",
+    title: "Design-Led Homes in Mysuru",
+    subtitle: "From concept plans to approval drawings and site coordination, every project is managed with clear documentation.",
+    image_url: "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1800&q=80",
+    cta_label: "View Projects",
+    cta_url: "/projects"
+  },
+  {
+    id: "demo-banner-3",
+    title: "Approvals, Billing, Projects, Support",
+    subtitle: "Customers, documents, quotations, invoices, payments, and support history stay connected through the AMK platform.",
+    image_url: "https://images.unsplash.com/photo-1497366754035-f200968a6e72?auto=format&fit=crop&w=1800&q=80",
+    cta_label: "Get Started",
+    cta_url: "/customer-register"
+  }
+];
+
 export function HomePage() {
   const { data: services = [] } = useTable("services", { limit: 6, orderBy: "created_at", eq: { status: "published" } });
   const { data: projects = [] } = useTable("projects", { limit: 6, orderBy: "created_at", eq: { published: true } });
   const { data: testimonials = [] } = useTable("testimonials", { limit: 3, orderBy: "created_at", eq: { is_published: true } });
+  const { data: banners = [] } = useTable("banners", { orderBy: "created_at", ascending: true, eq: { is_active: true } });
+  const [activeSlide, setActiveSlide] = useState(0);
   const serviceRows = services.length ? services : demoServices;
   const projectRows = projects.length ? projects : demoProjects;
   const testimonialRows = testimonials.length ? testimonials : demoTestimonials;
+  const bannerRows = banners.length ? banners : demoBanners;
+  const slide = bannerRows[activeSlide % bannerRows.length];
+  useEffect(() => {
+    const timer = window.setInterval(() => setActiveSlide((current) => (current + 1) % bannerRows.length), 5500);
+    return () => window.clearInterval(timer);
+  }, [bannerRows.length]);
   return (
     <>
-      <section className="relative overflow-hidden bg-slate-950 px-4 py-20 text-white">
-        <div className="absolute inset-0 opacity-30" style={{ backgroundImage: "linear-gradient(135deg, #F86A0D, transparent 45%), url(https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=1800&q=80)", backgroundSize: "cover", backgroundPosition: "center" }} />
-        <div className="relative mx-auto max-w-7xl">
-          <motion.h1 initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} className="max-w-4xl text-5xl font-black tracking-tight md:text-7xl">AMK Architects & Engineers</motion.h1>
-          <p className="mt-5 max-w-2xl text-lg text-slate-200">Integrated architecture, approvals, engineering, project execution, and client operations for residential and commercial developments.</p>
-          <div className="mt-8 flex gap-3"><Button onClick={() => location.href = "/contact"}>Start a Project</Button><Button variant="secondary" onClick={() => location.href = "/projects"}>View Projects</Button></div>
+      <section className="relative min-h-[620px] overflow-hidden bg-slate-950 px-4 py-20 text-white">
+        {bannerRows.map((item, index) => (
+          <motion.div
+            key={item.id}
+            className="absolute inset-0"
+            initial={false}
+            animate={{ opacity: index === activeSlide ? 1 : 0, scale: index === activeSlide ? 1 : 1.04 }}
+            transition={{ duration: 0.7 }}
+            style={{ backgroundImage: `linear-gradient(90deg, rgba(15,23,42,0.92), rgba(15,23,42,0.52), rgba(15,23,42,0.18)), url(${item.image_url ?? demoBanners[0].image_url})`, backgroundSize: "cover", backgroundPosition: "center" }}
+          />
+        ))}
+        <div className="relative mx-auto flex min-h-[460px] max-w-7xl items-center">
+          <div>
+            <motion.h1 key={slide.title} initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} className="max-w-4xl text-5xl font-black tracking-tight md:text-7xl">{slide.title}</motion.h1>
+            <p className="mt-5 max-w-2xl text-lg text-slate-200">{slide.subtitle}</p>
+            <div className="mt-8 flex flex-wrap gap-3">
+              <Button onClick={() => location.href = slide.cta_url ?? "/contact"}>{slide.cta_label ?? "Start a Project"}</Button>
+              <Button variant="secondary" onClick={() => location.href = "/projects"}>View Projects</Button>
+            </div>
+          </div>
+        </div>
+        <div className="absolute bottom-8 left-1/2 flex -translate-x-1/2 gap-2">
+          {bannerRows.map((item, index) => (
+            <button key={item.id} aria-label={`Go to slide ${index + 1}`} onClick={() => setActiveSlide(index)} className={`h-2.5 rounded-full transition-all ${index === activeSlide ? "w-9 bg-brand-primary" : "w-2.5 bg-white/60"}`} />
+          ))}
         </div>
       </section>
       <Section title="From Concept to Completion">

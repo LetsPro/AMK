@@ -10,6 +10,7 @@ import { DashboardPage } from "@/pages/admin/DashboardPage";
 import { ModulePage } from "@/pages/operations/ModulePage";
 import { CalculatorPage } from "@/pages/operations/CalculatorPage";
 import { CmsPage } from "@/pages/admin/CmsPage";
+import { MediaPage } from "@/pages/admin/MediaPage";
 import { ReportsPage } from "@/pages/reports/ReportsPage";
 
 export function App() {
@@ -45,6 +46,7 @@ export function App() {
           <Route path="expenses" element={<ModulePage name="expenses" />} />
           <Route path="tickets" element={<ModulePage name="tickets" />} />
           <Route path="cms" element={<CmsPage />} />
+          <Route path="media" element={<MediaPage />} />
           <Route path="reports" element={<ReportsPage />} />
           <Route path="activity" element={<ModulePage name="activity" />} />
         </Route>

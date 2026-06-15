@@ -1,3 +1,9 @@
+insert into banners(title, subtitle, image_url, cta_label, cta_url, is_active) values
+('AMK Architects & Engineers', 'Integrated architecture, approvals, engineering, project execution, and client operations for residential and commercial developments in Mysuru.', 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=1800&q=80', 'Start a Project', '/contact', true),
+('Design-Led Homes in Mysuru', 'From concept plans to approval drawings and site coordination, every project is managed with clear documentation.', 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1800&q=80', 'View Projects', '/projects', true),
+('Approvals, Billing, Projects, Support', 'Customers, documents, quotations, invoices, payments, and support history stay connected through the AMK platform.', 'https://images.unsplash.com/photo-1497366754035-f200968a6e72?auto=format&fit=crop&w=1800&q=80', 'Get Started', '/customer-register', true)
+on conflict do nothing;
+
 insert into services(name, slug, description, image_url, price_from, status) values
 ('Architectural Design', 'architectural-design', 'Concept planning, floor plans, elevations, working drawings, and design coordination for homes and commercial spaces in Mysuru.', 'https://images.unsplash.com/photo-1503387762-592deb58ef4e?auto=format&fit=crop&w=1200&q=80', 75000, 'published'),
 ('Approval Drawings', 'approval-drawings', 'Municipal approval drawings, documentation support, and submission-ready technical packages for Mysuru and Karnataka projects.', 'https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?auto=format&fit=crop&w=1200&q=80', 35000, 'published'),

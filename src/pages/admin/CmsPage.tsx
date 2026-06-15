@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Input, Select, Textarea } from "@/components/ui/Input";
 import { DataTable } from "@/components/tables/DataTable";
+import { MediaPicker } from "@/components/media/MediaPicker";
 import { useTable, useTableMutations } from "@/hooks/useSupabaseTable";
 
 const cmsTables = ["website_pages", "banners", "services", "projects", "gallery", "testimonials"] as const;
@@ -12,14 +13,15 @@ export function CmsPage() {
   const { data = [] } = useTable(table, { orderBy: "created_at" });
   const { create } = useTableMutations(table);
   const [form, setForm] = useState<Record<string, string>>({});
+  const mediaField = table === "projects" ? "cover_image_url" : "image_url";
   async function submit(event: React.FormEvent) {
     event.preventDefault();
     const defaults = table === "website_pages" ? { content: form.content ?? "", slug: form.slug, title: form.title, status: form.status || "draft" } :
-      table === "services" ? { name: form.title, slug: form.slug, description: form.content ?? "", status: form.status || "draft" } :
-      table === "projects" ? { name: form.title, slug: form.slug, description: form.content ?? "", status: "Planning", published: form.status === "published" } :
+      table === "services" ? { name: form.title, slug: form.slug, description: form.content ?? "", image_url: form.image_url, status: form.status || "draft" } :
+      table === "projects" ? { name: form.title, slug: form.slug, description: form.content ?? "", cover_image_url: form.cover_image_url, status: "Planning", published: form.status === "published" } :
       table === "gallery" ? { title: form.title, image_url: form.image_url } :
       table === "testimonials" ? { name: form.title, quote: form.content ?? "", rating: Number(form.rating || 5), is_published: form.status === "published" } :
-      { title: form.title, subtitle: form.content, image_url: form.image_url, is_active: form.status === "published" };
+      { title: form.title, subtitle: form.content, image_url: form.image_url, cta_label: form.cta_label, cta_url: form.cta_url, is_active: form.status === "published" };
     await create.mutateAsync(defaults as never);
     setForm({});
   }
@@ -31,8 +33,10 @@ export function CmsPage() {
         <form className="grid gap-3 md:grid-cols-2" onSubmit={submit}>
           <Input required placeholder="Title / Name" value={form.title ?? ""} onChange={(e) => setForm({ ...form, title: e.target.value })} />
           <Input placeholder="Slug" value={form.slug ?? ""} onChange={(e) => setForm({ ...form, slug: e.target.value })} />
-          <Input placeholder="Image URL" value={form.image_url ?? ""} onChange={(e) => setForm({ ...form, image_url: e.target.value })} />
+          {table !== "website_pages" && table !== "testimonials" ? <MediaPicker label={table === "projects" ? "Cover Image" : "Image"} value={form[mediaField] ?? ""} onChange={(url) => setForm({ ...form, [mediaField]: url })} /> : <Input placeholder="SEO title or testimonial company" value={form.image_url ?? ""} onChange={(e) => setForm({ ...form, image_url: e.target.value })} />}
           <Select value={form.status ?? "draft"} onChange={(e) => setForm({ ...form, status: e.target.value })}><option value="draft">draft</option><option value="published">published</option></Select>
+          {table === "banners" && <Input placeholder="CTA label" value={form.cta_label ?? ""} onChange={(e) => setForm({ ...form, cta_label: e.target.value })} />}
+          {table === "banners" && <Input placeholder="CTA URL e.g. /customer-register" value={form.cta_url ?? ""} onChange={(e) => setForm({ ...form, cta_url: e.target.value })} />}
           <Textarea className="md:col-span-2" placeholder="Rich text content / description / SEO description" value={form.content ?? ""} onChange={(e) => setForm({ ...form, content: e.target.value })} />
           <Button>Publish / Save Draft</Button>
         </form>
