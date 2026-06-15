@@ -64,6 +64,8 @@ Deploy the generated Vite app to Vercel, Netlify, Cloudflare Pages, or any stati
 - `VITE_COMPANY_EMAIL`
 - `VITE_COMPANY_PHONE`
 
+For Vercel, `vercel.json` rewrites all routes to `index.html` so direct browser visits to `/login`, `/app`, `/projects/:slug`, and other React Router routes do not return `404: NOT_FOUND`.
+
 ## 6. Realtime Notifications
 
 Enable Realtime replication for `notifications`, `leads`, `tickets`, and `enquiries` in Supabase if live push updates are required across browser tabs.
