@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
 import { useAuth } from "@/contexts/AuthContext";
+import { useToast } from "@/contexts/ToastContext";
 
 const schema = z.object({ email: z.string().email(), password: z.string().min(6) });
 type FormData = z.infer<typeof schema>;
@@ -15,15 +16,19 @@ type FormData = z.infer<typeof schema>;
 export function LoginPage() {
   const { signIn } = useAuth();
   const navigate = useNavigate();
+  const toast = useToast();
   const [error, setError] = useState("");
   const form = useForm<FormData>({ resolver: zodResolver(schema) });
   async function onSubmit(values: FormData) {
     setError("");
     try {
       await signIn(values.email, values.password);
+      toast.success("Logged in", "Welcome back to AMK CRM.");
       navigate("/app");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Login failed");
+      const message = err instanceof Error ? err.message : "Login failed";
+      setError(message);
+      toast.error("Login failed", message);
     }
   }
   return (

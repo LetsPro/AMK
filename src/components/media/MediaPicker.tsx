@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/Input";
 import { useTable, useTableMutations } from "@/hooks/useSupabaseTable";
 import { removeStoredFile, uploadFile } from "@/services/crud";
 import type { TableRow } from "@/types/database";
+import { useToast } from "@/contexts/ToastContext";
 
 type MediaAsset = TableRow<"media_assets">;
 
@@ -27,7 +28,8 @@ function MediaLibraryContent({ onClose, onSelect, embedded = false }: { onClose?
   const inputRef = useRef<HTMLInputElement | null>(null);
   const [uploading, setUploading] = useState(false);
   const { data = [], refetch } = useTable("media_assets", { orderBy: "created_at" });
-  const { create, remove } = useTableMutations("media_assets");
+  const { create, remove } = useTableMutations("media_assets", { toast: false });
+  const toast = useToast();
 
   async function upload(files: FileList | null) {
     const file = files?.[0];
@@ -39,6 +41,9 @@ function MediaLibraryContent({ onClose, onSelect, embedded = false }: { onClose?
       const url = await uploadFile("website", path, file);
       await create.mutateAsync({ bucket: "website", path, url, file_name: file.name, mime_type: file.type, size: file.size });
       await refetch();
+      toast.success("Image uploaded", file.name);
+    } catch (error) {
+      toast.error("Upload failed", error instanceof Error ? error.message : "Could not upload image");
     } finally {
       setUploading(false);
       if (inputRef.current) inputRef.current.value = "";
@@ -46,9 +51,14 @@ function MediaLibraryContent({ onClose, onSelect, embedded = false }: { onClose?
   }
 
   async function deleteAsset(asset: MediaAsset) {
-    await removeStoredFile(asset.bucket, asset.path);
-    await remove.mutateAsync(asset.id);
-    await refetch();
+    try {
+      await removeStoredFile(asset.bucket, asset.path);
+      await remove.mutateAsync(asset.id);
+      await refetch();
+      toast.success("Image deleted", asset.file_name);
+    } catch (error) {
+      toast.error("Delete failed", error instanceof Error ? error.message : "Could not delete image");
+    }
   }
 
   return (

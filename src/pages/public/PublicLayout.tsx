@@ -12,7 +12,11 @@ export function PublicLayout() {
     <div className="min-h-screen bg-white text-slate-900">
       <header className="sticky top-0 z-20 border-b border-slate-200 bg-white/90 backdrop-blur">
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 py-4">
-          <Link to="/" className="flex items-center gap-3 font-bold"><span className="grid h-10 w-10 place-items-center overflow-hidden rounded-lg bg-brand-primary text-white">{branding.logoUrl ? <img src={branding.logoUrl} alt={branding.companyName} className="h-full w-full object-cover" /> : <Building2 />}</span>{branding.companyName} {branding.companySuffix}</Link>
+          <Link to="/" className="flex items-center" aria-label={`${branding.companyName} ${branding.companySuffix}`}>
+            <span className="grid h-16 w-24 place-items-center overflow-hidden bg-transparent text-brand-primary md:h-20 md:w-32">
+              {branding.logoUrl ? <img src={branding.logoUrl} alt={branding.companyName} className="h-full w-full object-contain" /> : <Building2 className="h-12 w-12" />}
+            </span>
+          </Link>
           <nav className="hidden gap-5 text-sm font-medium md:flex">
             {navItems.map((item) => <Link key={item} className="capitalize hover:text-brand-primary" to={`/${item}`}>{item.replace("-", " ")}</Link>)}
           </nav>
