@@ -10,25 +10,39 @@ import { Button } from "@/components/ui/Button";
 import { useAuth } from "@/contexts/AuthContext";
 import { cn, initials } from "@/lib/utils";
 import { useTable } from "@/hooks/useSupabaseTable";
+import { useAppSettings } from "@/hooks/useAppSettings";
 
-const nav = [
-  { to: "/app", label: "Dashboard", icon: LayoutDashboard },
-  { to: "/app/leads", label: "Leads", icon: BriefcaseBusiness },
-  { to: "/app/customers", label: "Customers", icon: Users },
-  { to: "/app/clients", label: "Clients", icon: Building2 },
-  { to: "/app/projects", label: "Projects", icon: BarChart3 },
-  { to: "/app/calculations", label: "Calculator", icon: Calculator },
-  { to: "/app/quotations", label: "Quotations", icon: FileText },
-  { to: "/app/invoices", label: "Invoices", icon: ReceiptText },
-  { to: "/app/payments", label: "Payments", icon: CreditCard },
-  { to: "/app/staff", label: "Staff", icon: ShieldCheck },
-  { to: "/app/attendance", label: "Attendance", icon: CalendarCheck },
-  { to: "/app/expenses", label: "Expenses", icon: ReceiptText },
-  { to: "/app/tickets", label: "Support", icon: Ticket },
-  { to: "/app/cms", label: "Website CMS", icon: GalleryHorizontal },
-  { to: "/app/media", label: "Media", icon: Image },
-  { to: "/app/reports", label: "Reports", icon: BarChart3 },
-  { to: "/app/activity", label: "Activity Logs", icon: Settings }
+const navGroups = [
+  { group: "Overview", items: [{ to: "/app", label: "Dashboard", icon: LayoutDashboard }] },
+  { group: "CRM", items: [
+    { to: "/app/leads", label: "Leads", icon: BriefcaseBusiness },
+    { to: "/app/customers", label: "Customers", icon: Users },
+    { to: "/app/clients", label: "Clients", icon: Building2 }
+  ] },
+  { group: "Projects", items: [
+    { to: "/app/projects", label: "Projects", icon: BarChart3 },
+    { to: "/app/calculations", label: "Calculator", icon: Calculator }
+  ] },
+  { group: "Finance", items: [
+    { to: "/app/quotations", label: "Quotations", icon: FileText },
+    { to: "/app/invoices", label: "Invoices", icon: ReceiptText },
+    { to: "/app/payments", label: "Payments", icon: CreditCard },
+    { to: "/app/expenses", label: "Expenses", icon: ReceiptText }
+  ] },
+  { group: "Team", items: [
+    { to: "/app/staff", label: "Staff", icon: ShieldCheck },
+    { to: "/app/attendance", label: "Attendance", icon: CalendarCheck },
+    { to: "/app/tickets", label: "Support", icon: Ticket }
+  ] },
+  { group: "Website", items: [
+    { to: "/app/cms", label: "Website CMS", icon: GalleryHorizontal },
+    { to: "/app/media", label: "Media", icon: Image }
+  ] },
+  { group: "Admin", items: [
+    { to: "/app/reports", label: "Reports", icon: BarChart3 },
+    { to: "/app/activity", label: "Activity Logs", icon: Settings },
+    { to: "/app/settings", label: "Settings", icon: Settings }
+  ] }
 ];
 
 export function AppLayout() {
@@ -36,6 +50,7 @@ export function AppLayout() {
   const [dark, setDark] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const { profile, signOut } = useAuth();
+  const { branding } = useAppSettings();
   const navigate = useNavigate();
   const { data: notifications = [] } = useTable("notifications", { limit: 8, orderBy: "created_at", eq: profile?.id ? { user_id: profile.id } : undefined });
 
@@ -47,17 +62,24 @@ export function AppLayout() {
 
   return (
     <div className="flex min-h-screen bg-brand-background text-slate-900 dark:bg-slate-950 dark:text-slate-100">
-      <aside className={cn("fixed inset-y-0 left-0 z-30 hidden border-r border-white/50 bg-slate-950 text-white shadow-2xl transition-all lg:block", collapsed ? "w-20" : "w-72")}>
+      <aside className={cn("fixed inset-y-0 left-0 z-30 hidden border-r border-white/50 bg-slate-950 text-white shadow-2xl transition-all lg:flex lg:flex-col", collapsed ? "w-20" : "w-72")}>
         <div className="flex h-16 items-center gap-3 border-b border-white/10 px-4">
-          <div className="grid h-10 w-10 place-items-center rounded-lg bg-gradient-to-br from-brand-primary to-brand-accent font-black">AMK</div>
-          {!collapsed && <div><div className="font-bold">AMK Architects</div><div className="text-xs text-slate-400">& Engineers</div></div>}
+          <div className="grid h-10 w-10 place-items-center overflow-hidden rounded-lg bg-gradient-to-br from-brand-primary to-brand-accent font-black">{branding.logoUrl ? <img src={branding.logoUrl} alt={branding.companyName} className="h-full w-full object-cover" /> : "AMK"}</div>
+          {!collapsed && <div><div className="font-bold">{branding.companyName}</div><div className="text-xs text-slate-400">{branding.companySuffix}</div></div>}
         </div>
-        <nav className="space-y-1 p-3">
-          {nav.map((item) => (
-            <NavLink key={item.to} end={item.to === "/app"} to={item.to} className={({ isActive }) => cn("group flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium transition", isActive ? "bg-gradient-to-r from-brand-primary to-brand-accent text-white shadow-glow" : "text-slate-300 hover:bg-white/10 hover:text-white")}>
-              <item.icon className="h-5 w-5 shrink-0" />
-              {!collapsed && <span>{item.label}</span>}
-            </NavLink>
+        <nav className="min-h-0 flex-1 space-y-5 overflow-y-auto p-3 pb-10">
+          {navGroups.map((group) => (
+            <div key={group.group}>
+              {!collapsed && <div className="mb-2 px-3 text-[11px] font-bold uppercase tracking-wider text-slate-500">{group.group}</div>}
+              <div className="space-y-1">
+                {group.items.map((item) => (
+                  <NavLink key={item.to} end={item.to === "/app"} to={item.to} className={({ isActive }) => cn("group flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium transition", isActive ? "bg-gradient-to-r from-brand-primary to-brand-accent text-white shadow-glow" : "text-slate-300 hover:bg-white/10 hover:text-white")}>
+                    <item.icon className="h-5 w-5 shrink-0" />
+                    {!collapsed && <span>{item.label}</span>}
+                  </NavLink>
+                ))}
+              </div>
+            </div>
           ))}
         </nav>
         <button onClick={() => setCollapsed((value) => !value)} className="absolute -right-4 top-20 grid h-8 w-8 place-items-center rounded-full border border-slate-200 bg-white text-slate-900 shadow">

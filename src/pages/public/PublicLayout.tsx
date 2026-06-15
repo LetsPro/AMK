@@ -2,15 +2,17 @@ import { useState } from "react";
 import { Link, Outlet } from "react-router-dom";
 import { Building2, Facebook, Instagram, Linkedin, LogIn, Mail, MapPin, Menu, Phone, UserPlus, X } from "lucide-react";
 import { Button } from "@/components/ui/Button";
+import { useAppSettings } from "@/hooks/useAppSettings";
 
 export function PublicLayout() {
   const [open, setOpen] = useState(false);
+  const { branding } = useAppSettings();
   const navItems = ["about", "projects", "services", "gallery", "testimonials", "contact"];
   return (
     <div className="min-h-screen bg-white text-slate-900">
       <header className="sticky top-0 z-20 border-b border-slate-200 bg-white/90 backdrop-blur">
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 py-4">
-          <Link to="/" className="flex items-center gap-3 font-bold"><span className="grid h-10 w-10 place-items-center rounded-lg bg-brand-primary text-white"><Building2 /></span>AMK Architects & Engineers</Link>
+          <Link to="/" className="flex items-center gap-3 font-bold"><span className="grid h-10 w-10 place-items-center overflow-hidden rounded-lg bg-brand-primary text-white">{branding.logoUrl ? <img src={branding.logoUrl} alt={branding.companyName} className="h-full w-full object-cover" /> : <Building2 />}</span>{branding.companyName} {branding.companySuffix}</Link>
           <nav className="hidden gap-5 text-sm font-medium md:flex">
             {navItems.map((item) => <Link key={item} className="capitalize hover:text-brand-primary" to={`/${item}`}>{item.replace("-", " ")}</Link>)}
           </nav>
@@ -38,7 +40,7 @@ export function PublicLayout() {
       <footer className="bg-slate-950 px-4 pt-14 text-white">
         <div className="mx-auto grid max-w-7xl gap-10 border-b border-white/10 pb-10 lg:grid-cols-[1.4fr_0.8fr_0.8fr_1fr]">
           <div>
-            <div className="flex items-center gap-3 text-lg font-bold"><span className="grid h-11 w-11 place-items-center rounded-lg bg-brand-primary"><Building2 /></span>AMK Architects & Engineers</div>
+            <div className="flex items-center gap-3 text-lg font-bold"><span className="grid h-11 w-11 place-items-center overflow-hidden rounded-lg bg-brand-primary">{branding.logoUrl ? <img src={branding.logoUrl} alt={branding.companyName} className="h-full w-full object-cover" /> : <Building2 />}</span>{branding.companyName} {branding.companySuffix}</div>
             <p className="mt-4 max-w-sm text-sm leading-6 text-slate-400">Architecture, engineering, approvals, project execution, documentation, and client operations managed with accountable delivery.</p>
             <div className="mt-5 flex gap-3">
               {[Facebook, Instagram, Linkedin].map((Icon, index) => <span key={index} className="grid h-9 w-9 place-items-center rounded-full bg-white/10 text-slate-200"><Icon className="h-4 w-4" /></span>)}
@@ -59,15 +61,15 @@ export function PublicLayout() {
           <div>
             <h4 className="font-semibold">Contact</h4>
             <div className="mt-4 grid gap-3 text-sm text-slate-400">
-              <span className="flex items-center gap-2"><Mail className="h-4 w-4 text-brand-accent" />{import.meta.env.VITE_COMPANY_EMAIL ?? "info@amkarchitects.com"}</span>
-              <span className="flex items-center gap-2"><Phone className="h-4 w-4 text-brand-accent" />{import.meta.env.VITE_COMPANY_PHONE ?? "+91 00000 00000"}</span>
-              <span className="flex items-start gap-2"><MapPin className="mt-0.5 h-4 w-4 text-brand-accent" />Kerala, India</span>
+              <span className="flex items-center gap-2"><Mail className="h-4 w-4 text-brand-accent" />{branding.email}</span>
+              <span className="flex items-center gap-2"><Phone className="h-4 w-4 text-brand-accent" />{branding.phone}</span>
+              <span className="flex items-start gap-2"><MapPin className="mt-0.5 h-4 w-4 text-brand-accent" />{branding.location}</span>
             </div>
             <Button className="mt-5" onClick={() => location.href = "/customer-register"}>Get Started</Button>
           </div>
         </div>
         <div className="mx-auto flex max-w-7xl flex-col gap-2 py-5 text-xs text-slate-500 md:flex-row md:items-center md:justify-between">
-          <span>© 2026 AMK Architects & Engineers. All rights reserved.</span>
+          <span>© 2026 {branding.companyName} {branding.companySuffix}. All rights reserved.</span>
           <span>CRM powered client operations, approvals, projects, billing, and support.</span>
         </div>
       </footer>

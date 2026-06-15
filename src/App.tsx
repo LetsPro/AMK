@@ -11,6 +11,7 @@ import { ModulePage } from "@/pages/operations/ModulePage";
 import { CalculatorPage } from "@/pages/operations/CalculatorPage";
 import { CmsPage } from "@/pages/admin/CmsPage";
 import { MediaPage } from "@/pages/admin/MediaPage";
+import { SettingsPage } from "@/pages/admin/SettingsPage";
 import { ReportsPage } from "@/pages/reports/ReportsPage";
 
 export function App() {
@@ -49,6 +50,7 @@ export function App() {
           <Route path="media" element={<MediaPage />} />
           <Route path="reports" element={<ReportsPage />} />
           <Route path="activity" element={<ModulePage name="activity" />} />
+          <Route path="settings" element={<SettingsPage />} />
         </Route>
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />

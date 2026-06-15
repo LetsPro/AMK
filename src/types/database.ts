@@ -53,6 +53,7 @@ export type Database = {
       notifications: { Row: Base & { user_id: string | null; title: string; message: string; module: string; entity_id: string | null; is_read: boolean }; Insert: Partial<Base> & { title: string; message: string; module: string }; Update: Partial<Database["public"]["Tables"]["notifications"]["Row"]> };
       activity_logs: { Row: Base & { user_id: string | null; module: string; action: string; entity_id: string | null; metadata: Json }; Insert: Partial<Base> & { module: string; action: string; metadata?: Json }; Update: Partial<Database["public"]["Tables"]["activity_logs"]["Row"]> };
       media_assets: { Row: Base & { bucket: string; path: string; url: string; file_name: string; mime_type: string | null; size: number | null; alt_text: string | null; created_by: string | null }; Insert: Partial<Base> & { bucket: string; path: string; url: string; file_name: string; mime_type?: string | null; size?: number | null; alt_text?: string | null; created_by?: string | null }; Update: Partial<Database["public"]["Tables"]["media_assets"]["Row"]> };
+      app_settings: { Row: Base & { key: string; value: Json }; Insert: Partial<Base> & { key: string; value: Json }; Update: Partial<Database["public"]["Tables"]["app_settings"]["Row"]> };
     };
     Views: Record<string, never>;
     Functions: Record<string, never>;
