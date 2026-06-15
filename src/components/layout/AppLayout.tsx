@@ -111,7 +111,7 @@ export function AppLayout() {
             <div className="grid h-9 w-9 place-items-center rounded-full bg-slate-900 text-sm font-bold text-white">{initials(profile?.full_name)}</div>
             <div className="text-sm"><div className="font-semibold">{profile?.full_name ?? "User"}</div><div className="text-xs text-slate-500">{profile?.roles?.name ?? "Role pending"}</div></div>
           </div>
-          <Button variant="ghost" onClick={signOut}><LogOut className="h-5 w-5" /></Button>
+          <Button variant="ghost" onClick={async () => { await signOut(); navigate("/"); }}><LogOut className="h-5 w-5" /></Button>
         </header>
         <main className="flex-1 p-4 md:p-6">
           <Outlet />

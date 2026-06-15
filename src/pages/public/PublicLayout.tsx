@@ -7,18 +7,19 @@ import { useAppSettings } from "@/hooks/useAppSettings";
 export function PublicLayout() {
   const [open, setOpen] = useState(false);
   const { branding } = useAppSettings();
-  const navItems = ["about", "projects", "services", "gallery", "contact"];
+  const navItems = ["home", "about", "projects", "services", "gallery", "contact"];
+  const hrefFor = (item: string) => item === "home" ? "/" : `/${item}`;
   return (
     <div className="min-h-screen bg-white text-slate-900">
       <header className="sticky top-0 z-20 border-b border-slate-200 bg-white/90 backdrop-blur">
-        <div className="mx-auto flex h-24 max-w-7xl items-center justify-between gap-3 px-4">
+        <div className="mx-auto flex h-24 max-w-7xl items-center justify-between gap-3 overflow-hidden px-4">
           <Link to="/" className="flex items-center" aria-label={`${branding.companyName} ${branding.companySuffix}`}>
-            <span className="grid h-20 w-36 place-items-center bg-transparent text-brand-primary md:h-24 md:w-44">
-              {branding.logoUrl ? <img src={branding.logoUrl} alt={branding.companyName} className="max-h-full max-w-full object-contain" /> : <Building2 className="h-12 w-12" />}
+            <span className="grid h-20 w-32 place-items-center bg-transparent text-brand-primary md:w-40">
+              {branding.logoUrl ? <img src={branding.logoUrl} alt={branding.companyName} className="max-h-16 max-w-full object-contain md:max-h-20" /> : <Building2 className="h-12 w-12" />}
             </span>
           </Link>
           <nav className="hidden gap-5 text-sm font-medium md:flex">
-            {navItems.map((item) => <Link key={item} className="capitalize hover:text-brand-primary" to={`/${item}`}>{item.replace("-", " ")}</Link>)}
+            {navItems.map((item) => <Link key={item} className="capitalize hover:text-brand-primary" to={hrefFor(item)}>{item.replace("-", " ")}</Link>)}
           </nav>
           <div className="hidden items-center gap-2 md:flex">
             <Button variant="secondary" onClick={() => location.href = "/login"}><LogIn className="h-4 w-4" /> Login</Button>
@@ -31,7 +32,7 @@ export function PublicLayout() {
         {open && (
           <div className="border-t border-slate-200 bg-white px-4 py-4 shadow-lg md:hidden">
             <nav className="grid gap-2 text-sm font-semibold">
-              {navItems.map((item) => <Link key={item} className="rounded-md px-3 py-2 capitalize hover:bg-orange-50 hover:text-brand-primary" to={`/${item}`} onClick={() => setOpen(false)}>{item.replace("-", " ")}</Link>)}
+              {navItems.map((item) => <Link key={item} className="rounded-md px-3 py-2 capitalize hover:bg-orange-50 hover:text-brand-primary" to={hrefFor(item)} onClick={() => setOpen(false)}>{item.replace("-", " ")}</Link>)}
             </nav>
             <div className="mt-4 grid grid-cols-2 gap-2">
               <Button variant="secondary" onClick={() => { setOpen(false); location.href = "/login"; }}><LogIn className="h-4 w-4" /> Login</Button>
@@ -44,7 +45,7 @@ export function PublicLayout() {
       <footer className="bg-slate-950 px-4 pt-14 text-white">
         <div className="mx-auto grid max-w-7xl gap-10 border-b border-white/10 pb-10 lg:grid-cols-[1.4fr_0.8fr_0.8fr_1fr]">
           <div>
-            <div className="flex items-center gap-3 text-lg font-bold"><span className="grid h-20 w-32 place-items-center bg-transparent">{branding.logoUrl ? <img src={branding.logoUrl} alt={branding.companyName} className="max-h-full max-w-full object-contain" /> : <Building2 />}</span></div>
+            <div className="flex items-center gap-3 text-lg font-bold"><span className="grid h-20 w-32 place-items-center bg-transparent">{branding.logoUrl ? <img src={branding.logoUrl} alt={branding.companyName} className="max-h-20 max-w-full object-contain brightness-0 invert" /> : <Building2 className="text-white" />}</span></div>
             <p className="mt-4 max-w-sm text-sm leading-6 text-slate-400">Architecture, engineering, approvals, project execution, documentation, and client operations managed with accountable delivery.</p>
             <div className="mt-5 flex gap-3">
               {[Facebook, Instagram, Linkedin].map((Icon, index) => <span key={index} className="grid h-9 w-9 place-items-center rounded-full bg-white/10 text-slate-200"><Icon className="h-4 w-4" /></span>)}
@@ -53,7 +54,7 @@ export function PublicLayout() {
           <div>
             <h4 className="font-semibold">Company</h4>
             <div className="mt-4 grid gap-3 text-sm text-slate-400">
-              {["About", "Projects", "Services", "Gallery", "Contact"].map((item) => <Link key={item} to={`/${item.toLowerCase()}`} className="hover:text-white">{item}</Link>)}
+              {["Home", "About", "Projects", "Services", "Gallery", "Contact"].map((item) => <Link key={item} to={hrefFor(item.toLowerCase())} className="hover:text-white">{item}</Link>)}
             </div>
           </div>
           <div>
