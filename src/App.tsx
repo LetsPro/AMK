@@ -24,7 +24,6 @@ export function App() {
         <Route path="projects/:slug" element={<ProjectDetailPage />} />
         <Route path="services" element={<ListingPage type="services" />} />
         <Route path="gallery" element={<ListingPage type="gallery" />} />
-        <Route path="testimonials" element={<ListingPage type="testimonials" />} />
         <Route path="contact" element={<ContactPage />} />
         <Route path="customer-register" element={<CustomerRegisterPage />} />
       </Route>
