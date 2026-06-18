@@ -424,10 +424,6 @@ function TestimonialCarousel({ items }: { items: PublicTestimonial[] }) {
     return () => window.clearInterval(timer);
   }, [paused, safeItems.length]);
 
-  function move(direction: 1 | -1) {
-    setActive((current) => (current + direction + safeItems.length) % safeItems.length);
-  }
-
   return (
     <section className="mx-auto max-w-7xl px-4 py-14">
       <div
@@ -435,30 +431,11 @@ function TestimonialCarousel({ items }: { items: PublicTestimonial[] }) {
         onMouseEnter={() => setPaused(true)}
         onMouseLeave={() => setPaused(false)}
       >
-        <div className="flex flex-col justify-between gap-8">
+        <div className="flex flex-col justify-center gap-5">
           <div>
             <div className="text-sm font-semibold uppercase tracking-wide text-brand-primary">Client Testimonials</div>
             <h2 className="mt-3 max-w-xl text-3xl font-semibold tracking-tight text-slate-950 md:text-4xl">What clients say about working with AMK.</h2>
             <p className="mt-4 max-w-md text-sm font-normal leading-7 text-slate-500">Real feedback from residential, commercial, and development clients who trusted AMK for design, coordination, and project execution.</p>
-          </div>
-          <div>
-            <div className="mb-4 text-sm font-medium text-slate-400">{String(active + 1).padStart(2, "0")} / {String(safeItems.length).padStart(2, "0")}</div>
-            <div className="flex items-center gap-2">
-              <Button variant="secondary" onClick={() => move(-1)} aria-label="Previous testimonial"><ChevronLeft className="h-4 w-4" /></Button>
-              <Button variant="secondary" onClick={() => move(1)} aria-label="Next testimonial"><ChevronRight className="h-4 w-4" /></Button>
-              <div className="ml-2 flex gap-1">
-                {safeItems.map((item, index) => (
-                  <button
-                    key={item.id}
-                    type="button"
-                    aria-label={`Show testimonial ${index + 1}`}
-                    onClick={() => setActive(index)}
-                    className={`h-2 rounded-full transition-all ${index === active ? "w-8 bg-brand-primary" : "w-2 bg-slate-300"}`}
-                  />
-                ))}
-              </div>
-            </div>
-            <p className="mt-4 text-xs font-medium uppercase tracking-wide text-slate-400">{paused ? "Paused on hover" : "Auto-scrolls every 3 seconds"}</p>
           </div>
         </div>
         <div className="overflow-hidden rounded-lg text-slate-950">
