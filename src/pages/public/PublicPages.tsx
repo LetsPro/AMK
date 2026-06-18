@@ -147,6 +147,44 @@ const serviceDetails: Record<string, { intro: string; includes: string[]; signat
   }
 };
 
+const designProcess = [
+  {
+    title: "Discovery & Consultation",
+    text: "Every successful project begins with understanding. We take the time to understand your vision, requirements, aspirations, site conditions, budget, and project goals to establish a strong foundation for design.",
+    note: "Great Architecture Begins with Great Conversations."
+  },
+  {
+    title: "Concept Design & Planning",
+    text: "Our team transforms ideas into innovative design concepts through detailed site analysis, space planning, feasibility studies, and creative exploration. Multiple design options are evaluated to identify the most effective solution.",
+    note: "Turning Ideas into Possibilities."
+  },
+  {
+    title: "Design Development & BIM Integration",
+    text: "The selected concept is refined through detailed plans, elevations, 3D models, material studies, BIM coordination, and technical design development. Every detail is carefully considered to ensure aesthetics, functionality, and constructability.",
+    note: "Precision in Every Detail."
+  },
+  {
+    title: "Construction Documentation & Approvals",
+    text: "We prepare comprehensive construction drawings, technical specifications, BIM documentation, and approval submissions required for smooth project execution and regulatory compliance.",
+    note: "Designed to Be Built."
+  },
+  {
+    title: "Visualization & Project Coordination",
+    text: "Through photorealistic renderings, walkthrough animations, BIM coordination, and digital reviews, clients gain a clear understanding of the project before construction begins.",
+    note: "See It Before It's Built."
+  },
+  {
+    title: "Execution Support & Quality Assurance",
+    text: "Our involvement continues on site through regular inspections, contractor coordination, quality monitoring, and technical support to ensure the final outcome aligns with the original design vision.",
+    note: "From Concept to Completion."
+  },
+  {
+    title: "Project Handover",
+    text: "The journey concludes with the successful delivery of a fully realized space that meets the highest standards of design, functionality, and craftsmanship.",
+    note: "Delivering Spaces That Inspire."
+  }
+];
+
 const serviceAliases: Record<string, string> = {
   "architectural-design": "architecture-master-planning",
   "approval-drawings": "bim-digital-engineering",
@@ -264,22 +302,29 @@ export function HomePage() {
           ))}
         </div>
       </section>
-      <Section title="Our Design Process">
-        <div className="grid gap-5 lg:grid-cols-4">
-          {[
-            ["Discovery & Consultation", "We understand your vision, requirements, aspirations, site conditions, budget, and project goals before design begins."],
-            ["Concept Design & Planning", "Ideas become site-responsive concepts through analysis, space planning, feasibility studies, and creative exploration."],
-            ["Design Development & BIM", "Plans, elevations, 3D models, material studies, BIM coordination, and technical details are refined together."],
-            ["Execution & Handover", "Drawings, approvals, site coordination, quality monitoring, and handover support keep the project aligned."]
-          ].map(([title, text], index) => (
-            <Card key={title} className="relative overflow-hidden">
-              <div className="absolute right-4 top-4 text-5xl font-black text-orange-100">{index + 1}</div>
-              <h3 className="relative text-lg font-bold">{title}</h3>
-              <p className="relative mt-3 text-sm leading-6 text-slate-500">{text}</p>
-            </Card>
-          ))}
+      <section className="bg-slate-950 px-4 py-16 text-white">
+        <div className="mx-auto max-w-7xl">
+          <div className="grid gap-8 lg:grid-cols-[0.8fr_1.2fr]">
+            <div>
+              <div className="text-sm font-bold uppercase tracking-wide text-brand-accent">Our Design Process</div>
+              <h2 className="mt-3 text-4xl font-black tracking-tight">From first conversation to handover.</h2>
+              <p className="mt-4 text-sm leading-7 text-slate-300">A structured process keeps design ambition, technical coordination, approvals, site quality, and final delivery moving together.</p>
+            </div>
+            <div className="grid gap-4">
+              {designProcess.map((step, index) => (
+                <div key={step.title} className="grid gap-4 rounded-lg border border-white/10 bg-white/[0.04] p-5 sm:grid-cols-[4rem_1fr]">
+                  <div className="text-3xl font-black text-brand-accent">{String(index + 1).padStart(2, "0")}</div>
+                  <div>
+                    <h3 className="text-xl font-bold">{step.title}</h3>
+                    <p className="mt-2 text-sm leading-7 text-slate-300">{step.text}</p>
+                    <p className="mt-3 text-sm font-semibold text-brand-accent">"{step.note}"</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
-      </Section>
+      </section>
       <Section title="End-to-End Design, Engineering & Construction Solutions">
         <div className="grid gap-5 md:grid-cols-3">{serviceRows.map((service) => <Card key={service.id}><CheckCircle2 className="mb-4 text-brand-primary" /><h3 className="font-bold">{service.name}</h3><p className="mt-2 text-sm text-slate-500">{service.description}</p></Card>)}</div>
       </Section>
@@ -392,16 +437,22 @@ export function ListingPage({ type }: { type: "projects" | "services" | "gallery
         </div>
       </section>
       <Section title="About Us">
-        <div className="grid gap-8 lg:grid-cols-[1.1fr_0.9fr]">
+        <div className="grid gap-8 rounded-xl bg-slate-50 p-6 lg:grid-cols-[1.05fr_0.95fr] lg:p-8">
           <div className="space-y-5 text-sm leading-7 text-slate-600">
             <p>Founded by Ar. Andra Manoj Kumar, AMK is a technology-driven architecture and engineering studio based in Mysuru. Our expertise extends beyond conventional architectural practice into Building Information Modelling (BIM), parametric design, computational workflows, 3D visualization, 3D printed buildings, and digital fabrication technologies.</p>
             <p>We work across residential, commercial, institutional, healthcare, hospitality, and large-scale development projects, delivering innovative solutions that balance design excellence, technical performance, sustainability, and construction efficiency.</p>
             <p>By combining architectural creativity with advanced engineering and emerging technologies, we help clients transform ambitious ideas into built realities.</p>
           </div>
-          <Card className="bg-slate-950 text-white">
-            <div className="text-sm font-bold uppercase tracking-wide text-brand-accent">Signature Line</div>
-            <p className="mt-4 text-3xl font-black leading-tight">Building Tomorrow. Designing Beyond.</p>
-          </Card>
+          <div className="rounded-lg bg-white p-6 shadow-sm">
+            <div className="text-sm font-bold uppercase tracking-wide text-brand-primary">Technology-Led Practice</div>
+            <h3 className="mt-3 text-3xl font-black leading-tight">Building tomorrow through design intelligence.</h3>
+            <div className="mt-6 grid gap-3 sm:grid-cols-2">
+              {["BIM Workflows", "Parametric Design", "3D Visualization", "Digital Fabrication"].map((item) => (
+                <div key={item} className="rounded-md border border-slate-200 bg-slate-50 p-4 text-sm font-semibold text-slate-700">{item}</div>
+              ))}
+            </div>
+            <p className="mt-6 text-sm leading-7 text-slate-500">The studio combines architectural creativity with engineering precision and emerging construction technologies.</p>
+          </div>
         </div>
       </Section>
       <Section title="Meet the Founder">
@@ -441,6 +492,28 @@ export function ListingPage({ type }: { type: "projects" | "services" | "gallery
           </Card>
         </div>
       </Section>
+      <section className="bg-slate-950 px-4 py-16 text-white">
+        <div className="mx-auto max-w-7xl">
+          <div className="mb-8 max-w-3xl">
+            <div className="text-sm font-bold uppercase tracking-wide text-brand-accent">Our Design Process</div>
+            <h2 className="mt-3 text-4xl font-black tracking-tight">A complete path from discovery to handover.</h2>
+          </div>
+          <div className="grid gap-4 md:grid-cols-2">
+            {designProcess.map((step, index) => (
+              <div key={step.title} className={`rounded-lg border border-white/10 bg-white/[0.04] p-5 ${index === 6 ? "md:col-span-2" : ""}`}>
+                <div className="flex items-start gap-4">
+                  <div className="grid h-12 w-12 shrink-0 place-items-center rounded-md bg-brand-primary text-lg font-black">{String(index + 1).padStart(2, "0")}</div>
+                  <div>
+                    <h3 className="text-lg font-bold">{step.title}</h3>
+                    <p className="mt-2 text-sm leading-7 text-slate-300">{step.text}</p>
+                    <p className="mt-3 text-sm font-semibold text-brand-accent">"{step.note}"</p>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
       <Section title="What We Stand For">
         <div className="grid gap-5 md:grid-cols-3">
           {[
