@@ -1,13 +1,18 @@
 insert into banners(title, subtitle, image_url, cta_label, cta_url, is_active) values
-('AMK Architects & Engineers', 'Integrated architecture, approvals, engineering, project execution, and client operations for residential and commercial developments in Mysuru.', 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=1800&q=80', 'Start a Project', '/contact', true),
-('Design-Led Homes in Mysuru', 'From concept plans to approval drawings and site coordination, every project is managed with clear documentation.', 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1800&q=80', 'View Projects', '/projects', true),
-('Approvals, Billing, Projects, Support', 'Customers, documents, quotations, invoices, payments, and support history stay connected through the AMK platform.', 'https://images.unsplash.com/photo-1497366754035-f200968a6e72?auto=format&fit=crop&w=1800&q=80', 'Get Started', '/customer-register', true)
+('Beyond Buildings. We Design Experiences.', 'Technology-driven architecture and engineering studio in Mysuru creating intelligent, sustainable, and future-ready spaces.', 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=1800&q=80', 'Start a Project', '/contact', true),
+('Where Architecture Meets Innovation', 'Architecture, engineering, BIM workflows, parametric design, visualization, and execution support from concept to completion.', 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1800&q=80', 'View Projects', '/projects', true),
+('Designing Tomorrow. Building Beyond.', 'From luxury residences and commercial spaces to healthcare, hospitality, institutional, and large-scale development projects.', 'https://images.unsplash.com/photo-1497366754035-f200968a6e72?auto=format&fit=crop&w=1800&q=80', 'Get Started', '/customer-register', true)
 on conflict do nothing;
 
 insert into services(name, slug, description, image_url, price_from, status) values
-('Architectural Design', 'architectural-design', 'Concept planning, floor plans, elevations, working drawings, and design coordination for homes and commercial spaces in Mysuru.', 'https://images.unsplash.com/photo-1503387762-592deb58ef4e?auto=format&fit=crop&w=1200&q=80', 75000, 'published'),
-('Approval Drawings', 'approval-drawings', 'Municipal approval drawings, documentation support, and submission-ready technical packages for Mysuru and Karnataka projects.', 'https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?auto=format&fit=crop&w=1200&q=80', 35000, 'published'),
-('Structural Engineering', 'structural-engineering', 'Structural design coordination, site-responsive engineering inputs, and construction-ready technical documentation.', 'https://images.unsplash.com/photo-1494526585095-c41746248156?auto=format&fit=crop&w=1200&q=80', 55000, 'published')
+('Architecture & Master Planning', 'architecture-master-planning', 'Luxury residences, villas, apartments, commercial buildings, healthcare, hospitality, institutional, mixed-use, urban design, and master planning solutions.', 'https://images.unsplash.com/photo-1503387762-592deb58ef4e?auto=format&fit=crop&w=1200&q=80', 75000, 'published'),
+('Interior Design & Space Experience', 'interior-design-space-experience', 'Residential interiors, corporate offices, retail environments, hospitality interiors, space planning, custom furniture, and material selection.', 'https://images.unsplash.com/photo-1600210492486-724fe5c67fb0?auto=format&fit=crop&w=1200&q=80', 65000, 'published'),
+('BIM & Digital Engineering', 'bim-digital-engineering', 'BIM modelling, documentation, clash detection, construction documentation, quantity extraction, shop drawings, and digital project coordination.', 'https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?auto=format&fit=crop&w=1200&q=80', 55000, 'published'),
+('Parametric & Computational Design', 'parametric-computational-design', 'Parametric facade design, complex geometry development, performance-based design, digital form finding, and generative design workflows.', 'https://images.unsplash.com/photo-1497366754035-f200968a6e72?auto=format&fit=crop&w=1200&q=80', 85000, 'published'),
+('Engineering Solutions', 'engineering-solutions', 'Structural coordination, electrical design, plumbing design, storm water management, infrastructure planning, and utility coordination.', 'https://images.unsplash.com/photo-1494526585095-c41746248156?auto=format&fit=crop&w=1200&q=80', 55000, 'published'),
+('Visualization & Digital Experiences', 'visualization-digital-experiences', 'Photorealistic renderings, walkthrough animations, virtual reality experiences, marketing visuals, drone mapping, and site analysis.', 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=1200&q=80', 45000, 'published'),
+('3D Printing & Digital Fabrication', '3d-printing-digital-fabrication', '3D printed buildings, 3D printed furniture, architectural prototyping, design mockups, models, and digital fabrication solutions.', 'https://images.unsplash.com/photo-1615873968403-89e068629265?auto=format&fit=crop&w=1200&q=80', 90000, 'published'),
+('Project Management & Execution Support', 'project-management-execution-support', 'Site supervision, contractor coordination, quality assurance, cost monitoring, construction management, and technical site support.', 'https://images.unsplash.com/photo-1503387762-592deb58ef4e?auto=format&fit=crop&w=1200&q=80', 70000, 'published')
 on conflict (slug) do update
 set name = excluded.name,
     description = excluded.description,
@@ -49,11 +54,11 @@ insert into gallery(title, image_url, category, project_id, is_featured)
 select 'Approval Drawing Review', 'https://images.unsplash.com/photo-1503387762-592deb58ef4e?auto=format&fit=crop&w=1400&q=80', 'Documentation', null, false where not exists (select 1 from gallery where title = 'Approval Drawing Review');
 
 insert into testimonials(name, company, quote, rating, avatar_url, is_published)
-select 'Raghavendra Rao', 'Chamundi Hill Residence', 'AMK translated our requirements into a practical, elegant home design and kept every drawing revision clearly documented.', 5, null, true
-where not exists (select 1 from testimonials where name = 'Raghavendra Rao' and company = 'Chamundi Hill Residence');
+select 'Homeowner, Mysuru', 'Residential Client', 'From the initial concept to the final design, the AMK team demonstrated exceptional creativity, professionalism, and technical expertise.', 5, null, true
+where not exists (select 1 from testimonials where name = 'Homeowner, Mysuru' and company = 'Residential Client');
 insert into testimonials(name, company, quote, rating, avatar_url, is_published)
-select 'Nandini Prakash', 'Vijayanagar Courtyard Home', 'The team handled design, approvals, and site coordination with a professional process. Communication was consistent from start to finish.', 5, null, true
-where not exists (select 1 from testimonials where name = 'Nandini Prakash' and company = 'Vijayanagar Courtyard Home');
+select 'Commercial Property Owner', 'Commercial Client', 'AMK Architects & Engineers delivered a well-planned commercial project that balanced design, efficiency, and investment value.', 5, null, true
+where not exists (select 1 from testimonials where name = 'Commercial Property Owner' and company = 'Commercial Client');
 insert into testimonials(name, company, quote, rating, avatar_url, is_published)
-select 'Mohammed Irfan', 'Hebbal Workspace Studio', 'Our workspace plan was delivered with clear cost visibility and fast revisions. The Mysuru site constraints were handled well.', 4, null, true
-where not exists (select 1 from testimonials where name = 'Mohammed Irfan' and company = 'Hebbal Workspace Studio');
+select 'Real Estate Developer', 'Development Client', 'Their expertise in planning, engineering coordination, and project execution gave us complete confidence throughout the project.', 5, null, true
+where not exists (select 1 from testimonials where name = 'Real Estate Developer' and company = 'Development Client');

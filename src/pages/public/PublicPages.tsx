@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Input, Textarea } from "@/components/ui/Input";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { useAppSettings } from "@/hooks/useAppSettings";
 import { useTable, useTableMutations } from "@/hooks/useSupabaseTable";
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
@@ -30,9 +31,14 @@ type PublicProject = { id: string; name: string; slug?: string; description?: st
 type PublicGallery = { id: string; title: string; category?: string | null; image_url: string; description?: string | null };
 
 const demoServices = [
-  { id: "demo-service-1", name: "Architectural Design", slug: "architectural-design", description: "Concept planning, elevations, working drawings, and design coordination for Mysuru homes and commercial spaces.", image_url: "https://images.unsplash.com/photo-1503387762-592deb58ef4e?auto=format&fit=crop&w=1200&q=80" },
-  { id: "demo-service-2", name: "Approval Drawings", slug: "approval-drawings", description: "Submission-ready approval drawings and documentation support for Mysuru and Karnataka projects.", image_url: "https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?auto=format&fit=crop&w=1200&q=80" },
-  { id: "demo-service-3", name: "Structural Engineering", slug: "structural-engineering", description: "Structural coordination and construction-ready technical documentation for residential and commercial work.", image_url: "https://images.unsplash.com/photo-1494526585095-c41746248156?auto=format&fit=crop&w=1200&q=80" }
+  { id: "demo-service-1", name: "Architecture & Master Planning", slug: "architecture-master-planning", description: "Luxury residences, villas, apartments, commercial buildings, healthcare, hospitality, institutional, mixed-use, urban design, and master planning solutions.", image_url: "https://images.unsplash.com/photo-1503387762-592deb58ef4e?auto=format&fit=crop&w=1200&q=80" },
+  { id: "demo-service-2", name: "Interior Design & Space Experience", slug: "interior-design-space-experience", description: "Residential interiors, corporate offices, retail environments, hospitality interiors, space planning, custom furniture, and material selection.", image_url: "https://images.unsplash.com/photo-1600210492486-724fe5c67fb0?auto=format&fit=crop&w=1200&q=80" },
+  { id: "demo-service-3", name: "BIM & Digital Engineering", slug: "bim-digital-engineering", description: "BIM modelling, documentation, clash detection, construction documentation, quantity extraction, shop drawings, and digital project coordination.", image_url: "https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?auto=format&fit=crop&w=1200&q=80" },
+  { id: "demo-service-4", name: "Parametric & Computational Design", slug: "parametric-computational-design", description: "Parametric facade design, complex geometry development, performance-based design, digital form finding, and generative design workflows.", image_url: "https://images.unsplash.com/photo-1497366754035-f200968a6e72?auto=format&fit=crop&w=1200&q=80" },
+  { id: "demo-service-5", name: "Engineering Solutions", slug: "engineering-solutions", description: "Structural coordination, electrical design, plumbing design, storm water management, infrastructure planning, and utility coordination.", image_url: "https://images.unsplash.com/photo-1494526585095-c41746248156?auto=format&fit=crop&w=1200&q=80" },
+  { id: "demo-service-6", name: "Visualization & Digital Experiences", slug: "visualization-digital-experiences", description: "Photorealistic renderings, walkthrough animations, virtual reality experiences, marketing visuals, drone mapping, and site analysis.", image_url: "https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=1200&q=80" },
+  { id: "demo-service-7", name: "3D Printing & Digital Fabrication", slug: "3d-printing-digital-fabrication", description: "3D printed buildings, 3D printed furniture, architectural prototyping, design mockups, models, and digital fabrication solutions.", image_url: "https://images.unsplash.com/photo-1615873968403-89e068629265?auto=format&fit=crop&w=1200&q=80" },
+  { id: "demo-service-8", name: "Project Management & Execution Support", slug: "project-management-execution-support", description: "Site supervision, contractor coordination, quality assurance, cost monitoring, construction management, and technical site support.", image_url: "https://images.unsplash.com/photo-1503387762-592deb58ef4e?auto=format&fit=crop&w=1200&q=80" }
 ];
 
 const demoProjects = [
@@ -51,32 +57,32 @@ const demoGallery = [
 ];
 
 const demoTestimonials = [
-  { id: "demo-testimonial-1", name: "Raghavendra Rao", company: "Chamundi Hill Residence", quote: "AMK translated our requirements into a practical, elegant home design and kept every drawing revision clearly documented." },
-  { id: "demo-testimonial-2", name: "Nandini Prakash", company: "Vijayanagar Courtyard Home", quote: "The team handled design, approvals, and site coordination with a professional process. Communication was consistent from start to finish." },
-  { id: "demo-testimonial-3", name: "Mohammed Irfan", company: "Hebbal Workspace Studio", quote: "Our workspace plan was delivered with clear cost visibility and fast revisions. The Mysuru site constraints were handled well." }
+  { id: "demo-testimonial-1", name: "Homeowner, Mysuru", company: "Residential Client", quote: "From the initial concept to the final design, the AMK team demonstrated exceptional creativity, professionalism, and technical expertise." },
+  { id: "demo-testimonial-2", name: "Commercial Property Owner", company: "Commercial Client", quote: "AMK Architects & Engineers delivered a well-planned commercial project that balanced design, efficiency, and investment value." },
+  { id: "demo-testimonial-3", name: "Real Estate Developer", company: "Development Client", quote: "Their expertise in planning, engineering coordination, and project execution gave us complete confidence throughout the project." }
 ];
 
 const demoBanners = [
   {
     id: "demo-banner-1",
-    title: "AMK Architects & Engineers",
-    subtitle: "Integrated architecture, approvals, engineering, project execution, and client operations for residential and commercial developments in Mysuru.",
+    title: "Beyond Buildings. We Design Experiences.",
+    subtitle: "Technology-driven architecture and engineering studio in Mysuru creating intelligent, sustainable, and future-ready spaces.",
     image_url: "https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=1800&q=80",
     cta_label: "Start a Project",
     cta_url: "/contact"
   },
   {
     id: "demo-banner-2",
-    title: "Design-Led Homes in Mysuru",
-    subtitle: "From concept plans to approval drawings and site coordination, every project is managed with clear documentation.",
+    title: "Where Architecture Meets Innovation",
+    subtitle: "Architecture, engineering, BIM workflows, parametric design, visualization, and execution support from concept to completion.",
     image_url: "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1800&q=80",
     cta_label: "View Projects",
     cta_url: "/projects"
   },
   {
     id: "demo-banner-3",
-    title: "Approvals, Billing, Projects, Support",
-    subtitle: "Customers, documents, quotations, invoices, payments, and support history stay connected through the AMK platform.",
+    title: "Designing Tomorrow. Building Beyond.",
+    subtitle: "From luxury residences and commercial spaces to healthcare, hospitality, institutional, and large-scale development projects.",
     image_url: "https://images.unsplash.com/photo-1497366754035-f200968a6e72?auto=format&fit=crop&w=1800&q=80",
     cta_label: "Get Started",
     cta_url: "/customer-register"
@@ -150,7 +156,7 @@ export function HomePage() {
   const visibleProjects = [0, 1, 2].map((offset) => projectRows[(activeProjectIndex + offset) % projectRows.length]).filter(Boolean);
   return (
     <>
-      <Seo title="AMK Architects & Engineers Mysuru | Architecture, Approvals & Project Management" description="AMK Architects & Engineers in Mysuru, Karnataka provides architectural design, approval drawings, structural coordination, interiors, project execution, and client operations." />
+      <Seo title="AMK Architects & Engineers Mysuru | Technology-Driven Architecture Studio" description="AMK Architects & Engineers is a Mysuru architecture and engineering studio specializing in Architecture, BIM, Parametric Design, 3D Printed Buildings, Visualization, and Construction Solutions." />
       <section className="relative min-h-[620px] overflow-hidden bg-slate-950 px-4 py-20 text-white">
         {bannerRows.map((item, index) => (
           <motion.div
@@ -178,13 +184,13 @@ export function HomePage() {
           ))}
         </div>
       </section>
-      <Section title="From Concept to Completion">
+      <Section title="Our Design Process">
         <div className="grid gap-5 lg:grid-cols-4">
           {[
-            ["Discover", "Site context, requirements, constraints, budget and approval route are mapped before design starts."],
-            ["Design", "Architecture, structural coordination, interiors and engineering packages are developed together."],
-            ["Approve", "Drawing sets, statutory documentation and client approvals are tracked with clear ownership."],
-            ["Execute", "Milestones, tasks, budgets, vendors, invoices and support are managed through delivery."]
+            ["Discovery & Consultation", "We understand your vision, requirements, aspirations, site conditions, budget, and project goals before design begins."],
+            ["Concept Design & Planning", "Ideas become site-responsive concepts through analysis, space planning, feasibility studies, and creative exploration."],
+            ["Design Development & BIM", "Plans, elevations, 3D models, material studies, BIM coordination, and technical details are refined together."],
+            ["Execution & Handover", "Drawings, approvals, site coordination, quality monitoring, and handover support keep the project aligned."]
           ].map(([title, text], index) => (
             <Card key={title} className="relative overflow-hidden">
               <div className="absolute right-4 top-4 text-5xl font-black text-orange-100">{index + 1}</div>
@@ -194,16 +200,16 @@ export function HomePage() {
           ))}
         </div>
       </Section>
-      <Section title="Architecture and Engineering Services">
+      <Section title="End-to-End Design, Engineering & Construction Solutions">
         <div className="grid gap-5 md:grid-cols-3">{serviceRows.map((service) => <Card key={service.id}><CheckCircle2 className="mb-4 text-brand-primary" /><h3 className="font-bold">{service.name}</h3><p className="mt-2 text-sm text-slate-500">{service.description}</p></Card>)}</div>
       </Section>
       <Section title="Integrated Capabilities">
         <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
           {[
-            [Ruler, "Design Intelligence", "Space planning, elevation studies, technical drawings and material direction."],
-            [Layers3, "Engineering Coordination", "Structure, services and execution details aligned before site work begins."],
-            [ClipboardCheck, "Approval Management", "Document registers, drawing submissions and follow-up accountability."],
-            [ShieldCheck, "Client Assurance", "Transparent communication, billing, support and project history records."]
+            [Ruler, "Architecture", "Functional, sustainable, and visually compelling environments for people and future possibilities."],
+            [Layers3, "BIM Workflows", "Digital modelling and coordination that reduce conflicts and improve construction efficiency."],
+            [ClipboardCheck, "Parametric Design", "Computational workflows for optimized facades, complex geometry, and performance-led forms."],
+            [ShieldCheck, "Visualization", "Renderings, walkthroughs, VR, and digital reviews so clients can see it before it is built."]
           ].map(([Icon, title, text]) => (
             <Card key={String(title)}>
               <div className="mb-4 grid h-11 w-11 place-items-center rounded-lg bg-orange-100 text-brand-primary"><Icon className="h-6 w-6" /></div>
@@ -240,9 +246,12 @@ export function HomePage() {
       <Section title="Sectors We Serve">
         <div className="grid gap-5 md:grid-cols-3">
           {[
-            ["Residential Villas", "Custom homes, renovations, interiors, approvals and construction coordination."],
-            ["Commercial Spaces", "Offices, retail, hospitality and mixed-use environments built for daily operations."],
-            ["Institutional Projects", "Purpose-led planning, documentation and engineering for long-term facility use."]
+            ["Residential", "Luxury homes, villas, apartments, and gated communities designed around modern lifestyles."],
+            ["Commercial", "Workspaces, retail developments, mixed-use projects, and business environments that support growth."],
+            ["Healthcare", "Hospitals, clinics, diagnostic centers, and wellness facilities planned around efficiency and patient care."],
+            ["Hospitality", "Hotels, resorts, restaurants, and experiential destinations designed to leave lasting impressions."],
+            ["Institutional", "Educational campuses, public buildings, and community-focused developments."],
+            ["Layout Development", "Master planning, land development, infrastructure design, and township planning solutions."]
           ].map(([title, text]) => (
             <div key={title} className="rounded-lg border border-slate-200 bg-slate-50 p-6">
               <h3 className="text-lg font-bold">{title}</h3>
@@ -251,17 +260,24 @@ export function HomePage() {
           ))}
         </div>
       </Section>
-      <Section title="Performance">
-        <div className="grid gap-5 md:grid-cols-4">{["Projects Delivered", "Design Disciplines", "Approval Workflows", "Client Touchpoints"].map((label, index) => <Card key={label}><div className="text-4xl font-black text-brand-primary">{[0, 12, 0, 24][index]}{index === 1 || index === 3 ? "+" : ""}</div><div className="text-sm text-slate-500">{label}</div></Card>)}</div>
+      <Section title="Creating Spaces. Building Trust.">
+        <div className="grid gap-5 md:grid-cols-4">
+          {[
+            ["250+", "Projects Across South India"],
+            ["675,000+", "Square Feet of Thoughtfully Designed Spaces"],
+            ["Multi-Sector", "Residential, Commercial, and Institutional Expertise"],
+            ["Complete Partner", "Architecture, Engineering, BIM, Visualization, and Execution"]
+          ].map(([value, label]) => <Card key={label}><div className="text-4xl font-black text-brand-primary">{value}</div><div className="text-sm text-slate-500">{label}</div></Card>)}
+        </div>
       </Section>
       <section className="bg-slate-950 px-4 py-16 text-white">
         <div className="mx-auto grid max-w-7xl items-center gap-8 lg:grid-cols-2">
           <div>
-            <h2 className="text-3xl font-black tracking-tight md:text-4xl">A connected client experience after registration</h2>
-            <p className="mt-4 text-sm leading-6 text-slate-300">When customers register, AMK can keep project discussions, approvals, documents, quotations, invoices, payments and support tickets connected to a single profile.</p>
+            <h2 className="text-3xl font-black tracking-tight md:text-4xl">One Partner. Infinite Possibilities.</h2>
+            <p className="mt-4 text-sm leading-6 text-slate-300">Architecture, engineering, BIM, parametric design, 3D printing, visualization, and project management come together in one accountable process.</p>
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
-            {["Customer profile", "Project history", "Approval documents", "Invoice tracking", "Support tickets", "Communication logs"].map((item) => (
+            {["Architecture", "Engineering", "BIM", "Parametric Design", "3D Printing", "Visualization"].map((item) => (
               <div key={item} className="rounded-md border border-white/10 bg-white/5 p-4 text-sm font-semibold">{item}</div>
             ))}
           </div>
@@ -291,16 +307,28 @@ export function ListingPage({ type }: { type: "projects" | "services" | "gallery
       <section className="bg-slate-950 px-4 py-20 text-white">
         <div className="mx-auto max-w-7xl">
           <div className="max-w-3xl text-sm font-bold uppercase tracking-wide text-brand-accent">About AMK</div>
-          <h1 className="mt-3 max-w-4xl text-4xl font-black tracking-tight md:text-6xl">Architecture, engineering, approvals, and execution support for Mysuru projects.</h1>
-          <p className="mt-5 max-w-3xl text-lg leading-8 text-slate-300">AMK Architects & Engineers helps homeowners, developers, and commercial clients convert project ideas into coordinated drawings, approvals, cost visibility, and site-ready documentation.</p>
+          <h1 className="mt-3 max-w-4xl text-4xl font-black tracking-tight md:text-6xl">We do not just design buildings. We shape the future.</h1>
+          <p className="mt-5 max-w-3xl text-lg leading-8 text-slate-300">AMK Architects & Engineers brings together architecture, engineering, computational design, BIM workflows, and advanced visualization to create projects that perform as beautifully as they look.</p>
         </div>
       </section>
+      <Section title="Meet the Founder">
+        <div className="grid gap-8 lg:grid-cols-[0.8fr_1.2fr]">
+          <Card>
+            <div className="text-sm font-bold uppercase tracking-wide text-brand-primary">Founder</div>
+            <h2 className="mt-2 text-3xl font-black">Ar. Andra Manoj Kumar</h2>
+            <p className="mt-3 text-sm font-semibold text-slate-500">Architect | Computational Designer | BIM Specialist | Architectural Visualizer</p>
+          </Card>
+          <Card>
+            <p className="text-lg leading-8 text-slate-600">Architecture today demands more than drawings. It requires technology, data, visualization, and execution expertise working together. AMK creates spaces that are intelligent, efficient, sustainable, and timeless.</p>
+          </Card>
+        </div>
+      </Section>
       <Section title="What We Stand For">
         <div className="grid gap-5 md:grid-cols-3">
           {[
-            ["Clarity", "Every project starts with documented requirements, scope, budget expectations, and approval direction."],
-            ["Coordination", "Architecture, structural inputs, drawings, documents, and site execution are connected in one workflow."],
-            ["Accountability", "Clients get communication history, project records, quotations, invoices, and support continuity."]
+            ["Creativity", "Every project begins with purpose-led design thinking and a clear understanding of the client's vision."],
+            ["Technology", "BIM, parametric design, digital fabrication, and visualization are integrated into the design process."],
+            ["Performance", "Spaces are planned to inspire, function, endure, and deliver long-term value."]
           ].map(([title, text]) => <Card key={title}><h3 className="text-xl font-bold">{title}</h3><p className="mt-3 text-sm leading-6 text-slate-500">{text}</p></Card>)}
         </div>
       </Section>
@@ -308,7 +336,7 @@ export function ListingPage({ type }: { type: "projects" | "services" | "gallery
         <div className="grid gap-8 lg:grid-cols-[0.9fr_1.1fr]">
           <div className="min-h-80 rounded-lg bg-cover bg-center" style={{ backgroundImage: "url(https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?auto=format&fit=crop&w=1400&q=80)" }} />
           <div className="space-y-5">
-            {["Climate-conscious planning for light, ventilation, shade, and material comfort.", "Practical approval documentation for Mysuru and Karnataka project requirements.", "Modern residential, commercial, and interior solutions with execution thinking from day one."].map((item) => <div key={item} className="flex gap-3 rounded-lg border border-slate-200 p-4"><CheckCircle2 className="mt-0.5 h-5 w-5 text-brand-primary" /><p className="text-sm leading-6 text-slate-600">{item}</p></div>)}
+            {["Design should not only look exceptional; it should perform exceptionally.", "Every project evolves through collaboration, data-driven decision making, and technical expertise.", "From concept development and approvals to execution and delivery, AMK creates spaces that inspire, function, and endure."].map((item) => <div key={item} className="flex gap-3 rounded-lg border border-slate-200 p-4"><CheckCircle2 className="mt-0.5 h-5 w-5 text-brand-primary" /><p className="text-sm leading-6 text-slate-600">{item}</p></div>)}
           </div>
         </div>
       </Section>
@@ -335,11 +363,11 @@ export function ListingPage({ type }: { type: "projects" | "services" | "gallery
     <>
       <Seo title="Architecture Services Mysuru | Design, Approval Drawings, Structural Coordination" description="AMK Architects & Engineers offers architectural design, approval drawings, structural coordination, interiors, project management, and documentation services in Mysuru." />
       <Section title="Architecture & Engineering Services">
-        <p className="mb-6 max-w-3xl text-sm leading-6 text-slate-500">AMK provides end-to-end architecture services in Mysuru, from early design concepts and authority drawings to engineering coordination, interiors, estimates, and project documentation.</p>
+        <p className="mb-6 max-w-3xl text-sm leading-6 text-slate-500">AMK brings together architecture, engineering, technology, and innovation to deliver comprehensive solutions from concept to completion.</p>
         <div className="grid gap-5 md:grid-cols-3">{rows.map((item) => <Card key={item.id as string} className="p-0"><div className="aspect-[4/3] rounded-t-lg bg-cover bg-center" style={{ backgroundImage: `url(${(item as { image_url?: string }).image_url ?? ""})` }} /><div className="p-5"><h3 className="font-bold">{(item as { name?: string }).name}</h3><p className="mt-2 text-sm leading-6 text-slate-500">{(item as { description?: string }).description}</p></div></Card>)}</div>
       </Section>
       <Section title="How We Work">
-        <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-4">{["Requirement brief", "Drawings & estimates", "Approvals & revisions", "Execution tracking"].map((item, index) => <Card key={item}><div className="text-3xl font-black text-brand-primary">0{index + 1}</div><h3 className="mt-3 font-bold">{item}</h3></Card>)}</div>
+        <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-4">{["Discovery & Consultation", "Concept Design & Planning", "Design Development & BIM", "Execution Support & Handover"].map((item, index) => <Card key={item}><div className="text-3xl font-black text-brand-primary">0{index + 1}</div><h3 className="mt-3 font-bold">{item}</h3></Card>)}</div>
       </Section>
     </>
   );
@@ -378,6 +406,7 @@ export function ProjectDetailPage() {
 
 export function ContactPage({ compact = false }: { compact?: boolean }) {
   const { create } = useTableMutations("enquiries");
+  const { branding } = useAppSettings();
   const [form, setForm] = useState({ name: "", email: "", mobile: "", subject: "", message: "" });
   return (
     <>
@@ -385,10 +414,19 @@ export function ContactPage({ compact = false }: { compact?: boolean }) {
       <Section title="Contact Us">
         <div className="grid gap-6 md:grid-cols-2">
           <Card><h3 className="mb-4 font-bold">Send an enquiry</h3><form className="space-y-3" onSubmit={async (event) => { event.preventDefault(); await create.mutateAsync({ ...form, source: "website" }); setForm({ name: "", email: "", mobile: "", subject: "", message: "" }); }}><Input required placeholder="Name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /><Input placeholder="Email" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /><Input placeholder="Mobile" value={form.mobile} onChange={(e) => setForm({ ...form, mobile: e.target.value })} /><Input placeholder="Subject" value={form.subject} onChange={(e) => setForm({ ...form, subject: e.target.value })} /><Textarea required placeholder="Message" value={form.message} onChange={(e) => setForm({ ...form, message: e.target.value })} /><Button disabled={create.isPending}><Send className="h-4 w-4" /> Submit</Button></form></Card>
-          <Card><h3 className="mb-4 font-bold">Visit AMK</h3><div className="grid aspect-video place-items-center rounded-lg bg-slate-100 text-slate-500">Google Maps embed placeholder configured in Contact CMS</div><p className="mt-4 text-sm text-slate-500">Website enquiries are inserted into Supabase and converted to leads automatically by the database trigger.</p></Card>
+          <Card>
+            <h3 className="mb-4 font-bold">Schedule a Consultation</h3>
+            <div className="space-y-3 text-sm text-slate-600">
+              <p className="flex items-start gap-2"><MapPin className="mt-0.5 h-4 w-4 text-brand-primary" />{branding.location}</p>
+              <p>{branding.phone}</p>
+              <p>{branding.email}</p>
+              <p>www.amkarchitects.in</p>
+            </div>
+            <p className="mt-5 text-sm leading-6 text-slate-500">Tell us your ideas, goals, and project requirements. Together, we will create spaces that inspire, perform, and endure.</p>
+          </Card>
         </div>
-        {!compact && <div className="mt-8 grid gap-5 md:grid-cols-3">{["Architecture consultation", "Approval drawing enquiry", "Project estimate request"].map((item) => <Card key={item}><h3 className="font-bold">{item}</h3><p className="mt-2 text-sm text-slate-500">Share your requirements and AMK will create a CRM lead for follow-up.</p></Card>)}</div>}
-        {compact && <div className="mt-8 rounded-lg bg-gradient-to-r from-brand-primary to-brand-accent p-8 text-white"><h3 className="text-2xl font-bold">Ready to plan your next project?</h3><p className="mt-2">Share your requirements and the AMK team will follow up from CRM.</p></div>}
+        {!compact && <div className="mt-8 grid gap-5 md:grid-cols-3">{["Dream residence", "Commercial development", "BIM, Parametric Design, or 3D Printing"].map((item) => <Card key={item}><h3 className="font-bold">{item}</h3><p className="mt-2 text-sm text-slate-500">Share your requirements and AMK will create a CRM lead for follow-up.</p></Card>)}</div>}
+        {compact && <div className="mt-8 rounded-lg bg-gradient-to-r from-brand-primary to-brand-accent p-8 text-white"><h3 className="text-2xl font-bold">Let's build something extraordinary</h3><p className="mt-2">Whether you are planning a residence, commercial development, healthcare facility, layout project, interior transformation, or technology-led design solution, AMK is ready to turn your vision into reality.</p></div>}
       </Section>
     </>
   );

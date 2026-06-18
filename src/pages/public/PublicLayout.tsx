@@ -18,19 +18,19 @@ export function PublicLayout() {
               {branding.logoUrl ? <img src={branding.logoUrl} alt={branding.companyName} className="max-h-16 max-w-full object-contain md:max-h-20" /> : <Building2 className="h-12 w-12" />}
             </span>
           </Link>
-          <nav className="hidden gap-5 text-sm font-medium md:flex">
+          <nav className="hidden gap-5 text-sm font-medium xl:flex">
             {navItems.map((item) => <Link key={item} className="capitalize hover:text-brand-primary" to={hrefFor(item)}>{item.replace("-", " ")}</Link>)}
           </nav>
-          <div className="hidden items-center gap-2 md:flex">
+          <div className="hidden items-center gap-2 xl:flex">
             <Button variant="secondary" onClick={() => location.href = "/login"}><LogIn className="h-4 w-4" /> Login</Button>
             <Button onClick={() => location.href = "/customer-register"}><UserPlus className="h-4 w-4" /> Get Started</Button>
           </div>
-          <button className="grid h-10 w-10 place-items-center rounded-md border border-slate-200 bg-white text-slate-800 md:hidden" onClick={() => setOpen((value) => !value)} aria-label="Toggle menu">
+          <button className="grid h-10 w-10 place-items-center rounded-md border border-slate-200 bg-white text-slate-800 xl:hidden" onClick={() => setOpen((value) => !value)} aria-label="Toggle menu">
             {open ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
           </button>
         </div>
         {open && (
-          <div className="border-t border-slate-200 bg-white px-4 py-4 shadow-lg md:hidden">
+          <div className="border-t border-slate-200 bg-white px-4 py-4 shadow-lg xl:hidden">
             <nav className="grid gap-2 text-sm font-semibold">
               {navItems.map((item) => <Link key={item} className="rounded-md px-3 py-2 capitalize hover:bg-orange-50 hover:text-brand-primary" to={hrefFor(item)} onClick={() => setOpen(false)}>{item.replace("-", " ")}</Link>)}
             </nav>
@@ -46,7 +46,7 @@ export function PublicLayout() {
         <div className="mx-auto grid max-w-7xl gap-10 border-b border-white/10 pb-10 lg:grid-cols-[1.4fr_0.8fr_0.8fr_1fr]">
           <div>
             <div className="flex items-center gap-3 text-lg font-bold"><span className="grid h-20 w-32 place-items-center bg-transparent">{branding.logoUrl ? <img src={branding.logoUrl} alt={branding.companyName} className="max-h-20 max-w-full object-contain brightness-0 invert" /> : <Building2 className="text-white" />}</span></div>
-            <p className="mt-4 max-w-sm text-sm leading-6 text-slate-400">Architecture, engineering, approvals, project execution, documentation, and client operations managed with accountable delivery.</p>
+            <p className="mt-4 max-w-sm text-sm leading-6 text-slate-400">Technology-driven architecture, engineering, BIM, parametric design, visualization, digital fabrication, and project execution support.</p>
             <div className="mt-5 flex gap-3">
               {[Facebook, Instagram, Linkedin].map((Icon, index) => <span key={index} className="grid h-9 w-9 place-items-center rounded-full bg-white/10 text-slate-200"><Icon className="h-4 w-4" /></span>)}
             </div>
@@ -60,7 +60,7 @@ export function PublicLayout() {
           <div>
             <h4 className="font-semibold">Services</h4>
             <div className="mt-4 grid gap-3 text-sm text-slate-400">
-              {["Architectural Design", "Structural Engineering", "Approval Drawings", "Project Management", "Interior Planning"].map((item) => <span key={item}>{item}</span>)}
+              {["Architecture & Master Planning", "Interior Design", "BIM & Digital Engineering", "Parametric Design", "3D Printing & Fabrication"].map((item) => <span key={item}>{item}</span>)}
             </div>
           </div>
           <div>
