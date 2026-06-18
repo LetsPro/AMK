@@ -89,6 +89,86 @@ const demoBanners = [
   }
 ];
 
+const serviceDetails: Record<string, { intro: string; includes: string[]; signature: string }> = {
+  "architecture-master-planning": {
+    intro: "Creating functional, sustainable, and visually compelling environments that respond to both human needs and future possibilities.",
+    includes: ["Luxury Residences & Villas", "Apartments & Group Housing", "Commercial & Office Buildings", "Mixed-Use Developments", "Educational & Institutional Buildings", "Healthcare Facilities & Hospitals", "Hospitality & Resort Projects", "Urban Design & Master Planning"],
+    signature: "Every Great Building Begins with a Great Vision."
+  },
+  "architectural-design": {
+    intro: "Creating functional, sustainable, and visually compelling environments that respond to both human needs and future possibilities.",
+    includes: ["Luxury Residences & Villas", "Apartments & Group Housing", "Commercial & Office Buildings", "Mixed-Use Developments", "Educational & Institutional Buildings", "Healthcare Facilities & Hospitals", "Hospitality & Resort Projects", "Urban Design & Master Planning"],
+    signature: "Every Great Building Begins with a Great Vision."
+  },
+  "interior-design-space-experience": {
+    intro: "Designing interiors that elevate lifestyles, enhance productivity, and create memorable experiences.",
+    includes: ["Residential Interiors", "Corporate Offices", "Retail & Commercial Interiors", "Hospitality Interiors", "Space Planning & Optimization", "Custom Furniture Design", "Material & Finish Selection"],
+    signature: "Designing Spaces People Love to Live, Work, and Experience."
+  },
+  "bim-digital-engineering": {
+    intro: "Leveraging Building Information Modelling (BIM) to improve coordination, reduce construction conflicts, and enhance project efficiency.",
+    includes: ["BIM Modeling & Documentation", "Clash Detection & Coordination", "Construction Documentation", "Quantity Extraction", "Shop Drawings", "Digital Project Coordination"],
+    signature: "Building Smarter Before Building Better."
+  },
+  "approval-drawings": {
+    intro: "Leveraging Building Information Modelling (BIM) to improve coordination, reduce construction conflicts, and enhance project efficiency.",
+    includes: ["BIM Modeling & Documentation", "Clash Detection & Coordination", "Construction Documentation", "Quantity Extraction", "Shop Drawings", "Digital Project Coordination"],
+    signature: "Building Smarter Before Building Better."
+  },
+  "parametric-computational-design": {
+    intro: "Harnessing advanced algorithms and digital workflows to create optimized, efficient, and innovative design solutions.",
+    includes: ["Parametric Facade Design", "Complex Geometry Development", "Performance-Based Design", "Computational Design Solutions", "Digital Form Finding", "Generative Design Workflows"],
+    signature: "From Algorithms to Architecture."
+  },
+  "engineering-solutions": {
+    intro: "Integrated engineering systems that ensure performance, safety, and long-term reliability.",
+    includes: ["Structural Coordination", "Electrical Design & Planning", "Plumbing Design", "Storm Water Management", "Infrastructure Planning", "Utility Coordination"],
+    signature: "Engineering Precision into Every Project."
+  },
+  "structural-engineering": {
+    intro: "Integrated engineering systems that ensure performance, safety, and long-term reliability.",
+    includes: ["Structural Coordination", "Electrical Design & Planning", "Plumbing Design", "Storm Water Management", "Infrastructure Planning", "Utility Coordination"],
+    signature: "Engineering Precision into Every Project."
+  },
+  "visualization-digital-experiences": {
+    intro: "Helping clients visualize projects before construction begins through immersive digital experiences.",
+    includes: ["Photorealistic Architectural Renderings", "Walkthrough Animations", "Virtual Reality Experiences", "Marketing & Presentation Visuals", "Drone Mapping & Site Analysis"],
+    signature: "See It Before It's Built."
+  },
+  "3d-printing-digital-fabrication": {
+    intro: "Exploring the future of construction through additive manufacturing and advanced fabrication technologies.",
+    includes: ["3D Printed Buildings", "3D Printed Furniture", "Architectural Prototyping", "Design Mockups & Models", "Digital Fabrication Solutions"],
+    signature: "Printing the Future of Architecture."
+  },
+  "project-management-execution-support": {
+    intro: "Ensuring projects are delivered efficiently, on time, and to the highest quality standards.",
+    includes: ["Site Supervision", "Contractor Coordination", "Quality Assurance", "Cost Monitoring", "Construction Management", "Technical Site Support"],
+    signature: "From Concept to Completion."
+  }
+};
+
+const serviceAliases: Record<string, string> = {
+  "architectural-design": "architecture-master-planning",
+  "approval-drawings": "bim-digital-engineering",
+  "structural-engineering": "engineering-solutions"
+};
+
+function serviceKey(service: { name?: string; slug?: string }) {
+  const raw = service.slug ?? service.name?.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") ?? "";
+  return serviceAliases[raw] ?? raw;
+}
+
+function mergeServiceRows<T extends { id: string; name?: string; slug?: string }>(rows: T[]) {
+  const merged = new Map<string, T | typeof demoServices[number]>();
+  demoServices.forEach((service) => merged.set(service.slug, service));
+  rows.forEach((service) => {
+    const key = serviceKey(service);
+    const fallback = demoServices.find((item) => item.slug === key);
+    merged.set(key, fallback ? { ...service, name: fallback.name, slug: fallback.slug, description: fallback.description, image_url: (service as { image_url?: string }).image_url || fallback.image_url } : service);
+  });
+  return Array.from(merged.values());
+}
+
 function ProjectModal({ project, onClose }: { project: PublicProject; onClose: () => void }) {
   return (
     <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/75 p-4">
@@ -144,7 +224,7 @@ export function HomePage() {
   const [activeSlide, setActiveSlide] = useState(0);
   const [activeProjectIndex, setActiveProjectIndex] = useState(0);
   const [selectedProject, setSelectedProject] = useState<PublicProject | null>(null);
-  const serviceRows = services.length ? services : demoServices;
+  const serviceRows = mergeServiceRows(services as typeof demoServices);
   const projectRows = projects.length ? projects : demoProjects;
   const testimonialRows = testimonials.length ? testimonials : demoTestimonials;
   const bannerRows = banners.length ? banners : demoBanners;
@@ -299,18 +379,31 @@ export function ListingPage({ type }: { type: "projects" | "services" | "gallery
   const [selectedProject, setSelectedProject] = useState<PublicProject | null>(null);
   const [preview, setPreview] = useState<PublicGallery | null>(null);
   const fallbackRows = type === "services" ? demoServices : type === "gallery" ? demoGallery : demoProjects;
-  const sourceRows = data.length ? data : fallbackRows;
+  const sourceRows = type === "services" ? mergeServiceRows(data as typeof demoServices) : data.length ? data : fallbackRows;
   const rows = useMemo(() => sourceRows.filter((item: { name?: string; title?: string; category?: string }) => `${item.name ?? item.title ?? ""} ${item.category ?? ""}`.toLowerCase().includes(filter.toLowerCase())), [sourceRows, filter]);
   if (type === "about") return (
     <>
-      <Seo title="About AMK Architects & Engineers Mysuru | Architecture & Engineering Studio" description="Learn about AMK Architects & Engineers, a Mysuru architecture and engineering team delivering residential design, approval drawings, structural coordination, interiors, and project operations." />
+      <Seo title="About AMK Architects & Engineers Mysuru | Technology-Driven Architecture Studio" description="AMK Architects & Engineers is a Mysuru-based technology-driven architecture and engineering studio integrating BIM, parametric design, visualization, digital fabrication, and project delivery." />
       <section className="bg-slate-950 px-4 py-20 text-white">
         <div className="mx-auto max-w-7xl">
           <div className="max-w-3xl text-sm font-bold uppercase tracking-wide text-brand-accent">About AMK</div>
           <h1 className="mt-3 max-w-4xl text-4xl font-black tracking-tight md:text-6xl">We do not just design buildings. We shape the future.</h1>
-          <p className="mt-5 max-w-3xl text-lg leading-8 text-slate-300">AMK Architects & Engineers brings together architecture, engineering, computational design, BIM workflows, and advanced visualization to create projects that perform as beautifully as they look.</p>
+          <p className="mt-5 max-w-3xl text-lg leading-8 text-slate-300">At AMK Architects & Engineers, architecture is where creativity, technology, and human experience come together. Every space we design is driven by purpose, engineered with precision, and crafted to create lasting value.</p>
         </div>
       </section>
+      <Section title="About Us">
+        <div className="grid gap-8 lg:grid-cols-[1.1fr_0.9fr]">
+          <div className="space-y-5 text-sm leading-7 text-slate-600">
+            <p>Founded by Ar. Andra Manoj Kumar, AMK is a technology-driven architecture and engineering studio based in Mysuru. Our expertise extends beyond conventional architectural practice into Building Information Modelling (BIM), parametric design, computational workflows, 3D visualization, 3D printed buildings, and digital fabrication technologies.</p>
+            <p>We work across residential, commercial, institutional, healthcare, hospitality, and large-scale development projects, delivering innovative solutions that balance design excellence, technical performance, sustainability, and construction efficiency.</p>
+            <p>By combining architectural creativity with advanced engineering and emerging technologies, we help clients transform ambitious ideas into built realities.</p>
+          </div>
+          <Card className="bg-slate-950 text-white">
+            <div className="text-sm font-bold uppercase tracking-wide text-brand-accent">Signature Line</div>
+            <p className="mt-4 text-3xl font-black leading-tight">Building Tomorrow. Designing Beyond.</p>
+          </Card>
+        </div>
+      </Section>
       <Section title="Meet the Founder">
         <div className="grid gap-8 lg:grid-cols-[0.8fr_1.2fr]">
           <Card>
@@ -320,6 +413,31 @@ export function ListingPage({ type }: { type: "projects" | "services" | "gallery
           </Card>
           <Card>
             <p className="text-lg leading-8 text-slate-600">Architecture today demands more than drawings. It requires technology, data, visualization, and execution expertise working together. AMK creates spaces that are intelligent, efficient, sustainable, and timeless.</p>
+          </Card>
+        </div>
+      </Section>
+      <Section title="Our Philosophy">
+        <div className="grid gap-8 lg:grid-cols-[0.8fr_1.2fr]">
+          <Card>
+            <h3 className="text-2xl font-black">Design should not only look exceptional; it should perform exceptionally.</h3>
+          </Card>
+          <div className="space-y-4 text-sm leading-7 text-slate-600">
+            <p>Every project begins with a deep understanding of our client's vision and evolves through a collaborative process that integrates design thinking, data-driven decision making, and technical expertise.</p>
+            <p>From concept development and approvals to execution and project delivery, we remain committed to creating spaces that inspire, function, and endure.</p>
+          </div>
+        </div>
+      </Section>
+      <Section title="Vision & Mission">
+        <div className="grid gap-5 lg:grid-cols-2">
+          <Card>
+            <div className="text-sm font-bold uppercase tracking-wide text-brand-primary">Our Vision</div>
+            <h3 className="mt-2 text-2xl font-black">Designing the Future of the Built Environment</h3>
+            <p className="mt-4 text-sm leading-7 text-slate-600">To become a leading technology-driven architecture and engineering practice that transforms ideas into intelligent, sustainable, and impactful spaces through innovation, creativity, and advanced design technologies.</p>
+          </Card>
+          <Card>
+            <div className="text-sm font-bold uppercase tracking-wide text-brand-primary">Our Mission</div>
+            <h3 className="mt-2 text-2xl font-black">Design excellence with advanced delivery</h3>
+            <p className="mt-4 text-sm leading-7 text-slate-600">To deliver exceptional architectural and engineering solutions by integrating design excellence, BIM, parametric design, emerging construction technologies, and collaborative thinking to create spaces that inspire people, enhance communities, and stand the test of time.</p>
           </Card>
         </div>
       </Section>
@@ -361,10 +479,44 @@ export function ListingPage({ type }: { type: "projects" | "services" | "gallery
   );
   if (type === "services") return (
     <>
-      <Seo title="Architecture Services Mysuru | Design, Approval Drawings, Structural Coordination" description="AMK Architects & Engineers offers architectural design, approval drawings, structural coordination, interiors, project management, and documentation services in Mysuru." />
+      <Seo title="Architecture Services Mysuru | BIM, Parametric Design & Engineering" description="AMK Architects & Engineers offers architecture, master planning, interiors, BIM, parametric design, engineering, visualization, 3D printing, digital fabrication, and execution support in Mysuru." />
       <Section title="Architecture & Engineering Services">
-        <p className="mb-6 max-w-3xl text-sm leading-6 text-slate-500">AMK brings together architecture, engineering, technology, and innovation to deliver comprehensive solutions from concept to completion.</p>
-        <div className="grid gap-5 md:grid-cols-3">{rows.map((item) => <Card key={item.id as string} className="p-0"><div className="aspect-[4/3] rounded-t-lg bg-cover bg-center" style={{ backgroundImage: `url(${(item as { image_url?: string }).image_url ?? ""})` }} /><div className="p-5"><h3 className="font-bold">{(item as { name?: string }).name}</h3><p className="mt-2 text-sm leading-6 text-slate-500">{(item as { description?: string }).description}</p></div></Card>)}</div>
+        <p className="mb-8 max-w-3xl text-sm leading-7 text-slate-500">At AMK Architects & Engineers, we bring together architecture, engineering, technology, and innovation to deliver comprehensive solutions from concept to completion.</p>
+        <div className="grid gap-6">
+          {rows.map((item) => {
+            const service = item as { id: string; name?: string; slug?: string; description?: string; image_url?: string };
+            const detail = serviceDetails[service.slug ?? ""] ?? {
+              intro: service.description ?? "",
+              includes: [],
+              signature: "From Concept to Completion."
+            };
+            return (
+              <Card key={service.id} className="overflow-hidden p-0">
+                <div className="grid lg:grid-cols-[0.9fr_1.1fr]">
+                  <div className="min-h-72 bg-slate-200 bg-cover bg-center" style={{ backgroundImage: `url(${service.image_url ?? "https://images.unsplash.com/photo-1503387762-592deb58ef4e?auto=format&fit=crop&w=1200&q=80"})` }} />
+                  <div className="p-6">
+                    <h3 className="text-2xl font-black">{service.name}</h3>
+                    <p className="mt-3 text-sm leading-7 text-slate-600">{detail.intro || service.description}</p>
+                    {detail.includes.length > 0 && (
+                      <>
+                        <h4 className="mt-5 text-sm font-bold uppercase tracking-wide text-brand-primary">Services Include</h4>
+                        <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                          {detail.includes.map((entry) => (
+                            <div key={entry} className="flex gap-2 text-sm leading-6 text-slate-600">
+                              <CheckCircle2 className="mt-1 h-4 w-4 shrink-0 text-brand-primary" />
+                              <span>{entry}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </>
+                    )}
+                    <div className="mt-6 rounded-md bg-orange-50 p-4 text-sm font-semibold text-slate-700">"{detail.signature}"</div>
+                  </div>
+                </div>
+              </Card>
+            );
+          })}
+        </div>
       </Section>
       <Section title="How We Work">
         <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-4">{["Discovery & Consultation", "Concept Design & Planning", "Design Development & BIM", "Execution Support & Handover"].map((item, index) => <Card key={item}><div className="text-3xl font-black text-brand-primary">0{index + 1}</div><h3 className="mt-3 font-bold">{item}</h3></Card>)}</div>
