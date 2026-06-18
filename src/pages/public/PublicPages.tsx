@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { motion } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import { ArrowRight, CheckCircle2, ChevronLeft, ChevronRight, ClipboardCheck, Eye, Layers3, MapPin, Ruler, Send, ShieldCheck, UserPlus, X } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
@@ -185,6 +185,13 @@ const designProcess = [
   }
 ];
 
+const performanceStats = [
+  { value: "250+", label: "Projects Across South India", detail: "Residential, commercial, institutional, and large-scale developments handled through a structured studio process." },
+  { value: "675,000+", label: "Square Feet of Thoughtfully Designed Spaces", detail: "Spaces planned with attention to function, engineering coordination, material comfort, and long-term use." },
+  { value: "Multi-Sector", label: "Residential, Commercial, and Institutional Expertise", detail: "A portfolio spanning homes, workplaces, healthcare, hospitality, education, layouts, and adaptive reuse." },
+  { value: "Complete Partner", label: "Architecture, Engineering, BIM, Visualization, and Execution", detail: "One integrated team connecting design strategy, technical documentation, digital workflows, and site delivery." }
+];
+
 const serviceAliases: Record<string, string> = {
   "architectural-design": "architecture-master-planning",
   "approval-drawings": "bim-digital-engineering",
@@ -267,7 +274,15 @@ function DesignProcessSection({ title = "Our Design Process", subtitle = "From f
         </div>
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {designProcess.map((step, index) => (
-            <div key={step.title} className={`group rounded-lg border border-slate-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-orange-200 hover:shadow-md ${index === 6 ? "md:col-span-2 xl:col-span-3" : ""}`}>
+            <motion.div
+              key={step.title}
+              className={`group rounded-lg border border-slate-200 bg-white p-5 shadow-sm ${index === 6 ? "md:col-span-2 xl:col-span-3" : ""}`}
+              initial={{ opacity: 0, y: 18 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, amount: 0.25 }}
+              transition={{ duration: 0.35, delay: Math.min(index * 0.04, 0.24) }}
+              whileHover={{ y: -4, borderColor: "rgba(248, 106, 13, 0.35)", boxShadow: "0 18px 40px rgba(15, 23, 42, 0.1)" }}
+            >
               <div className="flex gap-4">
                 <div className="grid h-12 w-12 shrink-0 place-items-center rounded-md bg-orange-50 text-lg font-black text-brand-primary ring-1 ring-orange-100">{String(index + 1).padStart(2, "0")}</div>
                 <div>
@@ -276,7 +291,116 @@ function DesignProcessSection({ title = "Our Design Process", subtitle = "From f
                   <p className="mt-4 border-l-2 border-brand-primary pl-3 text-sm font-semibold text-slate-700">"{step.note}"</p>
                 </div>
               </div>
-            </div>
+            </motion.div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function VisionMissionToggle() {
+  const [active, setActive] = useState<"vision" | "mission">("vision");
+  const content = {
+    vision: {
+      eyebrow: "Our Vision",
+      title: "Designing the Future of the Built Environment",
+      text: "To become a leading technology-driven architecture and engineering practice that transforms ideas into intelligent, sustainable, and impactful spaces through innovation, creativity, and advanced design technologies.",
+      points: ["Intelligent spaces", "Sustainable outcomes", "Advanced design technologies"]
+    },
+    mission: {
+      eyebrow: "Our Mission",
+      title: "Design excellence with advanced delivery",
+      text: "To deliver exceptional architectural and engineering solutions by integrating design excellence, BIM, parametric design, emerging construction technologies, and collaborative thinking to create spaces that inspire people, enhance communities, and stand the test of time.",
+      points: ["Design excellence", "BIM-enabled coordination", "Collaborative delivery"]
+    }
+  }[active];
+
+  return (
+    <section className="mx-auto max-w-7xl px-4 py-14">
+      <div className="grid gap-8 rounded-xl bg-slate-950 p-6 text-white lg:grid-cols-[0.8fr_1.2fr] lg:p-8">
+        <div>
+          <div className="text-sm font-bold uppercase tracking-wide text-brand-accent">Vision & Mission</div>
+          <h2 className="mt-3 text-3xl font-black tracking-tight md:text-4xl">Switch between what guides us and how we deliver.</h2>
+          <div className="mt-6 inline-grid rounded-full border border-white/10 bg-white/5 p-1 sm:grid-cols-2">
+            {(["vision", "mission"] as const).map((item) => (
+              <button
+                key={item}
+                type="button"
+                onClick={() => setActive(item)}
+                className={`relative rounded-full px-5 py-2 text-sm font-bold capitalize transition ${active === item ? "text-slate-950" : "text-slate-300 hover:text-white"}`}
+              >
+                {active === item && <motion.span layoutId="vision-mission-pill" className="absolute inset-0 rounded-full bg-brand-accent" transition={{ type: "spring", stiffness: 420, damping: 32 }} />}
+                <span className="relative">{item}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="min-h-80 rounded-lg border border-white/10 bg-white/[0.04] p-6">
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={active}
+              initial={{ opacity: 0, x: 24 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -24 }}
+              transition={{ duration: 0.25 }}
+            >
+              <div className="text-sm font-bold uppercase tracking-wide text-brand-accent">{content.eyebrow}</div>
+              <h3 className="mt-3 text-3xl font-black leading-tight">{content.title}</h3>
+              <p className="mt-5 text-sm leading-7 text-slate-300">{content.text}</p>
+              <div className="mt-6 grid gap-3 sm:grid-cols-3">
+                {content.points.map((point) => (
+                  <div key={point} className="rounded-md border border-white/10 bg-white/5 p-3 text-sm font-semibold text-slate-200">{point}</div>
+                ))}
+              </div>
+            </motion.div>
+          </AnimatePresence>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function PerformanceSection() {
+  const [active, setActive] = useState(0);
+  const selected = performanceStats[active];
+  return (
+    <section className="mx-auto max-w-7xl px-4 py-14">
+      <div className="mb-6 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+        <h2 className="text-3xl font-bold tracking-tight">Creating Spaces. Building Trust.</h2>
+        <p className="max-w-xl text-sm leading-7 text-slate-500">Hover or tap each metric to see what it represents in AMK's work.</p>
+      </div>
+      <div className="grid gap-5 lg:grid-cols-[0.95fr_1.05fr]">
+        <motion.div
+          key={selected.label}
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.25 }}
+          className="rounded-xl bg-slate-950 p-7 text-white"
+        >
+          <div className="text-sm font-bold uppercase tracking-wide text-brand-accent">Selected Metric</div>
+          <div className="mt-5 text-5xl font-black text-brand-accent md:text-6xl">{selected.value}</div>
+          <h3 className="mt-4 text-2xl font-black">{selected.label}</h3>
+          <p className="mt-4 text-sm leading-7 text-slate-300">{selected.detail}</p>
+        </motion.div>
+        <div className="grid gap-4 sm:grid-cols-2">
+          {performanceStats.map((stat, index) => (
+            <motion.button
+              key={stat.label}
+              type="button"
+              onMouseEnter={() => setActive(index)}
+              onFocus={() => setActive(index)}
+              onClick={() => setActive(index)}
+              className={`rounded-lg border p-5 text-left shadow-sm transition ${active === index ? "border-orange-200 bg-orange-50" : "border-slate-200 bg-white hover:border-orange-200"}`}
+              whileHover={{ y: -3 }}
+              whileTap={{ scale: 0.98 }}
+            >
+              <div className="text-3xl font-black text-brand-primary">{stat.value}</div>
+              <div className="mt-2 text-sm font-semibold leading-6 text-slate-600">{stat.label}</div>
+              <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-slate-100">
+                <motion.div className="h-full rounded-full bg-brand-primary" animate={{ width: active === index ? "100%" : "35%" }} transition={{ duration: 0.25 }} />
+              </div>
+            </motion.button>
           ))}
         </div>
       </div>
@@ -334,7 +458,24 @@ export function HomePage() {
       </section>
       <DesignProcessSection />
       <Section title="End-to-End Design, Engineering & Construction Solutions">
-        <div className="grid gap-5 md:grid-cols-3">{serviceRows.map((service) => <Card key={service.id}><CheckCircle2 className="mb-4 text-brand-primary" /><h3 className="font-bold">{service.name}</h3><p className="mt-2 text-sm text-slate-500">{service.description}</p></Card>)}</div>
+        <div className="grid gap-5 md:grid-cols-3">
+          {serviceRows.map((service, index) => (
+            <motion.div
+              key={service.id}
+              initial={{ opacity: 0, y: 16 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, amount: 0.2 }}
+              transition={{ duration: 0.3, delay: Math.min(index * 0.04, 0.24) }}
+              whileHover={{ y: -4 }}
+            >
+              <Card className="h-full">
+                <CheckCircle2 className="mb-4 text-brand-primary" />
+                <h3 className="font-bold">{service.name}</h3>
+                <p className="mt-2 text-sm text-slate-500">{service.description}</p>
+              </Card>
+            </motion.div>
+          ))}
+        </div>
       </Section>
       <Section title="Integrated Capabilities">
         <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
@@ -393,16 +534,7 @@ export function HomePage() {
           ))}
         </div>
       </Section>
-      <Section title="Creating Spaces. Building Trust.">
-        <div className="grid gap-5 md:grid-cols-4">
-          {[
-            ["250+", "Projects Across South India"],
-            ["675,000+", "Square Feet of Thoughtfully Designed Spaces"],
-            ["Multi-Sector", "Residential, Commercial, and Institutional Expertise"],
-            ["Complete Partner", "Architecture, Engineering, BIM, Visualization, and Execution"]
-          ].map(([value, label]) => <Card key={label}><div className="text-4xl font-black text-brand-primary">{value}</div><div className="text-sm text-slate-500">{label}</div></Card>)}
-        </div>
-      </Section>
+      <PerformanceSection />
       <section className="bg-slate-950 px-4 py-16 text-white">
         <div className="mx-auto grid max-w-7xl items-center gap-8 lg:grid-cols-2">
           <div>
@@ -486,20 +618,7 @@ export function ListingPage({ type }: { type: "projects" | "services" | "gallery
           </div>
         </div>
       </Section>
-      <Section title="Vision & Mission">
-        <div className="grid gap-5 lg:grid-cols-2">
-          <Card>
-            <div className="text-sm font-bold uppercase tracking-wide text-brand-primary">Our Vision</div>
-            <h3 className="mt-2 text-2xl font-black">Designing the Future of the Built Environment</h3>
-            <p className="mt-4 text-sm leading-7 text-slate-600">To become a leading technology-driven architecture and engineering practice that transforms ideas into intelligent, sustainable, and impactful spaces through innovation, creativity, and advanced design technologies.</p>
-          </Card>
-          <Card>
-            <div className="text-sm font-bold uppercase tracking-wide text-brand-primary">Our Mission</div>
-            <h3 className="mt-2 text-2xl font-black">Design excellence with advanced delivery</h3>
-            <p className="mt-4 text-sm leading-7 text-slate-600">To deliver exceptional architectural and engineering solutions by integrating design excellence, BIM, parametric design, emerging construction technologies, and collaborative thinking to create spaces that inspire people, enhance communities, and stand the test of time.</p>
-          </Card>
-        </div>
-      </Section>
+      <VisionMissionToggle />
       <DesignProcessSection subtitle="A complete path from discovery to handover." />
       <Section title="What We Stand For">
         <div className="grid gap-5 md:grid-cols-3">
