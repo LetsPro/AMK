@@ -431,18 +431,18 @@ function TestimonialCarousel({ items }: { items: PublicTestimonial[] }) {
   return (
     <section className="mx-auto max-w-7xl px-4 py-14">
       <div
-        className="grid gap-8 rounded-xl bg-slate-950 p-6 text-white lg:grid-cols-[0.85fr_1.15fr] lg:p-8"
+        className="grid gap-8 border-y border-slate-200 py-10 lg:grid-cols-[0.85fr_1.15fr]"
         onMouseEnter={() => setPaused(true)}
         onMouseLeave={() => setPaused(false)}
       >
         <div className="flex flex-col justify-between gap-8">
           <div>
-            <div className="text-sm font-bold uppercase tracking-wide text-brand-accent">Client Testimonials</div>
-            <h2 className="mt-3 text-3xl font-black tracking-tight md:text-4xl">What clients say about working with AMK.</h2>
-            <p className="mt-4 text-sm leading-7 text-slate-300">Real feedback from residential, commercial, and development clients who trusted AMK for design, coordination, and project execution.</p>
+            <div className="text-sm font-semibold uppercase tracking-wide text-brand-primary">Client Testimonials</div>
+            <h2 className="mt-3 max-w-xl text-3xl font-semibold tracking-tight text-slate-950 md:text-4xl">What clients say about working with AMK.</h2>
+            <p className="mt-4 max-w-md text-sm font-normal leading-7 text-slate-500">Real feedback from residential, commercial, and development clients who trusted AMK for design, coordination, and project execution.</p>
           </div>
           <div>
-            <div className="mb-4 text-sm text-slate-400">{String(active + 1).padStart(2, "0")} / {String(safeItems.length).padStart(2, "0")}</div>
+            <div className="mb-4 text-sm font-medium text-slate-400">{String(active + 1).padStart(2, "0")} / {String(safeItems.length).padStart(2, "0")}</div>
             <div className="flex items-center gap-2">
               <Button variant="secondary" onClick={() => move(-1)} aria-label="Previous testimonial"><ChevronLeft className="h-4 w-4" /></Button>
               <Button variant="secondary" onClick={() => move(1)} aria-label="Next testimonial"><ChevronRight className="h-4 w-4" /></Button>
@@ -453,15 +453,15 @@ function TestimonialCarousel({ items }: { items: PublicTestimonial[] }) {
                     type="button"
                     aria-label={`Show testimonial ${index + 1}`}
                     onClick={() => setActive(index)}
-                    className={`h-2 rounded-full transition-all ${index === active ? "w-8 bg-brand-accent" : "w-2 bg-white/30"}`}
+                    className={`h-2 rounded-full transition-all ${index === active ? "w-8 bg-brand-primary" : "w-2 bg-slate-300"}`}
                   />
                 ))}
               </div>
             </div>
-            <p className="mt-4 text-xs font-semibold uppercase tracking-wide text-slate-500">{paused ? "Paused on hover" : "Auto-scrolls every 3 seconds"}</p>
+            <p className="mt-4 text-xs font-medium uppercase tracking-wide text-slate-400">{paused ? "Paused on hover" : "Auto-scrolls every 3 seconds"}</p>
           </div>
         </div>
-        <div className="overflow-hidden rounded-lg bg-white p-2 text-slate-950">
+        <div className="overflow-hidden rounded-lg text-slate-950">
           <AnimatePresence mode="wait">
             <motion.div
               key={testimonial.id}
@@ -469,17 +469,17 @@ function TestimonialCarousel({ items }: { items: PublicTestimonial[] }) {
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -80 }}
               transition={{ duration: 1, ease: [0.22, 1, 0.36, 1] }}
-              className="min-h-80 rounded-md border border-slate-100 bg-white p-6 shadow-sm md:p-8"
+              className="min-h-80 rounded-lg border border-slate-200 bg-white p-6 shadow-sm md:p-8"
             >
               <div className="flex gap-1 text-yellow-400">
                 {Array.from({ length: 5 }).map((_, index) => (
                   <Star key={index} className={`h-5 w-5 ${index < rating ? "fill-yellow-400" : "text-slate-200"}`} />
                 ))}
               </div>
-              <p className="mt-8 text-2xl font-semibold leading-10 text-slate-700">"{testimonial.quote}"</p>
+              <p className="mt-8 text-2xl font-normal leading-10 text-slate-600">"{testimonial.quote}"</p>
               <div className="mt-8 border-t border-slate-200 pt-5">
-                <div className="text-xl font-black text-slate-950">{testimonial.name}</div>
-                <div className="mt-1 text-sm font-semibold text-slate-500">{testimonial.company}</div>
+                <div className="text-xl font-semibold text-slate-950">{testimonial.name}</div>
+                <div className="mt-1 text-sm font-normal text-slate-500">{testimonial.company}</div>
               </div>
             </motion.div>
           </AnimatePresence>
