@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
-import { ArrowRight, CheckCircle2, ChevronLeft, ChevronRight, ClipboardCheck, Eye, Layers3, MapPin, Ruler, Send, ShieldCheck, UserPlus, X } from "lucide-react";
+import { ArrowRight, CheckCircle2, ChevronLeft, ChevronRight, ClipboardCheck, Eye, Layers3, MapPin, Ruler, Send, ShieldCheck, Star, UserPlus, X } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Input, Textarea } from "@/components/ui/Input";
@@ -29,6 +29,7 @@ function Seo({ title, description }: { title: string; description: string }) {
 
 type PublicProject = { id: string; name: string; slug?: string; description?: string | null; category?: string | null; location?: string | null; cover_image_url?: string | null; progress?: number | null; status?: string | null; budget?: number | null };
 type PublicGallery = { id: string; title: string; category?: string | null; image_url: string; description?: string | null };
+type PublicTestimonial = { id: string; name: string; company?: string | null; quote: string; rating?: number | null };
 
 const demoServices = [
   { id: "demo-service-1", name: "Architecture & Master Planning", slug: "architecture-master-planning", description: "Luxury residences, villas, apartments, commercial buildings, healthcare, hospitality, institutional, mixed-use, urban design, and master planning solutions.", image_url: "https://images.unsplash.com/photo-1503387762-592deb58ef4e?auto=format&fit=crop&w=1200&q=80" },
@@ -57,9 +58,9 @@ const demoGallery = [
 ];
 
 const demoTestimonials = [
-  { id: "demo-testimonial-1", name: "Homeowner, Mysuru", company: "Residential Client", quote: "From the initial concept to the final design, the AMK team demonstrated exceptional creativity, professionalism, and technical expertise." },
-  { id: "demo-testimonial-2", name: "Commercial Property Owner", company: "Commercial Client", quote: "AMK Architects & Engineers delivered a well-planned commercial project that balanced design, efficiency, and investment value." },
-  { id: "demo-testimonial-3", name: "Real Estate Developer", company: "Development Client", quote: "Their expertise in planning, engineering coordination, and project execution gave us complete confidence throughout the project." }
+  { id: "demo-testimonial-1", name: "Homeowner, Mysuru", company: "Residential Client", quote: "From the initial concept to the final design, the AMK team demonstrated exceptional creativity, professionalism, and technical expertise.", rating: 5 },
+  { id: "demo-testimonial-2", name: "Commercial Property Owner", company: "Commercial Client", quote: "AMK Architects & Engineers delivered a well-planned commercial project that balanced design, efficiency, and investment value.", rating: 5 },
+  { id: "demo-testimonial-3", name: "Real Estate Developer", company: "Development Client", quote: "Their expertise in planning, engineering coordination, and project execution gave us complete confidence throughout the project.", rating: 5 }
 ];
 
 const demoBanners = [
@@ -408,6 +409,86 @@ function PerformanceSection() {
   );
 }
 
+function TestimonialCarousel({ items }: { items: PublicTestimonial[] }) {
+  const [active, setActive] = useState(0);
+  const [paused, setPaused] = useState(false);
+  const safeItems = items.length ? items : demoTestimonials;
+  const testimonial = safeItems[active % safeItems.length];
+  const rating = Math.max(1, Math.min(5, testimonial.rating ?? 5));
+
+  useEffect(() => {
+    if (paused || safeItems.length <= 1) return;
+    const timer = window.setInterval(() => {
+      setActive((current) => (current + 1) % safeItems.length);
+    }, 3000);
+    return () => window.clearInterval(timer);
+  }, [paused, safeItems.length]);
+
+  function move(direction: 1 | -1) {
+    setActive((current) => (current + direction + safeItems.length) % safeItems.length);
+  }
+
+  return (
+    <section className="mx-auto max-w-7xl px-4 py-14">
+      <div
+        className="grid gap-8 rounded-xl bg-slate-950 p-6 text-white lg:grid-cols-[0.85fr_1.15fr] lg:p-8"
+        onMouseEnter={() => setPaused(true)}
+        onMouseLeave={() => setPaused(false)}
+      >
+        <div className="flex flex-col justify-between gap-8">
+          <div>
+            <div className="text-sm font-bold uppercase tracking-wide text-brand-accent">Client Testimonials</div>
+            <h2 className="mt-3 text-3xl font-black tracking-tight md:text-4xl">What clients say about working with AMK.</h2>
+            <p className="mt-4 text-sm leading-7 text-slate-300">Real feedback from residential, commercial, and development clients who trusted AMK for design, coordination, and project execution.</p>
+          </div>
+          <div>
+            <div className="mb-4 text-sm text-slate-400">{String(active + 1).padStart(2, "0")} / {String(safeItems.length).padStart(2, "0")}</div>
+            <div className="flex items-center gap-2">
+              <Button variant="secondary" onClick={() => move(-1)} aria-label="Previous testimonial"><ChevronLeft className="h-4 w-4" /></Button>
+              <Button variant="secondary" onClick={() => move(1)} aria-label="Next testimonial"><ChevronRight className="h-4 w-4" /></Button>
+              <div className="ml-2 flex gap-1">
+                {safeItems.map((item, index) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    aria-label={`Show testimonial ${index + 1}`}
+                    onClick={() => setActive(index)}
+                    className={`h-2 rounded-full transition-all ${index === active ? "w-8 bg-brand-accent" : "w-2 bg-white/30"}`}
+                  />
+                ))}
+              </div>
+            </div>
+            <p className="mt-4 text-xs font-semibold uppercase tracking-wide text-slate-500">{paused ? "Paused on hover" : "Auto-scrolls every 3 seconds"}</p>
+          </div>
+        </div>
+        <div className="overflow-hidden rounded-lg bg-white p-2 text-slate-950">
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={testimonial.id}
+              initial={{ opacity: 0, x: 80 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -80 }}
+              transition={{ duration: 1, ease: [0.22, 1, 0.36, 1] }}
+              className="min-h-80 rounded-md border border-slate-100 bg-white p-6 shadow-sm md:p-8"
+            >
+              <div className="flex gap-1 text-yellow-400">
+                {Array.from({ length: 5 }).map((_, index) => (
+                  <Star key={index} className={`h-5 w-5 ${index < rating ? "fill-yellow-400" : "text-slate-200"}`} />
+                ))}
+              </div>
+              <p className="mt-8 text-2xl font-semibold leading-10 text-slate-700">"{testimonial.quote}"</p>
+              <div className="mt-8 border-t border-slate-200 pt-5">
+                <div className="text-xl font-black text-slate-950">{testimonial.name}</div>
+                <div className="mt-1 text-sm font-semibold text-slate-500">{testimonial.company}</div>
+              </div>
+            </motion.div>
+          </AnimatePresence>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 export function HomePage() {
   const { data: services = [] } = useTable("services", { limit: 6, orderBy: "created_at", eq: { status: "published" } });
   const { data: projects = [] } = useTable("projects", { limit: 6, orderBy: "created_at", eq: { published: true } });
@@ -548,9 +629,7 @@ export function HomePage() {
           </div>
         </div>
       </section>
-      <Section title="Client Testimonials">
-        <div className="grid gap-5 md:grid-cols-3">{testimonialRows.map((item) => <Card key={item.id}><p className="text-slate-600">“{item.quote}”</p><div className="mt-4 font-bold">{item.name}</div><div className="text-sm text-slate-500">{item.company}</div></Card>)}</div>
-      </Section>
+      <TestimonialCarousel items={testimonialRows as PublicTestimonial[]} />
       <ContactPage compact />
       {selectedProject && <ProjectModal project={selectedProject} onClose={() => setSelectedProject(null)} />}
     </>
