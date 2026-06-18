@@ -818,26 +818,103 @@ export function ContactPage({ compact = false }: { compact?: boolean }) {
   const { create } = useTableMutations("enquiries");
   const { branding } = useAppSettings();
   const [form, setForm] = useState({ name: "", email: "", mobile: "", subject: "", message: "" });
+  const enquiryTypes = ["Architecture Consultation", "Commercial Development", "BIM / Parametric Design", "Interior Transformation", "3D Printing & Fabrication"];
+  const responseSteps = [
+    ["01", "Share requirements", "Tell us the project type, location, goals, and current stage."],
+    ["02", "Studio review", "AMK reviews the scope and identifies the right design and engineering route."],
+    ["03", "Consultation", "The team follows up with next steps, documentation needs, and a project direction."]
+  ];
+  if (compact) return (
+    <section className="mx-auto max-w-7xl px-4 py-14">
+      <div className="rounded-lg bg-gradient-to-r from-brand-primary to-brand-accent p-8 text-white">
+        <h3 className="text-2xl font-bold">Let's build something extraordinary</h3>
+        <p className="mt-2">Whether you are planning a residence, commercial development, healthcare facility, layout project, interior transformation, or technology-led design solution, AMK is ready to turn your vision into reality.</p>
+      </div>
+    </section>
+  );
   return (
     <>
-      {!compact && <Seo title="Contact AMK Architects Mysuru | Architecture & Engineering Enquiry" description="Contact AMK Architects & Engineers in Mysuru, Karnataka for residential design, approval drawings, structural coordination, interiors, and project execution support." />}
-      <Section title="Contact Us">
-        <div className="grid gap-6 md:grid-cols-2">
-          <Card><h3 className="mb-4 font-bold">Send an enquiry</h3><form className="space-y-3" onSubmit={async (event) => { event.preventDefault(); await create.mutateAsync({ ...form, source: "website" }); setForm({ name: "", email: "", mobile: "", subject: "", message: "" }); }}><Input required placeholder="Name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /><Input placeholder="Email" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /><Input placeholder="Mobile" value={form.mobile} onChange={(e) => setForm({ ...form, mobile: e.target.value })} /><Input placeholder="Subject" value={form.subject} onChange={(e) => setForm({ ...form, subject: e.target.value })} /><Textarea required placeholder="Message" value={form.message} onChange={(e) => setForm({ ...form, message: e.target.value })} /><Button disabled={create.isPending}><Send className="h-4 w-4" /> Submit</Button></form></Card>
-          <Card>
-            <h3 className="mb-4 font-bold">Schedule a Consultation</h3>
-            <div className="space-y-3 text-sm text-slate-600">
-              <p className="flex items-start gap-2"><MapPin className="mt-0.5 h-4 w-4 text-brand-primary" />{branding.location}</p>
-              <p>{branding.phone}</p>
-              <p>{branding.email}</p>
-              <p>www.amkarchitects.in</p>
-            </div>
-            <p className="mt-5 text-sm leading-6 text-slate-500">Tell us your ideas, goals, and project requirements. Together, we will create spaces that inspire, perform, and endure.</p>
-          </Card>
+      <Seo title="Contact AMK Architects Mysuru | Architecture & Engineering Enquiry" description="Contact AMK Architects & Engineers in Mysuru, Karnataka for residential design, approval drawings, structural coordination, interiors, and project execution support." />
+      <section className="bg-slate-950 px-4 py-20 text-white">
+        <div className="mx-auto grid max-w-7xl gap-8 lg:grid-cols-[0.95fr_1.05fr]">
+          <motion.div initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35 }}>
+            <div className="text-sm font-semibold uppercase tracking-wide text-brand-accent">Contact AMK</div>
+            <h1 className="mt-3 max-w-3xl text-4xl font-black tracking-tight md:text-6xl">Start a focused conversation about your next space.</h1>
+            <p className="mt-5 max-w-2xl text-sm leading-7 text-slate-300">Share your site, project goals, design expectations, or technology-led requirements. AMK will route the enquiry into the right architecture, engineering, BIM, visualization, or execution workflow.</p>
+          </motion.div>
+          <motion.div initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35, delay: 0.1 }} className="grid gap-3 sm:grid-cols-2">
+            {[
+              ["Location", branding.location],
+              ["Phone", branding.phone],
+              ["Email", branding.email],
+              ["Website", "www.amkarchitects.in"]
+            ].map(([label, value]) => (
+              <div key={label} className="rounded-lg border border-white/10 bg-white/[0.04] p-5">
+                <div className="text-xs font-bold uppercase tracking-wide text-brand-accent">{label}</div>
+                <div className="mt-2 text-sm leading-6 text-slate-200">{value}</div>
+              </div>
+            ))}
+          </motion.div>
         </div>
-        {!compact && <div className="mt-8 grid gap-5 md:grid-cols-3">{["Dream residence", "Commercial development", "BIM, Parametric Design, or 3D Printing"].map((item) => <Card key={item}><h3 className="font-bold">{item}</h3><p className="mt-2 text-sm text-slate-500">Share your requirements and AMK will create a CRM lead for follow-up.</p></Card>)}</div>}
-        {compact && <div className="mt-8 rounded-lg bg-gradient-to-r from-brand-primary to-brand-accent p-8 text-white"><h3 className="text-2xl font-bold">Let's build something extraordinary</h3><p className="mt-2">Whether you are planning a residence, commercial development, healthcare facility, layout project, interior transformation, or technology-led design solution, AMK is ready to turn your vision into reality.</p></div>}
-      </Section>
+      </section>
+      <section className="mx-auto max-w-7xl px-4 py-14">
+        <div className="grid gap-8 lg:grid-cols-[1.1fr_0.9fr]">
+          <motion.div initial={{ opacity: 0, y: 16 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, amount: 0.25 }} transition={{ duration: 0.35 }} className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+            <div className="mb-6">
+              <div className="text-sm font-semibold uppercase tracking-wide text-brand-primary">Project Enquiry</div>
+              <h2 className="mt-2 text-3xl font-semibold tracking-tight">Tell us what you want to build.</h2>
+              <p className="mt-3 text-sm leading-7 text-slate-500">Choose a project type or write your own subject. The enquiry is saved directly into AMK's CRM for follow-up.</p>
+            </div>
+            <div className="mb-5 flex flex-wrap gap-2">
+              {enquiryTypes.map((item) => (
+                <button
+                  key={item}
+                  type="button"
+                  onClick={() => setForm({ ...form, subject: item })}
+                  className={`rounded-full border px-4 py-2 text-sm font-medium transition ${form.subject === item ? "border-brand-primary bg-orange-50 text-brand-primary" : "border-slate-200 bg-white text-slate-600 hover:border-orange-200"}`}
+                >
+                  {item}
+                </button>
+              ))}
+            </div>
+            <form className="grid gap-4 md:grid-cols-2" onSubmit={async (event) => { event.preventDefault(); await create.mutateAsync({ ...form, source: "website" }); setForm({ name: "", email: "", mobile: "", subject: "", message: "" }); }}>
+              <Input required placeholder="Name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+              <Input placeholder="Mobile" value={form.mobile} onChange={(e) => setForm({ ...form, mobile: e.target.value })} />
+              <Input className="md:col-span-2" placeholder="Email" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
+              <Input className="md:col-span-2" placeholder="Subject" value={form.subject} onChange={(e) => setForm({ ...form, subject: e.target.value })} />
+              <Textarea className="md:col-span-2 min-h-40" required placeholder="Project brief, site location, expected scope, or questions" value={form.message} onChange={(e) => setForm({ ...form, message: e.target.value })} />
+              <div className="md:col-span-2">
+                <Button disabled={create.isPending}><Send className="h-4 w-4" /> Submit Enquiry</Button>
+              </div>
+            </form>
+            {create.error && <p className="mt-4 rounded-md bg-red-50 p-3 text-sm font-medium text-red-700">{create.error.message}</p>}
+          </motion.div>
+          <div className="grid gap-5">
+            <motion.div initial={{ opacity: 0, y: 16 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, amount: 0.25 }} transition={{ duration: 0.35, delay: 0.08 }} className="rounded-xl bg-slate-50 p-6">
+              <h2 className="text-2xl font-semibold tracking-tight">How the consultation moves forward</h2>
+              <div className="mt-6 grid gap-4">
+                {responseSteps.map(([number, title, text]) => (
+                  <div key={number} className="grid grid-cols-[3rem_1fr] gap-4">
+                    <div className="grid h-11 w-11 place-items-center rounded-md bg-orange-50 text-sm font-bold text-brand-primary">{number}</div>
+                    <div>
+                      <h3 className="font-semibold text-slate-950">{title}</h3>
+                      <p className="mt-1 text-sm leading-6 text-slate-500">{text}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </motion.div>
+            <motion.div initial={{ opacity: 0, y: 16 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, amount: 0.25 }} transition={{ duration: 0.35, delay: 0.14 }} className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+              <h2 className="text-2xl font-semibold tracking-tight">Useful details to include</h2>
+              <div className="mt-5 grid gap-3">
+                {["Project type and site location", "Approximate area or scale", "Current stage and timeline", "Design, BIM, approval, or execution needs"].map((item) => (
+                  <div key={item} className="flex gap-3 text-sm leading-6 text-slate-600"><CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-brand-primary" />{item}</div>
+                ))}
+              </div>
+            </motion.div>
+          </div>
+        </div>
+      </section>
     </>
   );
 }
