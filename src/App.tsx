@@ -46,7 +46,6 @@ export function App() {
             <Route index element={<DashboardPage />} />
             <Route path="leads" element={<ModulePage name="leads" />} />
             <Route path="customers" element={<ModulePage name="customers" />} />
-            <Route path="clients" element={<ModulePage name="clients" />} />
             <Route path="projects" element={<ModulePage name="projects" />} />
             <Route path="calculations" element={<CalculatorPage />} />
             <Route path="quotations" element={<ModulePage name="quotations" />} />

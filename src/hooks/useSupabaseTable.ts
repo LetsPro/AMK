@@ -13,7 +13,10 @@ export function useTable<T extends TableName>(table: T, options?: Parameters<typ
 export function useTableMutations<T extends TableName>(table: T, options?: { toast?: boolean }) {
   const queryClient = useQueryClient();
   const toast = useToast();
-  const invalidate = () => queryClient.invalidateQueries({ queryKey: [table] });
+  const invalidate = () => {
+    queryClient.invalidateQueries({ queryKey: [table] });
+    if (table === "leads") queryClient.invalidateQueries({ queryKey: ["customers"] });
+  };
   const label = String(table).replace(/_/g, " ");
   const message = (error: unknown) => error instanceof Error ? error.message : "Operation failed";
   const notify = options?.toast !== false;

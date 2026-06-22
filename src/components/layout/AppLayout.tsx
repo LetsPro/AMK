@@ -2,7 +2,7 @@ import { Outlet, NavLink, useNavigate } from "react-router-dom";
 import { useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
-  BarChart3, Bell, BriefcaseBusiness, Building2, Calculator, CalendarCheck, ChevronLeft, ChevronRight,
+  BarChart3, Bell, BriefcaseBusiness, Calculator, CalendarCheck, ChevronLeft, ChevronRight,
   CreditCard, FileText, GalleryHorizontal, Image, LayoutDashboard, LogOut, Menu, Moon, Plus, ReceiptText,
   Search, Settings, ShieldCheck, Sun, Ticket, Users
 } from "lucide-react";
@@ -16,8 +16,7 @@ const navGroups = [
   { group: "Overview", items: [{ to: "/app", label: "Dashboard", icon: LayoutDashboard }] },
   { group: "CRM", items: [
     { to: "/app/leads", label: "Leads", icon: BriefcaseBusiness },
-    { to: "/app/customers", label: "Customers", icon: Users },
-    { to: "/app/clients", label: "Clients", icon: Building2 }
+    { to: "/app/customers", label: "Customers", icon: Users }
   ] },
   { group: "Projects", items: [
     { to: "/app/projects", label: "Projects", icon: BarChart3 },

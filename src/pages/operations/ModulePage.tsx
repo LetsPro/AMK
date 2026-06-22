@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { ColumnDef } from "@tanstack/react-table";
-import { Download, Edit3, Plus, Save, Trash2, UserCheck, X } from "lucide-react";
+import { Download, Edit3, Plus, Save, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Input, Select, Textarea } from "@/components/ui/Input";
@@ -17,7 +17,6 @@ type Field = { key: string; label: string; type?: "text" | "email" | "number" | 
 const configs: Record<string, { table: TableName; title: string; fields: Field[]; columns: string[] }> = {
   leads: { table: "leads", title: "Lead Management", fields: [{ key: "name", label: "Name" }, { key: "company", label: "Company" }, { key: "mobile", label: "Mobile" }, { key: "email", label: "Email", type: "email" }, { key: "address", label: "Address" }, { key: "source", label: "Source" }, { key: "service_interested", label: "Service Interested" }, { key: "budget", label: "Budget", type: "number" }, { key: "status", label: "Status", type: "select", options: ["New", "Contacted", "Follow Up", "Proposal Sent", "Converted", "Lost"] }, { key: "notes", label: "Notes", type: "textarea" }], columns: ["lead_code", "name", "mobile", "email", "status", "budget"] },
   customers: { table: "customers", title: "Customer Management", fields: [{ key: "name", label: "Name" }, { key: "company", label: "Company" }, { key: "email", label: "Email", type: "email" }, { key: "mobile", label: "Mobile" }, { key: "address", label: "Address" }, { key: "notes", label: "Notes", type: "textarea" }], columns: ["name", "company", "email", "mobile"] },
-  clients: { table: "clients", title: "Client Management", fields: [{ key: "name", label: "Client Name" }, { key: "contact_person", label: "Contact Person" }, { key: "email", label: "Email", type: "email" }, { key: "mobile", label: "Mobile" }, { key: "address", label: "Address" }, { key: "contract_value", label: "Contract Value", type: "number" }, { key: "notes", label: "Notes", type: "textarea" }], columns: ["name", "contact_person", "email", "contract_value"] },
   projects: { table: "projects", title: "Project Management", fields: [{ key: "name", label: "Project Name" }, { key: "slug", label: "Slug" }, { key: "category", label: "Category" }, { key: "location", label: "Location" }, { key: "cover_image_url", label: "Cover Image", type: "media" }, { key: "status", label: "Status", type: "select", options: ["Planning", "Design", "Approval", "Execution", "Completed"] }, { key: "budget", label: "Budget", type: "number" }, { key: "progress", label: "Progress", type: "number" }, { key: "start_date", label: "Start Date", type: "date" }, { key: "end_date", label: "Deadline", type: "date" }, { key: "description", label: "Description", type: "textarea" }], columns: ["name", "status", "location", "budget", "progress"] },
   quotations: { table: "quotations", title: "Quotation Management", fields: [{ key: "customer_id", label: "Customer", type: "customer" }, { key: "status", label: "Status", type: "select", options: ["Draft", "Sent", "Approved", "Rejected"] }, { key: "subtotal", label: "Subtotal", type: "number" }, { key: "tax", label: "Tax", type: "number" }, { key: "discount", label: "Discount", type: "number" }, { key: "grand_total", label: "Grand Total", type: "number" }, { key: "valid_until", label: "Valid Until", type: "date" }, { key: "notes", label: "Notes", type: "textarea" }], columns: ["quote_no", "customer_id", "status", "subtotal", "grand_total"] },
   invoices: { table: "invoices", title: "Invoice Management", fields: [{ key: "customer_id", label: "Customer", type: "customer" }, { key: "status", label: "Status", type: "select", options: ["Unpaid", "Partial", "Paid", "Overdue"] }, { key: "subtotal", label: "Subtotal", type: "number" }, { key: "tax", label: "Tax", type: "number" }, { key: "discount", label: "Discount", type: "number" }, { key: "grand_total", label: "Grand Total", type: "number" }, { key: "paid_total", label: "Paid Total", type: "number" }, { key: "due_date", label: "Due Date", type: "date" }, { key: "notes", label: "Notes", type: "textarea" }], columns: ["invoice_no", "customer_id", "status", "grand_total", "paid_total"] },
@@ -33,7 +32,6 @@ export function ModulePage({ name }: { name: keyof typeof configs }) {
   const config = configs[name];
   const { data = [], isLoading } = useTable(config.table, { orderBy: "created_at" });
   const { create, update, remove } = useTableMutations(config.table);
-  const customerMutations = useTableMutations("customers");
   const { data: customers = [] } = useTable("customers", { orderBy: "created_at" });
   const [open, setOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -45,7 +43,6 @@ export function ModulePage({ name }: { name: keyof typeof configs }) {
       const record = row.original as Record<string, string | number | null>;
       return (
         <div className="flex flex-wrap gap-1">
-          {config.table === "leads" && !record.customer_id && <Button className="h-8" variant="secondary" onClick={() => convertLead(record)}><UserCheck className="h-4 w-4" /> Convert</Button>}
           <Button className="h-8" variant="ghost" onClick={() => editRecord(record)}><Edit3 className="h-4 w-4" /></Button>
           <Button className="h-8" variant="ghost" onClick={() => remove.mutate(row.original.id)}><Trash2 className="h-4 w-4" /></Button>
         </div>
@@ -61,17 +58,6 @@ export function ModulePage({ name }: { name: keyof typeof configs }) {
     setForm(next as Record<string, string | number>);
     setEditingId(String(record.id));
     setOpen(true);
-  }
-  async function convertLead(record: Record<string, string | number | null>) {
-    const customer = await customerMutations.create.mutateAsync({
-      name: String(record.name ?? ""),
-      company: record.company ? String(record.company) : null,
-      email: record.email ? String(record.email) : null,
-      mobile: record.mobile ? String(record.mobile) : null,
-      address: record.address ? String(record.address) : null,
-      notes: record.notes ? String(record.notes) : "Converted from lead"
-    });
-    await update.mutateAsync({ id: String(record.id), payload: { status: "Converted", customer_id: customer.id } as never });
   }
   async function submit(event: React.FormEvent) {
     event.preventDefault();

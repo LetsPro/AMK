@@ -8,7 +8,7 @@ import { useTable } from "@/hooks/useSupabaseTable";
 import type { TableName } from "@/services/crud";
 import { exportCsv, exportPdf } from "@/services/pdf";
 
-const tables: TableName[] = ["leads", "customers", "clients", "projects", "quotations", "invoices", "payments", "expenses", "attendance"];
+const tables: TableName[] = ["leads", "customers", "projects", "quotations", "invoices", "payments", "expenses", "attendance"];
 
 export function ReportsPage() {
   const [table, setTable] = useState<TableName>("leads");
