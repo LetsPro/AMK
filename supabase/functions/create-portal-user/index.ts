@@ -7,6 +7,13 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
 };
 
+function ok(body: Record<string, unknown>) {
+  return new Response(JSON.stringify(body), {
+    status: 200,
+    headers: { "Content-Type": "application/json", ...corsHeaders },
+  });
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { status: 200, headers: corsHeaders });
@@ -16,10 +23,7 @@ Deno.serve(async (req: Request) => {
     const { email, password, full_name, existing_user_id } = await req.json();
 
     if (!email || !password) {
-      return new Response(JSON.stringify({ error: "Email and password are required" }), {
-        status: 400,
-        headers: { "Content-Type": "application/json", ...corsHeaders },
-      });
+      return ok({ error: "Email and password are required" });
     }
 
     const supabaseAdmin = createClient(
@@ -28,54 +32,50 @@ Deno.serve(async (req: Request) => {
       { auth: { autoRefreshToken: false, persistSession: false } }
     );
 
-    let userId: string;
-
     if (existing_user_id) {
-      // Update existing user's credentials
-      const { data: updated, error: updateError } = await supabaseAdmin.auth.admin.updateUserById(existing_user_id, {
-        email,
-        password,
-        email_confirm: true,
-      });
-      if (updateError) {
-        return new Response(JSON.stringify({ error: updateError.message }), {
-          status: 400,
-          headers: { "Content-Type": "application/json", ...corsHeaders },
-        });
-      }
-      userId = updated.user.id;
-    } else {
-      // Create new auth user
-      const { data: userData, error: createError } = await supabaseAdmin.auth.admin.createUser({
-        email,
-        password,
-        email_confirm: true,
-        user_metadata: { full_name },
-      });
-      if (createError) {
-        return new Response(JSON.stringify({ error: createError.message }), {
-          status: 400,
-          headers: { "Content-Type": "application/json", ...corsHeaders },
-        });
-      }
-      userId = userData.user.id;
-
-      // Insert profile row — ignore error if trigger already created it
-      await supabaseAdmin.from("profiles").upsert({
-        id: userId,
-        full_name: full_name ?? email,
-        email,
-      }, { onConflict: "id", ignoreDuplicates: false });
+      const { data: updated, error } = await supabaseAdmin.auth.admin.updateUserById(
+        existing_user_id,
+        { email, password, email_confirm: true }
+      );
+      if (error) return ok({ error: error.message });
+      return ok({ user_id: updated.user.id });
     }
 
-    return new Response(JSON.stringify({ user_id: userId }), {
-      status: 200,
-      headers: { "Content-Type": "application/json", ...corsHeaders },
+    // Try to create new user
+    const { data: created, error: createErr } = await supabaseAdmin.auth.admin.createUser({
+      email,
+      password,
+      email_confirm: true,
+      user_metadata: { full_name: full_name ?? email },
     });
+
+    if (createErr) {
+      // If email already registered, find and update that user
+      if (createErr.message.includes("already") || createErr.message.includes("registered")) {
+        const { data: list } = await supabaseAdmin.auth.admin.listUsers({ perPage: 1000 });
+        const existing = list?.users?.find((u) => u.email === email);
+        if (existing) {
+          const { data: updated, error: updErr } = await supabaseAdmin.auth.admin.updateUserById(
+            existing.id,
+            { password, email_confirm: true }
+          );
+          if (updErr) return ok({ error: updErr.message });
+          return ok({ user_id: updated.user.id });
+        }
+      }
+      return ok({ error: createErr.message });
+    }
+
+    const userId = created.user.id;
+
+    // Create profile row (ignore error — may already exist from trigger)
+    await supabaseAdmin.from("profiles").upsert(
+      { id: userId, full_name: full_name ?? email, email },
+      { onConflict: "id", ignoreDuplicates: true }
+    );
+
+    return ok({ user_id: userId });
   } catch (err) {
-    return new Response(JSON.stringify({ error: String(err) }), {
-      status: 500,
-      headers: { "Content-Type": "application/json", ...corsHeaders },
-    });
+    return ok({ error: String(err) });
   }
 });
