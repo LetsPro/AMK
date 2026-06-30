@@ -2,7 +2,7 @@ import { Outlet, NavLink, useNavigate } from "react-router-dom";
 import { useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
-  Bell, ChevronLeft, ChevronRight, FolderOpen,
+  Bell, ChevronLeft, ChevronRight, FileStack, FolderOpen,
   Gauge, LayoutDashboard, LogOut, Menu, Moon,
   Settings, Sun, Users, X
 } from "lucide-react";
@@ -17,6 +17,7 @@ const navItems = [
   { to: "/app/clients", label: "Clients", icon: Users },
   { to: "/app/portfolio", label: "Portfolio", icon: Gauge },
   { to: "/app/files", label: "My Files", icon: FolderOpen },
+  { to: "/app/stages", label: "Stages", icon: FileStack },
   { to: "/app/settings", label: "Settings", icon: Settings },
 ];
 
