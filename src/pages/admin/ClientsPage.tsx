@@ -250,7 +250,8 @@ export function ClientsPage() {
   function openEdit(client: Client) {
     setEditClient(client);
     setForm({ name: client.name, email: client.email ?? "", mobile: client.mobile ?? "", address: client.address ?? "", notes: client.notes ?? "", admin_notes: client.admin_notes ?? "", status: client.status as ClientStatus });
-    setPortalEmail("");
+    // Pre-fill portal email with client email so user only needs to enter password
+    setPortalEmail(client.email ?? "");
     setPortalPassword("");
     setShowPortalPassword(false);
     setShowForm(true);
@@ -260,31 +261,44 @@ export function ClientsPage() {
     if (!form.name.trim()) { toast.error("Name required"); return; }
     setSaving(true);
     try {
+      // Resolve portal email: explicit entry or fall back to client email
+      const effectivePortalEmail = portalEmail.trim() || form.email.trim();
+
       if (editClient) {
         const { error } = await supabase.from("clients").update(form).eq("id", editClient.id);
         if (error) throw error;
-        if (portalEmail && portalPassword) {
+
+        if (portalPassword.trim()) {
+          if (!effectivePortalEmail) throw new Error("Portal email is required to set credentials");
           if (portalPassword.length < 8) throw new Error("Password must be at least 8 characters");
           const { data: fn, error: fnErr } = await supabase.functions.invoke("create-portal-user", {
-            body: { email: portalEmail, password: portalPassword, full_name: form.name, existing_user_id: editClient.auth_user_id ?? null },
+            body: { email: effectivePortalEmail, password: portalPassword, full_name: form.name, existing_user_id: editClient.auth_user_id ?? null },
           });
           if (fnErr) throw new Error(fnErr.message);
           if (fn?.error) throw new Error(fn.error);
-          if (fn?.user_id) await supabase.from("clients").update({ auth_user_id: fn.user_id }).eq("id", editClient.id);
+          if (fn?.user_id) {
+            const { error: upErr } = await supabase.from("clients").update({ auth_user_id: fn.user_id }).eq("id", editClient.id);
+            if (upErr) throw upErr;
+          }
         }
         toast.success("Client updated");
       } else {
         const { data: newClient, error } = await supabase.from("clients").insert(form).select("id").single();
         if (error) throw error;
         const clientId = (newClient as { id: string }).id;
-        if (portalEmail && portalPassword) {
+
+        if (portalPassword.trim()) {
+          if (!effectivePortalEmail) throw new Error("Portal email is required to set credentials");
           if (portalPassword.length < 8) throw new Error("Password must be at least 8 characters");
           const { data: fn, error: fnErr } = await supabase.functions.invoke("create-portal-user", {
-            body: { email: portalEmail, password: portalPassword, full_name: form.name },
+            body: { email: effectivePortalEmail, password: portalPassword, full_name: form.name },
           });
           if (fnErr) throw new Error(fnErr.message);
           if (fn?.error) throw new Error(fn.error);
-          if (fn?.user_id) await supabase.from("clients").update({ auth_user_id: fn.user_id }).eq("id", clientId);
+          if (fn?.user_id) {
+            const { error: upErr } = await supabase.from("clients").update({ auth_user_id: fn.user_id }).eq("id", clientId);
+            if (upErr) throw upErr;
+          }
         }
         toast.success("Client created");
       }
@@ -677,7 +691,7 @@ export function ClientsPage() {
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-1">Email</label>
-                    <Input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="email@example.com" />
+                    <Input type="email" value={form.email} onChange={(e) => { setForm({ ...form, email: e.target.value }); if (!editClient) setPortalEmail(e.target.value); }} placeholder="email@example.com" />
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-1">Phone</label>
@@ -711,11 +725,20 @@ export function ClientsPage() {
                     {editClient?.auth_user_id && <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-700">Active</span>}
                   </div>
                   <p className="text-xs text-slate-500">
-                    {editClient?.auth_user_id ? "Enter new credentials to update portal login." : "Set login credentials so this client can access their portal."}
+                    {editClient?.auth_user_id
+                      ? "Enter a new password to update portal login. Leave password blank to keep existing."
+                      : "Enter a password to give this client portal access. Email defaults to the client email above."}
                   </p>
                   <div>
                     <label className="block text-xs font-medium text-slate-600 mb-1">Portal Email</label>
-                    <Input type="email" value={portalEmail} onChange={(e) => setPortalEmail(e.target.value)} placeholder={form.email || "client@example.com"} className="h-9 text-sm" />
+                    <Input
+                      type="email"
+                      value={portalEmail}
+                      onChange={(e) => setPortalEmail(e.target.value)}
+                      placeholder={form.email || "client@example.com"}
+                      className="h-9 text-sm"
+                    />
+                    <p className="mt-1 text-xs text-slate-400">Leave blank to use the client email above.</p>
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-slate-600 mb-1">Password</label>
