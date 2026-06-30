@@ -1,7 +1,7 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useSearchParams } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { Download, Eye, FileText, Pencil, Plus, Search, Trash2, X } from "lucide-react";
+import { ChevronDown, Download, Eye, FileText, Link2, Pencil, Plus, Search, Trash2, X } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/Button";
@@ -14,8 +14,15 @@ type FileAssignment = TableRow<"client_file_assignments"> & {
   file: { display_name: string; public_url: string; mime_type: string | null; size: number | null } | null;
   stage: { name: string; color: string | null } | null;
 };
+type BlueprintAssignment = TableRow<"client_blueprint_assignments"> & {
+  blueprint: { title: string; url: string } | null;
+};
+type FileRecord = TableRow<"files">;
+type Blueprint = TableRow<"blueprint_links">;
+type Stage = TableRow<"stages">;
 
 const STATUS_OPTIONS: ClientStatus[] = ["Active", "On Hold", "Completed", "Inactive"];
+const FILE_CATEGORIES = ["Blueprint", "Design", "Report", "Contract", "Invoice", "Other"];
 
 const statusColor: Record<ClientStatus, string> = {
   Active: "bg-emerald-100 text-emerald-700 border-emerald-200",
@@ -43,6 +50,51 @@ function formatSize(bytes: number | null) {
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 }
 
+// Simple inline combobox for file/blueprint selection
+type ComboOption = { id: string; label: string; sub?: string };
+function Combobox({ options, value, onChange, placeholder }: { options: ComboOption[]; value: string; onChange: (id: string) => void; placeholder?: string }) {
+  const [query, setQuery] = useState("");
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  const selected = options.find((o) => o.id === value);
+  const filtered = options.filter((o) => `${o.label} ${o.sub ?? ""}`.toLowerCase().includes(query.toLowerCase()));
+
+  useEffect(() => {
+    function handler(e: MouseEvent) { if (!ref.current?.contains(e.target as Node)) setOpen(false); }
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  return (
+    <div ref={ref} className="relative">
+      <button type="button" onClick={() => { setOpen((v) => !v); setQuery(""); }} className={cn("flex h-9 w-full items-center justify-between rounded-md border bg-white px-3 text-sm transition", open ? "border-brand-primary ring-2 ring-orange-100" : "border-slate-200 hover:border-slate-300")}>
+        <span className={selected ? "text-slate-900 truncate" : "text-slate-400 truncate"}>{selected ? selected.label : (placeholder ?? "Select...")}</span>
+        <ChevronDown className={cn("h-3.5 w-3.5 shrink-0 text-slate-400 transition-transform ml-2", open && "rotate-180")} />
+      </button>
+      {open && (
+        <div className="absolute z-50 mt-1 w-full rounded-lg border border-slate-200 bg-white shadow-xl">
+          <div className="p-2 border-b border-slate-100">
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-2.5 top-2 h-3 w-3 text-slate-400" />
+              <input autoFocus value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search..." className="h-7 w-full rounded border-0 bg-slate-50 pl-6 pr-2 text-xs outline-none" />
+            </div>
+          </div>
+          <div className="max-h-44 overflow-y-auto">
+            {filtered.length === 0 ? (
+              <div className="px-3 py-3 text-center text-xs text-slate-400">No results</div>
+            ) : filtered.map((o) => (
+              <button key={o.id} type="button" onClick={() => { onChange(o.id); setOpen(false); }} className={cn("flex w-full flex-col items-start px-3 py-1.5 text-xs hover:bg-slate-50 transition-colors", o.id === value && "bg-brand-primary/5 text-brand-primary")}>
+                <span className="font-medium">{o.label}</span>
+                {o.sub && <span className="text-slate-400 truncate w-full">{o.sub}</span>}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function ClientsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const toast = useToast();
@@ -59,7 +111,18 @@ export function ClientsPage() {
   // Detail modal state
   const [viewClient, setViewClient] = useState<Client | null>(null);
   const [clientFiles, setClientFiles] = useState<FileAssignment[]>([]);
+  const [clientBlueprints, setClientBlueprints] = useState<BlueprintAssignment[]>([]);
   const [loadingFiles, setLoadingFiles] = useState(false);
+
+  // Assign file state
+  const [allFiles, setAllFiles] = useState<FileRecord[]>([]);
+  const [allBlueprints, setAllBlueprints] = useState<Blueprint[]>([]);
+  const [allStages, setAllStages] = useState<Stage[]>([]);
+  const [showAssignFile, setShowAssignFile] = useState(false);
+  const [showAssignBlueprint, setShowAssignBlueprint] = useState(false);
+  const [fileAssignForm, setFileAssignForm] = useState({ file_id: "", stage_id: "", client_title: "", category: "", can_preview: true, can_download: true });
+  const [bpAssignForm, setBpAssignForm] = useState({ blueprint_id: "", stage_id: "", is_visible: true });
+  const [savingAssign, setSavingAssign] = useState(false);
 
   const fetchClients = useCallback(async () => {
     setLoading(true);
@@ -77,14 +140,89 @@ export function ClientsPage() {
   async function openDetail(client: Client) {
     setViewClient(client);
     setClientFiles([]);
+    setClientBlueprints([]);
+    setShowAssignFile(false);
+    setShowAssignBlueprint(false);
     setLoadingFiles(true);
-    const { data } = await supabase
-      .from("client_file_assignments")
-      .select("*, file:files(display_name,public_url,mime_type,size), stage:stages(name,color)")
-      .eq("client_id", client.id)
-      .order("display_order");
-    setClientFiles((data as FileAssignment[]) ?? []);
+
+    const [{ data: fData }, { data: bData }, { data: filesData }, { data: bpsData }, { data: stagesData }] = await Promise.all([
+      supabase.from("client_file_assignments").select("*, file:files(display_name,public_url,mime_type,size), stage:stages(name,color)").eq("client_id", client.id).order("display_order"),
+      supabase.from("client_blueprint_assignments").select("*, blueprint:blueprint_links(title,url)").eq("client_id", client.id),
+      supabase.from("files").select("id,display_name,mime_type").is("deleted_at", null).order("display_name"),
+      supabase.from("blueprint_links").select("id,title,url").eq("is_active", true).order("title"),
+      supabase.from("stages").select("id,name").eq("status", "active").order("display_order"),
+    ]);
+    setClientFiles((fData as FileAssignment[]) ?? []);
+    setClientBlueprints((bData as BlueprintAssignment[]) ?? []);
+    setAllFiles((filesData as FileRecord[]) ?? []);
+    setAllBlueprints((bpsData as Blueprint[]) ?? []);
+    setAllStages((stagesData as Stage[]) ?? []);
     setLoadingFiles(false);
+  }
+
+  async function assignFile() {
+    if (!viewClient || !fileAssignForm.file_id || !fileAssignForm.client_title.trim()) {
+      toast.error("File and title are required");
+      return;
+    }
+    setSavingAssign(true);
+    const { error } = await supabase.from("client_file_assignments").insert({
+      client_id: viewClient.id,
+      file_id: fileAssignForm.file_id,
+      stage_id: fileAssignForm.stage_id || null,
+      client_title: fileAssignForm.client_title,
+      category: fileAssignForm.category || null,
+      can_preview: fileAssignForm.can_preview,
+      can_download: fileAssignForm.can_download,
+      display_order: clientFiles.length,
+    });
+    if (error) {
+      toast.error("Error", error.message);
+    } else {
+      toast.success("File assigned");
+      setFileAssignForm({ file_id: "", stage_id: "", client_title: "", category: "", can_preview: true, can_download: true });
+      setShowAssignFile(false);
+      const { data } = await supabase.from("client_file_assignments").select("*, file:files(display_name,public_url,mime_type,size), stage:stages(name,color)").eq("client_id", viewClient.id).order("display_order");
+      setClientFiles((data as FileAssignment[]) ?? []);
+    }
+    setSavingAssign(false);
+  }
+
+  async function assignBlueprint() {
+    if (!viewClient || !bpAssignForm.blueprint_id) {
+      toast.error("Select a blueprint");
+      return;
+    }
+    setSavingAssign(true);
+    const { error } = await supabase.from("client_blueprint_assignments").insert({
+      client_id: viewClient.id,
+      blueprint_id: bpAssignForm.blueprint_id,
+      stage_id: bpAssignForm.stage_id || null,
+      is_visible: bpAssignForm.is_visible,
+      display_order: clientBlueprints.length,
+    });
+    if (error) {
+      toast.error("Error", error.message);
+    } else {
+      toast.success("Blueprint assigned");
+      setBpAssignForm({ blueprint_id: "", stage_id: "", is_visible: true });
+      setShowAssignBlueprint(false);
+      const { data } = await supabase.from("client_blueprint_assignments").select("*, blueprint:blueprint_links(title,url)").eq("client_id", viewClient.id);
+      setClientBlueprints((data as BlueprintAssignment[]) ?? []);
+    }
+    setSavingAssign(false);
+  }
+
+  async function removeFileAssignment(id: string) {
+    await supabase.from("client_file_assignments").delete().eq("id", id);
+    setClientFiles((prev) => prev.filter((f) => f.id !== id));
+    toast.success("File assignment removed");
+  }
+
+  async function removeBlueprintAssignment(id: string) {
+    await supabase.from("client_blueprint_assignments").delete().eq("id", id);
+    setClientBlueprints((prev) => prev.filter((b) => b.id !== id));
+    toast.success("Blueprint assignment removed");
   }
 
   const filtered = clients.filter((c) => {
@@ -116,7 +254,7 @@ export function ClientsPage() {
       setShowForm(false);
       fetchClients();
     } catch (err) {
-      toast.error("Error", err instanceof Error ? err.message : "Save failed");
+      toast.error("Error", (err as { message?: string })?.message ?? "Save failed");
     }
     setSaving(false);
   }
@@ -307,25 +445,67 @@ export function ClientsPage() {
 
                   {/* Assigned Files */}
                   <div>
-                    <h3 className="text-xs font-bold uppercase tracking-wide text-slate-400 mb-3">
-                      Assigned Files {!loadingFiles && `(${clientFiles.length})`}
-                    </h3>
+                    <div className="flex items-center justify-between mb-3">
+                      <h3 className="text-xs font-bold uppercase tracking-wide text-slate-400">
+                        Files {!loadingFiles && `(${clientFiles.length})`}
+                      </h3>
+                      <button onClick={() => { setShowAssignFile((v) => !v); setShowAssignBlueprint(false); }} className={cn("text-xs font-semibold rounded-lg px-2.5 py-1 transition-colors", showAssignFile ? "bg-brand-primary text-white" : "text-brand-primary hover:bg-brand-primary/10")}>
+                        {showAssignFile ? "Cancel" : "+ Assign File"}
+                      </button>
+                    </div>
+
+                    {/* Assign File Form */}
+                    <AnimatePresence>
+                      {showAssignFile && (
+                        <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden">
+                          <div className="mb-3 rounded-xl border border-brand-primary/20 bg-orange-50/50 p-4 space-y-3">
+                            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Assign a File</p>
+                            <Combobox
+                              options={allFiles.map((f) => ({ id: f.id, label: f.display_name, sub: f.mime_type ?? undefined }))}
+                              value={fileAssignForm.file_id}
+                              onChange={(id) => {
+                                const f = allFiles.find((x) => x.id === id);
+                                setFileAssignForm((prev) => ({ ...prev, file_id: id, client_title: f?.display_name ?? prev.client_title }));
+                              }}
+                              placeholder="Select file..."
+                            />
+                            <Input value={fileAssignForm.client_title} onChange={(e) => setFileAssignForm((p) => ({ ...p, client_title: e.target.value }))} placeholder="Title shown to client *" className="h-9" />
+                            <div className="grid grid-cols-2 gap-2">
+                              <select value={fileAssignForm.category} onChange={(e) => setFileAssignForm((p) => ({ ...p, category: e.target.value }))} className="h-9 rounded-md border border-slate-200 bg-white px-2 text-xs focus:border-brand-primary focus:outline-none">
+                                <option value="">Category</option>
+                                {FILE_CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
+                              </select>
+                              <select value={fileAssignForm.stage_id} onChange={(e) => setFileAssignForm((p) => ({ ...p, stage_id: e.target.value }))} className="h-9 rounded-md border border-slate-200 bg-white px-2 text-xs focus:border-brand-primary focus:outline-none">
+                                <option value="">No stage</option>
+                                {allStages.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+                              </select>
+                            </div>
+                            <div className="flex items-center gap-4">
+                              <label className="flex items-center gap-1.5 text-xs text-slate-600 cursor-pointer">
+                                <input type="checkbox" checked={fileAssignForm.can_preview} onChange={(e) => setFileAssignForm((p) => ({ ...p, can_preview: e.target.checked }))} className="accent-brand-primary" /> Preview
+                              </label>
+                              <label className="flex items-center gap-1.5 text-xs text-slate-600 cursor-pointer">
+                                <input type="checkbox" checked={fileAssignForm.can_download} onChange={(e) => setFileAssignForm((p) => ({ ...p, can_download: e.target.checked }))} className="accent-brand-primary" /> Download
+                              </label>
+                            </div>
+                            <Button onClick={assignFile} disabled={savingAssign} className="w-full">{savingAssign ? "Assigning..." : "Assign File"}</Button>
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+
                     {loadingFiles ? (
-                      <div className="space-y-2">
-                        {Array.from({ length: 3 }).map((_, i) => <div key={i} className="h-12 animate-pulse rounded-lg bg-slate-100" />)}
-                      </div>
-                    ) : clientFiles.length === 0 ? (
-                      <div className="rounded-lg border border-dashed border-slate-200 py-8 text-center">
-                        <FileText className="mx-auto h-8 w-8 text-slate-300 mb-2" />
-                        <p className="text-sm text-slate-400">No files assigned to this client yet.</p>
+                      <div className="space-y-2">{Array.from({ length: 2 }).map((_, i) => <div key={i} className="h-12 animate-pulse rounded-lg bg-slate-100" />)}</div>
+                    ) : clientFiles.length === 0 && !showAssignFile ? (
+                      <div className="rounded-lg border border-dashed border-slate-200 py-6 text-center">
+                        <FileText className="mx-auto h-7 w-7 text-slate-300 mb-1.5" />
+                        <p className="text-xs text-slate-400">No files assigned yet.</p>
                       </div>
                     ) : (
-                      <div className="space-y-2">
+                      <div className="space-y-1.5">
                         {clientFiles.map((fa) => (
                           <div key={fa.id} className="flex items-center gap-3 rounded-lg border border-slate-100 bg-slate-50 px-3 py-2.5">
-                            <div className="grid h-8 w-8 shrink-0 place-items-center rounded-md bg-white border border-slate-200 text-slate-400">
-                              <FileText className="h-4 w-4" />
-                            </div>
+                            <FileText className="h-4 w-4 shrink-0 text-slate-400" />
                             <div className="flex-1 min-w-0">
                               <div className="text-sm font-semibold text-slate-800 truncate">{fa.client_title || fa.file?.display_name}</div>
                               <div className="flex items-center gap-2 mt-0.5">
@@ -333,17 +513,82 @@ export function ClientsPage() {
                                 {fa.file?.size && <span className="text-xs text-slate-400">{formatSize(fa.file.size)}</span>}
                                 {fa.stage && (
                                   <span className="flex items-center gap-1 text-xs text-slate-400">
-                                    <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: fa.stage.color ?? "#94a3b8" }} />
-                                    {fa.stage.name}
+                                    <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: fa.stage.color ?? "#94a3b8" }} />{fa.stage.name}
                                   </span>
                                 )}
                               </div>
                             </div>
-                            {fa.can_download && fa.file && (
-                              <a href={fa.file.public_url} download target="_blank" rel="noopener noreferrer" className="grid h-7 w-7 place-items-center rounded-md text-slate-400 hover:bg-emerald-50 hover:text-emerald-600 transition-colors" title="Download">
-                                <Download className="h-3.5 w-3.5" />
-                              </a>
-                            )}
+                            <div className="flex items-center gap-1 shrink-0">
+                              {fa.can_download && fa.file && (
+                                <a href={fa.file.public_url} download target="_blank" rel="noopener noreferrer" className="grid h-7 w-7 place-items-center rounded text-slate-400 hover:text-emerald-600 transition-colors">
+                                  <Download className="h-3.5 w-3.5" />
+                                </a>
+                              )}
+                              <button onClick={() => removeFileAssignment(fa.id)} className="grid h-7 w-7 place-items-center rounded text-slate-300 hover:text-red-500 transition-colors">
+                                <X className="h-3.5 w-3.5" />
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Assigned Blueprints */}
+                  <div>
+                    <div className="flex items-center justify-between mb-3">
+                      <h3 className="text-xs font-bold uppercase tracking-wide text-slate-400">
+                        Blueprints {!loadingFiles && `(${clientBlueprints.length})`}
+                      </h3>
+                      <button onClick={() => { setShowAssignBlueprint((v) => !v); setShowAssignFile(false); }} className={cn("text-xs font-semibold rounded-lg px-2.5 py-1 transition-colors", showAssignBlueprint ? "bg-brand-primary text-white" : "text-brand-primary hover:bg-brand-primary/10")}>
+                        {showAssignBlueprint ? "Cancel" : "+ Assign Blueprint"}
+                      </button>
+                    </div>
+
+                    {/* Assign Blueprint Form */}
+                    <AnimatePresence>
+                      {showAssignBlueprint && (
+                        <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden">
+                          <div className="mb-3 rounded-xl border border-brand-primary/20 bg-orange-50/50 p-4 space-y-3">
+                            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Assign a Blueprint</p>
+                            <Combobox
+                              options={allBlueprints.map((b) => ({ id: b.id, label: b.title, sub: b.url }))}
+                              value={bpAssignForm.blueprint_id}
+                              onChange={(id) => setBpAssignForm((p) => ({ ...p, blueprint_id: id }))}
+                              placeholder="Select blueprint..."
+                            />
+                            <select value={bpAssignForm.stage_id} onChange={(e) => setBpAssignForm((p) => ({ ...p, stage_id: e.target.value }))} className="h-9 w-full rounded-md border border-slate-200 bg-white px-3 text-xs focus:border-brand-primary focus:outline-none">
+                              <option value="">No stage</option>
+                              {allStages.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+                            </select>
+                            <label className="flex items-center gap-2 text-xs text-slate-600 cursor-pointer">
+                              <input type="checkbox" checked={bpAssignForm.is_visible} onChange={(e) => setBpAssignForm((p) => ({ ...p, is_visible: e.target.checked }))} className="accent-brand-primary" /> Visible to client
+                            </label>
+                            <Button onClick={assignBlueprint} disabled={savingAssign} className="w-full">{savingAssign ? "Assigning..." : "Assign Blueprint"}</Button>
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+
+                    {loadingFiles ? (
+                      <div className="space-y-2">{Array.from({ length: 2 }).map((_, i) => <div key={i} className="h-10 animate-pulse rounded-lg bg-slate-100" />)}</div>
+                    ) : clientBlueprints.length === 0 && !showAssignBlueprint ? (
+                      <div className="rounded-lg border border-dashed border-slate-200 py-6 text-center">
+                        <Link2 className="mx-auto h-7 w-7 text-slate-300 mb-1.5" />
+                        <p className="text-xs text-slate-400">No blueprints assigned yet.</p>
+                      </div>
+                    ) : (
+                      <div className="space-y-1.5">
+                        {clientBlueprints.map((ba) => (
+                          <div key={ba.id} className="flex items-center gap-3 rounded-lg border border-slate-100 bg-slate-50 px-3 py-2.5">
+                            <Link2 className="h-4 w-4 shrink-0 text-slate-400" />
+                            <div className="flex-1 min-w-0">
+                              <div className="text-sm font-semibold text-slate-800 truncate">{ba.blueprint?.title ?? "—"}</div>
+                              {ba.blueprint?.url && <div className="text-xs text-slate-400 truncate">{ba.blueprint.url}</div>}
+                            </div>
+                            <button onClick={() => removeBlueprintAssignment(ba.id)} className="grid h-7 w-7 place-items-center rounded text-slate-300 hover:text-red-500 transition-colors">
+                              <X className="h-3.5 w-3.5" />
+                            </button>
                           </div>
                         ))}
                       </div>

@@ -75,12 +75,10 @@ type Assignment = TableRow<"client_file_assignments"> & {
 type Client = TableRow<"clients">;
 type File = TableRow<"files">;
 type Stage = TableRow<"stages">;
-type ClientProject = TableRow<"client_projects">;
 
 type FormData = {
   file_id: string;
   client_id: string;
-  client_project_id: string;
   stage_id: string;
   client_title: string;
   client_description: string;
@@ -95,7 +93,6 @@ type FormData = {
 const defaultForm: FormData = {
   file_id: "",
   client_id: "",
-  client_project_id: "",
   stage_id: "",
   client_title: "",
   client_description: "",
@@ -116,7 +113,6 @@ export function AssignmentsPage() {
   const [clients, setClients] = useState<Client[]>([]);
   const [files, setFiles] = useState<File[]>([]);
   const [stages, setStages] = useState<Stage[]>([]);
-  const [clientProjects, setClientProjects] = useState<ClientProject[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [filterClient, setFilterClient] = useState("");
@@ -143,19 +139,12 @@ export function AssignmentsPage() {
 
   useEffect(() => { load(); }, [load]);
 
-  async function loadProjects(clientId: string) {
-    if (!clientId) { setClientProjects([]); return; }
-    const { data } = await supabase.from("client_projects").select("*").eq("client_id", clientId).order("name");
-    setClientProjects((data as ClientProject[]) ?? []);
-  }
-
-  function openAdd() { setEditItem(null); setForm(defaultForm); setClientProjects([]); setShowForm(true); }
+  function openAdd() { setEditItem(null); setForm(defaultForm); setShowForm(true); }
   function openEdit(a: Assignment) {
     setEditItem(a);
     setForm({
       file_id: a.file_id,
       client_id: a.client_id,
-      client_project_id: a.client_project_id ?? "",
       stage_id: a.stage_id ?? "",
       client_title: a.client_title,
       client_description: a.client_description ?? "",
@@ -166,7 +155,6 @@ export function AssignmentsPage() {
       visible_from: a.visible_from ? a.visible_from.slice(0, 10) : "",
       expires_at: a.expires_at ? a.expires_at.slice(0, 10) : "",
     });
-    loadProjects(a.client_id);
     setShowForm(true);
   }
 
@@ -176,35 +164,47 @@ export function AssignmentsPage() {
       return;
     }
     setSaving(true);
-    const payload = {
-      file_id: form.file_id,
-      client_id: form.client_id,
-      client_project_id: form.client_project_id || null,
-      stage_id: form.stage_id || null,
-      client_title: form.client_title,
-      client_description: form.client_description || null,
-      category: form.category || null,
-      display_order: form.display_order,
-      can_preview: form.can_preview,
-      can_download: form.can_download,
-      visible_from: form.visible_from || null,
-      expires_at: form.expires_at || null,
-      updated_by: profile?.id,
-    };
     try {
       if (editItem) {
-        const { error } = await supabase.from("client_file_assignments").update(payload).eq("id", editItem.id);
+        const { error } = await supabase.from("client_file_assignments").update({
+          file_id: form.file_id,
+          client_id: form.client_id,
+          stage_id: form.stage_id || null,
+          client_title: form.client_title,
+          client_description: form.client_description || null,
+          category: form.category || null,
+          display_order: form.display_order,
+          can_preview: form.can_preview,
+          can_download: form.can_download,
+          visible_from: form.visible_from || null,
+          expires_at: form.expires_at || null,
+          updated_by: profile?.id ?? null,
+        }).eq("id", editItem.id);
         if (error) throw error;
         toast.success("Assignment updated");
       } else {
-        const { error } = await supabase.from("client_file_assignments").insert({ ...payload, created_by: profile?.id });
+        const { error } = await supabase.from("client_file_assignments").insert({
+          file_id: form.file_id,
+          client_id: form.client_id,
+          stage_id: form.stage_id || null,
+          client_title: form.client_title,
+          client_description: form.client_description || null,
+          category: form.category || null,
+          display_order: form.display_order,
+          can_preview: form.can_preview,
+          can_download: form.can_download,
+          visible_from: form.visible_from || null,
+          expires_at: form.expires_at || null,
+          created_by: profile?.id ?? null,
+        });
         if (error) throw error;
         toast.success("Assignment created");
       }
       setShowForm(false);
       load();
     } catch (err) {
-      toast.error("Error", err instanceof Error ? err.message : "Save failed");
+      const msg = (err as { message?: string })?.message ?? "Save failed";
+      toast.error("Error", msg);
     }
     setSaving(false);
   }
@@ -317,16 +317,9 @@ export function AssignmentsPage() {
                   label="Client *"
                   value={form.client_id}
                   options={clients.map((c) => ({ id: c.id, label: c.name, sub: c.email ?? c.mobile ?? undefined }))}
-                  onChange={(id) => { setForm({ ...form, client_id: id, client_project_id: "" }); loadProjects(id); }}
+                  onChange={(id) => setForm({ ...form, client_id: id })}
                   placeholder="Search and select client..."
                 />
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Client Project</label>
-                  <select value={form.client_project_id} onChange={(e) => setForm({ ...form, client_project_id: e.target.value })} className="h-10 w-full rounded-md border border-slate-200 bg-white px-3 text-sm focus:border-brand-primary focus:outline-none" disabled={!form.client_id}>
-                    <option value="">No project</option>
-                    {clientProjects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-                  </select>
-                </div>
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">Stage</label>
                   <select value={form.stage_id} onChange={(e) => setForm({ ...form, stage_id: e.target.value })} className="h-10 w-full rounded-md border border-slate-200 bg-white px-3 text-sm focus:border-brand-primary focus:outline-none">
