@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useSearchParams } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { ChevronDown, Download, Eye, FileText, Link2, Pencil, Plus, Search, Trash2, X } from "lucide-react";
+import { ChevronDown, Download, Eye, EyeOff, FileText, KeyRound, Link2, Pencil, Plus, Search, Trash2, X } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/Button";
@@ -18,8 +18,6 @@ type BlueprintAssignment = TableRow<"client_blueprint_assignments"> & {
   blueprint: { title: string; url: string } | null;
 };
 type FileRecord = TableRow<"files">;
-type Blueprint = TableRow<"blueprint_links">;
-type Stage = TableRow<"stages">;
 
 const STATUS_OPTIONS: ClientStatus[] = ["Active", "On Hold", "Completed", "Inactive"];
 const FILE_CATEGORIES = ["Blueprint", "Design", "Report", "Contract", "Invoice", "Other"];
@@ -107,6 +105,10 @@ export function ClientsPage() {
   const [deleteTarget, setDeleteTarget] = useState<Client | null>(null);
   const [form, setForm] = useState<ClientFormData>(defaultForm);
   const [saving, setSaving] = useState(false);
+  // Portal credentials for new clients
+  const [portalEmail, setPortalEmail] = useState("");
+  const [portalPassword, setPortalPassword] = useState("");
+  const [showPortalPassword, setShowPortalPassword] = useState(false);
 
   // Detail modal state
   const [viewClient, setViewClient] = useState<Client | null>(null);
@@ -114,14 +116,12 @@ export function ClientsPage() {
   const [clientBlueprints, setClientBlueprints] = useState<BlueprintAssignment[]>([]);
   const [loadingFiles, setLoadingFiles] = useState(false);
 
-  // Assign file state
+  // Assign file/blueprint state
   const [allFiles, setAllFiles] = useState<FileRecord[]>([]);
-  const [allBlueprints, setAllBlueprints] = useState<Blueprint[]>([]);
-  const [allStages, setAllStages] = useState<Stage[]>([]);
   const [showAssignFile, setShowAssignFile] = useState(false);
   const [showAssignBlueprint, setShowAssignBlueprint] = useState(false);
-  const [fileAssignForm, setFileAssignForm] = useState({ file_id: "", stage_id: "", client_title: "", category: "", can_preview: true, can_download: true });
-  const [bpAssignForm, setBpAssignForm] = useState({ blueprint_id: "", stage_id: "", is_visible: true });
+  const [fileAssignForm, setFileAssignForm] = useState({ file_id: "", client_title: "", category: "", can_preview: true, can_download: true });
+  const [bpAssignForm, setBpAssignForm] = useState({ title: "", url: "", is_visible: true });
   const [savingAssign, setSavingAssign] = useState(false);
 
   const fetchClients = useCallback(async () => {
@@ -145,18 +145,14 @@ export function ClientsPage() {
     setShowAssignBlueprint(false);
     setLoadingFiles(true);
 
-    const [{ data: fData }, { data: bData }, { data: filesData }, { data: bpsData }, { data: stagesData }] = await Promise.all([
+    const [{ data: fData }, { data: bData }, { data: filesData }] = await Promise.all([
       supabase.from("client_file_assignments").select("*, file:files(display_name,public_url,mime_type,size), stage:stages(name,color)").eq("client_id", client.id).order("display_order"),
       supabase.from("client_blueprint_assignments").select("*, blueprint:blueprint_links(title,url)").eq("client_id", client.id),
       supabase.from("files").select("id,display_name,mime_type").is("deleted_at", null).order("display_name"),
-      supabase.from("blueprint_links").select("id,title,url").eq("is_active", true).order("title"),
-      supabase.from("stages").select("id,name").eq("status", "active").order("display_order"),
     ]);
     setClientFiles((fData as FileAssignment[]) ?? []);
     setClientBlueprints((bData as BlueprintAssignment[]) ?? []);
     setAllFiles((filesData as FileRecord[]) ?? []);
-    setAllBlueprints((bpsData as Blueprint[]) ?? []);
-    setAllStages((stagesData as Stage[]) ?? []);
     setLoadingFiles(false);
   }
 
@@ -169,7 +165,6 @@ export function ClientsPage() {
     const { error } = await supabase.from("client_file_assignments").insert({
       client_id: viewClient.id,
       file_id: fileAssignForm.file_id,
-      stage_id: fileAssignForm.stage_id || null,
       client_title: fileAssignForm.client_title,
       category: fileAssignForm.category || null,
       can_preview: fileAssignForm.can_preview,
@@ -180,7 +175,7 @@ export function ClientsPage() {
       toast.error("Error", error.message);
     } else {
       toast.success("File assigned");
-      setFileAssignForm({ file_id: "", stage_id: "", client_title: "", category: "", can_preview: true, can_download: true });
+      setFileAssignForm({ file_id: "", client_title: "", category: "", can_preview: true, can_download: true });
       setShowAssignFile(false);
       const { data } = await supabase.from("client_file_assignments").select("*, file:files(display_name,public_url,mime_type,size), stage:stages(name,color)").eq("client_id", viewClient.id).order("display_order");
       setClientFiles((data as FileAssignment[]) ?? []);
@@ -189,15 +184,22 @@ export function ClientsPage() {
   }
 
   async function assignBlueprint() {
-    if (!viewClient || !bpAssignForm.blueprint_id) {
-      toast.error("Select a blueprint");
+    if (!viewClient || !bpAssignForm.title.trim() || !bpAssignForm.url.trim()) {
+      toast.error("Title and URL are required");
       return;
     }
     setSavingAssign(true);
+    // Create the blueprint link first, then assign it
+    const { data: bpData, error: bpError } = await supabase.from("blueprint_links").insert({
+      title: bpAssignForm.title,
+      url: bpAssignForm.url,
+      is_active: true,
+    }).select("id").single();
+    if (bpError) { toast.error("Error", bpError.message); setSavingAssign(false); return; }
+
     const { error } = await supabase.from("client_blueprint_assignments").insert({
       client_id: viewClient.id,
-      blueprint_id: bpAssignForm.blueprint_id,
-      stage_id: bpAssignForm.stage_id || null,
+      blueprint_id: (bpData as { id: string }).id,
       is_visible: bpAssignForm.is_visible,
       display_order: clientBlueprints.length,
     });
@@ -205,7 +207,7 @@ export function ClientsPage() {
       toast.error("Error", error.message);
     } else {
       toast.success("Blueprint assigned");
-      setBpAssignForm({ blueprint_id: "", stage_id: "", is_visible: true });
+      setBpAssignForm({ title: "", url: "", is_visible: true });
       setShowAssignBlueprint(false);
       const { data } = await supabase.from("client_blueprint_assignments").select("*, blueprint:blueprint_links(title,url)").eq("client_id", viewClient.id);
       setClientBlueprints((data as BlueprintAssignment[]) ?? []);
@@ -231,10 +233,20 @@ export function ClientsPage() {
     return matchSearch && matchStatus;
   });
 
-  function openAdd() { setEditClient(null); setForm(defaultForm); setShowForm(true); }
+  function openAdd() {
+    setEditClient(null);
+    setForm(defaultForm);
+    setPortalEmail("");
+    setPortalPassword("");
+    setShowPortalPassword(false);
+    setShowForm(true);
+  }
   function openEdit(client: Client) {
     setEditClient(client);
     setForm({ name: client.name, email: client.email ?? "", mobile: client.mobile ?? "", address: client.address ?? "", notes: client.notes ?? "", admin_notes: client.admin_notes ?? "", status: client.status as ClientStatus });
+    setPortalEmail("");
+    setPortalPassword("");
+    setShowPortalPassword(false);
     setShowForm(true);
   }
 
@@ -245,10 +257,31 @@ export function ClientsPage() {
       if (editClient) {
         const { error } = await supabase.from("clients").update(form).eq("id", editClient.id);
         if (error) throw error;
+        // Set new credentials if provided while editing
+        if (portalEmail && portalPassword) {
+          const { data: fn } = await supabase.functions.invoke("create-portal-user", {
+            body: { email: portalEmail, password: portalPassword, full_name: form.name },
+          });
+          if (fn?.error) throw new Error(fn.error);
+          if (fn?.user_id) {
+            await supabase.from("clients").update({ auth_user_id: fn.user_id }).eq("id", editClient.id);
+          }
+        }
         toast.success("Client updated");
       } else {
-        const { error } = await supabase.from("clients").insert(form);
+        const { data: newClient, error } = await supabase.from("clients").insert(form).select("id").single();
         if (error) throw error;
+        const clientId = (newClient as { id: string }).id;
+        // Create portal credentials if provided
+        if (portalEmail && portalPassword) {
+          const { data: fn } = await supabase.functions.invoke("create-portal-user", {
+            body: { email: portalEmail, password: portalPassword, full_name: form.name },
+          });
+          if (fn?.error) throw new Error(fn.error);
+          if (fn?.user_id) {
+            await supabase.from("clients").update({ auth_user_id: fn.user_id }).eq("id", clientId);
+          }
+        }
         toast.success("Client created");
       }
       setShowForm(false);
@@ -470,16 +503,10 @@ export function ClientsPage() {
                               placeholder="Select file..."
                             />
                             <Input value={fileAssignForm.client_title} onChange={(e) => setFileAssignForm((p) => ({ ...p, client_title: e.target.value }))} placeholder="Title shown to client *" className="h-9" />
-                            <div className="grid grid-cols-2 gap-2">
-                              <select value={fileAssignForm.category} onChange={(e) => setFileAssignForm((p) => ({ ...p, category: e.target.value }))} className="h-9 rounded-md border border-slate-200 bg-white px-2 text-xs focus:border-brand-primary focus:outline-none">
-                                <option value="">Category</option>
-                                {FILE_CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
-                              </select>
-                              <select value={fileAssignForm.stage_id} onChange={(e) => setFileAssignForm((p) => ({ ...p, stage_id: e.target.value }))} className="h-9 rounded-md border border-slate-200 bg-white px-2 text-xs focus:border-brand-primary focus:outline-none">
-                                <option value="">No stage</option>
-                                {allStages.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-                              </select>
-                            </div>
+                            <select value={fileAssignForm.category} onChange={(e) => setFileAssignForm((p) => ({ ...p, category: e.target.value }))} className="h-9 w-full rounded-md border border-slate-200 bg-white px-2 text-xs focus:border-brand-primary focus:outline-none">
+                              <option value="">Category (optional)</option>
+                              {FILE_CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
+                            </select>
                             <div className="flex items-center gap-4">
                               <label className="flex items-center gap-1.5 text-xs text-slate-600 cursor-pointer">
                                 <input type="checkbox" checked={fileAssignForm.can_preview} onChange={(e) => setFileAssignForm((p) => ({ ...p, can_preview: e.target.checked }))} className="accent-brand-primary" /> Preview
@@ -550,21 +577,13 @@ export function ClientsPage() {
                       {showAssignBlueprint && (
                         <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden">
                           <div className="mb-3 rounded-xl border border-brand-primary/20 bg-orange-50/50 p-4 space-y-3">
-                            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Assign a Blueprint</p>
-                            <Combobox
-                              options={allBlueprints.map((b) => ({ id: b.id, label: b.title, sub: b.url }))}
-                              value={bpAssignForm.blueprint_id}
-                              onChange={(id) => setBpAssignForm((p) => ({ ...p, blueprint_id: id }))}
-                              placeholder="Select blueprint..."
-                            />
-                            <select value={bpAssignForm.stage_id} onChange={(e) => setBpAssignForm((p) => ({ ...p, stage_id: e.target.value }))} className="h-9 w-full rounded-md border border-slate-200 bg-white px-3 text-xs focus:border-brand-primary focus:outline-none">
-                              <option value="">No stage</option>
-                              {allStages.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-                            </select>
+                            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Add Blueprint Link</p>
+                            <Input value={bpAssignForm.title} onChange={(e) => setBpAssignForm((p) => ({ ...p, title: e.target.value }))} placeholder="Title *" className="h-9" />
+                            <Input value={bpAssignForm.url} onChange={(e) => setBpAssignForm((p) => ({ ...p, url: e.target.value }))} placeholder="URL * (https://...)" className="h-9" />
                             <label className="flex items-center gap-2 text-xs text-slate-600 cursor-pointer">
                               <input type="checkbox" checked={bpAssignForm.is_visible} onChange={(e) => setBpAssignForm((p) => ({ ...p, is_visible: e.target.checked }))} className="accent-brand-primary" /> Visible to client
                             </label>
-                            <Button onClick={assignBlueprint} disabled={savingAssign} className="w-full">{savingAssign ? "Assigning..." : "Assign Blueprint"}</Button>
+                            <Button onClick={assignBlueprint} disabled={savingAssign} className="w-full">{savingAssign ? "Saving..." : "Add & Assign Blueprint"}</Button>
                           </div>
                         </motion.div>
                       )}
@@ -652,6 +671,32 @@ export function ClientsPage() {
                   <label className="block text-sm font-medium text-slate-700 mb-1">Internal Notes (admin only)</label>
                   <textarea value={form.admin_notes} onChange={(e) => setForm({ ...form, admin_notes: e.target.value })} placeholder="Internal notes not visible to client..." className="h-20 w-full rounded-md border border-slate-200 px-3 py-2 text-sm resize-none focus:border-brand-primary focus:outline-none" />
                 </div>
+
+                {/* Portal Access */}
+                <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 space-y-3">
+                  <div className="flex items-center gap-2">
+                    <KeyRound className="h-4 w-4 text-slate-400" />
+                    <span className="text-sm font-semibold text-slate-700">Portal Access</span>
+                    {editClient?.auth_user_id && <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-700">Active</span>}
+                  </div>
+                  <p className="text-xs text-slate-500">
+                    {editClient?.auth_user_id ? "Enter new credentials to reset portal access." : "Set login credentials so this client can access their portal."}
+                  </p>
+                  <div>
+                    <label className="block text-xs font-medium text-slate-600 mb-1">Portal Email</label>
+                    <Input type="email" value={portalEmail} onChange={(e) => setPortalEmail(e.target.value)} placeholder={form.email || "client@example.com"} className="h-9 text-sm" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-slate-600 mb-1">Password</label>
+                    <div className="relative">
+                      <Input type={showPortalPassword ? "text" : "password"} value={portalPassword} onChange={(e) => setPortalPassword(e.target.value)} placeholder="Min 8 characters" className="h-9 text-sm pr-10" />
+                      <button type="button" onClick={() => setShowPortalPassword((v) => !v)} className="absolute right-3 top-2 text-slate-400 hover:text-slate-600">
+                        {showPortalPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
                 <div className="flex gap-3 pt-2">
                   <Button onClick={saveClient} disabled={saving} className="flex-1">{saving ? "Saving..." : editClient ? "Update Client" : "Create Client"}</Button>
                   <Button variant="secondary" onClick={() => setShowForm(false)}>Cancel</Button>
