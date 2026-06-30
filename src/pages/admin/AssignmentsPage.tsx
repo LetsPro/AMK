@@ -1,6 +1,6 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Eye, Link2, Pencil, Plus, Search, Trash2, X } from "lucide-react";
+import { ChevronDown, Link2, Pencil, Plus, Search, Trash2, X } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/Button";
@@ -8,6 +8,64 @@ import { Input } from "@/components/ui/Input";
 import { useToast } from "@/contexts/ToastContext";
 import { useAuth } from "@/contexts/AuthContext";
 import type { TableRow } from "@/types/database";
+
+type SearchSelectOption = { id: string; label: string; sub?: string };
+
+function SearchSelect({ label, value, options, onChange, placeholder }: {
+  label: string;
+  value: string;
+  options: SearchSelectOption[];
+  onChange: (id: string) => void;
+  placeholder?: string;
+}) {
+  const [query, setQuery] = useState("");
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  const selected = options.find((o) => o.id === value);
+  const filtered = options.filter((o) => `${o.label} ${o.sub ?? ""}`.toLowerCase().includes(query.toLowerCase()));
+
+  useEffect(() => {
+    function handler(e: MouseEvent) { if (!ref.current?.contains(e.target as Node)) setOpen(false); }
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  return (
+    <div ref={ref} className="relative">
+      <label className="block text-sm font-medium text-slate-700 mb-1">{label}</label>
+      <button type="button" onClick={() => { setOpen((v) => !v); setQuery(""); }} className={cn("flex h-10 w-full items-center justify-between rounded-md border bg-white px-3 text-sm transition", open ? "border-brand-primary ring-4 ring-orange-100" : "border-slate-200 hover:border-slate-300")}>
+        <span className={selected ? "text-slate-900" : "text-slate-400"}>{selected ? selected.label : (placeholder ?? "Select...")}</span>
+        <ChevronDown className={cn("h-4 w-4 text-slate-400 transition-transform", open && "rotate-180")} />
+      </button>
+      {open && (
+        <div className="absolute z-50 mt-1 w-full rounded-lg border border-slate-200 bg-white shadow-lg">
+          <div className="p-2 border-b border-slate-100">
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-2.5 top-2 h-3.5 w-3.5 text-slate-400" />
+              <input autoFocus value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search..." className="h-8 w-full rounded border-0 bg-slate-50 pl-7 pr-3 text-sm outline-none focus:bg-white" />
+            </div>
+          </div>
+          <div className="max-h-52 overflow-y-auto">
+            {value && (
+              <button type="button" onClick={() => { onChange(""); setOpen(false); }} className="flex w-full items-center px-3 py-2 text-sm text-slate-400 hover:bg-slate-50">
+                Clear selection
+              </button>
+            )}
+            {filtered.length === 0 ? (
+              <div className="px-3 py-4 text-center text-sm text-slate-400">No results</div>
+            ) : filtered.map((o) => (
+              <button key={o.id} type="button" onClick={() => { onChange(o.id); setOpen(false); }} className={cn("flex w-full flex-col items-start px-3 py-2 text-sm hover:bg-slate-50 transition-colors", o.id === value && "bg-brand-primary/5 text-brand-primary")}>
+                <span className="font-medium">{o.label}</span>
+                {o.sub && <span className="text-xs text-slate-400 truncate w-full">{o.sub}</span>}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 type Assignment = TableRow<"client_file_assignments"> & {
   file: { display_name: string; mime_type: string | null } | null;
@@ -255,13 +313,13 @@ export function AssignmentsPage() {
                 <button onClick={() => setShowForm(false)} className="grid h-8 w-8 place-items-center rounded-lg hover:bg-slate-100"><X className="h-4 w-4" /></button>
               </div>
               <div className="p-6 space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Client *</label>
-                  <select value={form.client_id} onChange={(e) => { setForm({ ...form, client_id: e.target.value, client_project_id: "" }); loadProjects(e.target.value); }} className="h-10 w-full rounded-md border border-slate-200 bg-white px-3 text-sm focus:border-brand-primary focus:outline-none">
-                    <option value="">Select client...</option>
-                    {clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-                  </select>
-                </div>
+                <SearchSelect
+                  label="Client *"
+                  value={form.client_id}
+                  options={clients.map((c) => ({ id: c.id, label: c.name, sub: c.email ?? c.mobile ?? undefined }))}
+                  onChange={(id) => { setForm({ ...form, client_id: id, client_project_id: "" }); loadProjects(id); }}
+                  placeholder="Search and select client..."
+                />
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">Client Project</label>
                   <select value={form.client_project_id} onChange={(e) => setForm({ ...form, client_project_id: e.target.value })} className="h-10 w-full rounded-md border border-slate-200 bg-white px-3 text-sm focus:border-brand-primary focus:outline-none" disabled={!form.client_id}>
@@ -276,13 +334,13 @@ export function AssignmentsPage() {
                     {stages.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
                   </select>
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">File *</label>
-                  <select value={form.file_id} onChange={(e) => setForm({ ...form, file_id: e.target.value })} className="h-10 w-full rounded-md border border-slate-200 bg-white px-3 text-sm focus:border-brand-primary focus:outline-none">
-                    <option value="">Select file...</option>
-                    {files.map((f) => <option key={f.id} value={f.id}>{f.display_name}</option>)}
-                  </select>
-                </div>
+                <SearchSelect
+                  label="File *"
+                  value={form.file_id}
+                  options={files.map((f) => ({ id: f.id, label: f.display_name, sub: f.mime_type ?? undefined }))}
+                  onChange={(id) => setForm({ ...form, file_id: id })}
+                  placeholder="Search and select file..."
+                />
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">Client-Facing Title *</label>
                   <Input value={form.client_title} onChange={(e) => setForm({ ...form, client_title: e.target.value })} placeholder="Title shown to client" />

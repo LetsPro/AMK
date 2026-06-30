@@ -1,7 +1,7 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useSearchParams } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { Edit2, Eye, ExternalLink, Globe, Image, Plus, Star, Trash2, X } from "lucide-react";
+import { Edit2, Eye, ExternalLink, Globe, Image, Plus, Star, Trash2, Upload, X } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/Button";
@@ -52,6 +52,18 @@ export function PortfolioPage() {
   const [saving, setSaving] = useState(false);
   const [statusFilter, setStatusFilter] = useState<"all" | "draft" | "published">("all");
   const [previewProject, setPreviewProject] = useState<PortfolioProject | null>(null);
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const imageInputRef = useRef<HTMLInputElement>(null);
+
+  async function uploadCoverImage(file: globalThis.File) {
+    setUploadingImage(true);
+    const path = `portfolio/${Date.now()}_${file.name}`;
+    const { data: uploaded, error } = await supabase.storage.from("documents").upload(path, file, { upsert: false });
+    if (error) { toast.error("Upload failed", error.message); setUploadingImage(false); return; }
+    const { data: { publicUrl } } = supabase.storage.from("documents").getPublicUrl(uploaded.path);
+    setForm((f) => ({ ...f, cover_image_url: publicUrl }));
+    setUploadingImage(false);
+  }
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -258,7 +270,23 @@ export function PortfolioPage() {
                   <div><label className="block text-sm font-medium mb-1">Location</label><Input value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} /></div>
                   <div><label className="block text-sm font-medium mb-1">Completion Date</label><Input type="date" value={form.completion_date} onChange={(e) => setForm({ ...form, completion_date: e.target.value })} /></div>
                 </div>
-                <div><label className="block text-sm font-medium mb-1">Cover Image URL</label><Input value={form.cover_image_url} onChange={(e) => setForm({ ...form, cover_image_url: e.target.value })} placeholder="https://..." /></div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Cover Image</label>
+                  <input ref={imageInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => { if (e.target.files?.[0]) uploadCoverImage(e.target.files[0]); }} />
+                  {form.cover_image_url ? (
+                    <div className="relative rounded-lg overflow-hidden border border-slate-200">
+                      <img src={form.cover_image_url} alt="cover" className="w-full aspect-video object-cover" />
+                      <div className="absolute inset-0 flex items-center justify-center gap-2 bg-slate-950/40 opacity-0 hover:opacity-100 transition-opacity">
+                        <button type="button" onClick={() => imageInputRef.current?.click()} className="rounded-lg bg-white px-3 py-1.5 text-xs font-semibold text-slate-800 hover:bg-slate-50 flex items-center gap-1.5"><Upload className="h-3.5 w-3.5" /> Replace</button>
+                        <button type="button" onClick={() => setForm((f) => ({ ...f, cover_image_url: "" }))} className="rounded-lg bg-red-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-600"><X className="h-3.5 w-3.5" /></button>
+                      </div>
+                    </div>
+                  ) : (
+                    <button type="button" onClick={() => imageInputRef.current?.click()} disabled={uploadingImage} className="flex h-32 w-full items-center justify-center gap-2 rounded-lg border-2 border-dashed border-slate-300 text-slate-400 hover:border-brand-primary/50 hover:text-brand-primary transition-colors disabled:opacity-50">
+                      {uploadingImage ? <div className="h-5 w-5 rounded-full border-2 border-brand-primary border-t-transparent animate-spin" /> : <><Upload className="h-5 w-5" /><span className="text-sm font-medium">Upload cover image</span></>}
+                    </button>
+                  )}
+                </div>
                 <div><label className="block text-sm font-medium mb-1">Project URL</label><Input value={form.website_url} onChange={(e) => setForm({ ...form, website_url: e.target.value })} placeholder="https://..." /></div>
                 <div><label className="block text-sm font-medium mb-1">Services (comma separated)</label><Input value={form.services_provided} onChange={(e) => setForm({ ...form, services_provided: e.target.value })} placeholder="Architecture, BIM, Interior Design" /></div>
                 <div><label className="block text-sm font-medium mb-1">Technologies (comma separated)</label><Input value={form.technologies_used} onChange={(e) => setForm({ ...form, technologies_used: e.target.value })} placeholder="Revit, AutoCAD, 3ds Max" /></div>

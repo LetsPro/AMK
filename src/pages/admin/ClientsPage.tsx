@@ -7,7 +7,6 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { useToast } from "@/contexts/ToastContext";
-import { useAuth } from "@/contexts/AuthContext";
 import type { TableRow, ClientStatus } from "@/types/database";
 
 type Client = TableRow<"clients">;
@@ -23,7 +22,6 @@ const statusColor: Record<ClientStatus, string> = {
 
 type ClientFormData = {
   name: string;
-  contact_person: string;
   email: string;
   mobile: string;
   address: string;
@@ -32,13 +30,12 @@ type ClientFormData = {
   status: ClientStatus;
 };
 
-const defaultForm: ClientFormData = { name: "", contact_person: "", email: "", mobile: "", address: "", notes: "", admin_notes: "", status: "Active" };
+const defaultForm: ClientFormData = { name: "", email: "", mobile: "", address: "", notes: "", admin_notes: "", status: "Active" };
 
 export function ClientsPage() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const toast = useToast();
-  const { profile } = useAuth();
   const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -69,18 +66,18 @@ export function ClientsPage() {
   });
 
   function openAdd() { setEditClient(null); setForm(defaultForm); setShowForm(true); }
-  function openEdit(client: Client) { setEditClient(client); setForm({ name: client.name, contact_person: client.contact_person ?? "", email: client.email ?? "", mobile: client.mobile ?? "", address: client.address ?? "", notes: client.notes ?? "", admin_notes: client.admin_notes ?? "", status: client.status as ClientStatus }); setShowForm(true); }
+  function openEdit(client: Client) { setEditClient(client); setForm({ name: client.name, email: client.email ?? "", mobile: client.mobile ?? "", address: client.address ?? "", notes: client.notes ?? "", admin_notes: client.admin_notes ?? "", status: client.status as ClientStatus }); setShowForm(true); }
 
   async function saveClient() {
     if (!form.name.trim()) { toast.error("Name required", "Client name cannot be empty."); return; }
     setSaving(true);
     try {
       if (editClient) {
-        const { error } = await supabase.from("clients").update({ ...form, updated_by: profile?.id }).eq("id", editClient.id);
+        const { error } = await supabase.from("clients").update(form).eq("id", editClient.id);
         if (error) throw error;
         toast.success("Client updated");
       } else {
-        const { error } = await supabase.from("clients").insert({ ...form, created_by: profile?.id });
+        const { error } = await supabase.from("clients").insert(form);
         if (error) throw error;
         toast.success("Client created");
       }
@@ -160,7 +157,7 @@ export function ClientsPage() {
                         </div>
                         <div>
                           <div className="font-semibold text-slate-900">{client.name}</div>
-                          {client.contact_person && <div className="text-xs text-slate-400">{client.contact_person}</div>}
+                          {client.email && <div className="text-xs text-slate-400">{client.email}</div>}
                         </div>
                       </div>
                     </td>
@@ -208,10 +205,6 @@ export function ClientsPage() {
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">Client Name *</label>
                   <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Full name or company name" />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Contact Person</label>
-                  <Input value={form.contact_person} onChange={(e) => setForm({ ...form, contact_person: e.target.value })} placeholder="Primary contact name" />
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
