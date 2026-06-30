@@ -468,7 +468,8 @@ function TestimonialCarousel({ items }: { items: PublicTestimonial[] }) {
 
 export function HomePage() {
   const { data: services = [] } = useTable("services", { limit: 6, orderBy: "created_at", eq: { status: "published" } });
-  const { data: projects = [] } = useTable("projects", { limit: 6, orderBy: "created_at", eq: { published: true } });
+  const { data: rawProjects = [] } = useTable("portfolio_projects", { limit: 6, orderBy: "display_order", eq: { status: "published" } });
+  const projects: PublicProject[] = (rawProjects as Array<{ id: string; title: string; short_description?: string | null; category_id?: string | null; location?: string | null; cover_image_url?: string | null; slug: string }>).map((p) => ({ id: p.id, name: p.title, slug: p.slug, description: p.short_description, category: p.category_id ?? undefined, location: p.location, cover_image_url: p.cover_image_url }));
   const { data: testimonials = [] } = useTable("testimonials", { limit: 3, orderBy: "created_at", eq: { is_published: true } });
   const { data: banners = [] } = useTable("banners", { orderBy: "created_at", ascending: true, eq: { is_active: true } });
   const [activeSlide, setActiveSlide] = useState(0);
@@ -614,7 +615,7 @@ export function HomePage() {
 }
 
 export function ListingPage({ type }: { type: "projects" | "services" | "gallery" | "about" }) {
-  const table = type === "services" ? "services" : type === "gallery" ? "gallery" : "projects";
+  const table = type === "services" ? "services" : type === "gallery" ? "gallery" : "portfolio_projects";
   const { data = [] } = useTable(table as never, { orderBy: "created_at" });
   const [filter, setFilter] = useState("");
   const [selectedProject, setSelectedProject] = useState<PublicProject | null>(null);
@@ -785,8 +786,9 @@ export function ListingPage({ type }: { type: "projects" | "services" | "gallery
 
 export function ProjectDetailPage() {
   const { slug } = useParams();
-  const { data: projects = [] } = useTable("projects", { eq: { slug: slug ?? "" } });
-  const project = projects[0] ?? demoProjects.find((item) => item.slug === slug);
+  const { data: projects = [] } = useTable("portfolio_projects", { eq: { slug: slug ?? "", status: "published" } });
+  const rawProject = projects[0] as { id: string; title?: string; name?: string; short_description?: string | null; description?: string | null; location?: string | null; cover_image_url?: string | null } | undefined;
+  const project: PublicProject | undefined = rawProject ? { id: rawProject.id, name: rawProject.title ?? rawProject.name ?? "", description: rawProject.short_description ?? rawProject.description, location: rawProject.location, cover_image_url: rawProject.cover_image_url } : demoProjects.find((item) => item.slug === slug);
   if (!project) return <Section title="Project not found"><EmptyState title="No project found" description="The requested project is not published or does not exist." /></Section>;
   return <><Seo title={`${project.name} | AMK Architects Mysuru Project`} description={`${project.name} by AMK Architects & Engineers in ${project.location}. View architecture project details, scope, and design approach.`} /><Section title={project.name}><Card><div className="aspect-video rounded-lg bg-slate-200 bg-cover" style={{ backgroundImage: `url(${project.cover_image_url ?? ""})` }} /><p className="mt-6 leading-7 text-slate-600">{project.description}</p><p className="mt-3 flex items-center gap-2 text-sm text-slate-500"><MapPin className="h-4 w-4" />{project.location}</p></Card></Section></>;
 }

@@ -15,7 +15,6 @@ export function useTableMutations<T extends TableName>(table: T, options?: { toa
   const toast = useToast();
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: [table] });
-    if (table === "leads") queryClient.invalidateQueries({ queryKey: ["customers"] });
   };
   const label = String(table).replace(/_/g, " ");
   const message = (error: unknown) => error instanceof Error ? error.message : "Operation failed";

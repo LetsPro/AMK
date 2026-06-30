@@ -8,7 +8,7 @@ import { DataTable } from "@/components/tables/DataTable";
 import { MediaPicker } from "@/components/media/MediaPicker";
 import { useTable, useTableMutations } from "@/hooks/useSupabaseTable";
 
-const cmsTables = ["website_pages", "banners", "services", "projects", "gallery", "testimonials"] as const;
+const cmsTables = ["website_pages", "banners", "services", "gallery", "testimonials"] as const;
 
 export function CmsPage() {
   const [table, setTable] = useState<(typeof cmsTables)[number]>("website_pages");
@@ -16,12 +16,11 @@ export function CmsPage() {
   const { create, update, remove } = useTableMutations(table);
   const [form, setForm] = useState<Record<string, string>>({});
   const [editingId, setEditingId] = useState<string | null>(null);
-  const mediaField = table === "projects" ? "cover_image_url" : "image_url";
+  const mediaField = "image_url";
   async function submit(event: React.FormEvent) {
     event.preventDefault();
     const defaults = table === "website_pages" ? { content: form.content ?? "", slug: form.slug, title: form.title, status: form.status || "draft" } :
       table === "services" ? { name: form.title, slug: form.slug, description: form.content ?? "", image_url: form.image_url, status: form.status || "draft" } :
-      table === "projects" ? { name: form.title, slug: form.slug, description: form.content ?? "", cover_image_url: form.cover_image_url, status: "Planning", published: form.status === "published" } :
       table === "gallery" ? { title: form.title, image_url: form.image_url } :
       table === "testimonials" ? { name: form.title, quote: form.content ?? "", rating: Number(form.rating || 5), is_published: form.status === "published" } :
       { title: form.title, subtitle: form.content, image_url: form.image_url, cta_label: form.cta_label, cta_url: form.cta_url, is_active: form.status === "published" };
@@ -68,7 +67,7 @@ export function CmsPage() {
         <form className="grid gap-3 md:grid-cols-2" onSubmit={submit}>
           <Input required placeholder="Title / Name" value={form.title ?? ""} onChange={(e) => setForm({ ...form, title: e.target.value })} />
           <Input placeholder="Slug" value={form.slug ?? ""} onChange={(e) => setForm({ ...form, slug: e.target.value })} />
-          {table !== "website_pages" && table !== "testimonials" ? <MediaPicker label={table === "projects" ? "Cover Image" : "Image"} value={form[mediaField] ?? ""} onChange={(url) => setForm({ ...form, [mediaField]: url })} /> : <Input placeholder="SEO title or testimonial company" value={form.image_url ?? ""} onChange={(e) => setForm({ ...form, image_url: e.target.value })} />}
+          {table !== "website_pages" && table !== "testimonials" ? <MediaPicker label="Image" value={form[mediaField] ?? ""} onChange={(url) => setForm({ ...form, [mediaField]: url })} /> : <Input placeholder="SEO title or testimonial company" value={form.image_url ?? ""} onChange={(e) => setForm({ ...form, image_url: e.target.value })} />}
           <Select value={form.status ?? "draft"} onChange={(e) => setForm({ ...form, status: e.target.value })}><option value="draft">draft</option><option value="published">published</option></Select>
           {table === "banners" && <Input placeholder="CTA label" value={form.cta_label ?? ""} onChange={(e) => setForm({ ...form, cta_label: e.target.value })} />}
           {table === "banners" && <Input placeholder="CTA URL e.g. /customer-register" value={form.cta_url ?? ""} onChange={(e) => setForm({ ...form, cta_url: e.target.value })} />}
