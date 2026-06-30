@@ -74,10 +74,12 @@ type Assignment = TableRow<"client_file_assignments"> & {
 };
 type Client = TableRow<"clients">;
 type File = TableRow<"files">;
+type Stage = TableRow<"stages">;
 
 type FormData = {
   file_id: string;
   client_id: string;
+  stage_id: string;
   client_title: string;
   client_description: string;
   category: string;
@@ -91,6 +93,7 @@ type FormData = {
 const defaultForm: FormData = {
   file_id: "",
   client_id: "",
+  stage_id: "",
   client_title: "",
   client_description: "",
   category: "",
@@ -109,6 +112,7 @@ export function AssignmentsPage() {
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
   const [files, setFiles] = useState<File[]>([]);
+  const [stages, setStages] = useState<Stage[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [filterClient, setFilterClient] = useState("");
@@ -120,14 +124,16 @@ export function AssignmentsPage() {
 
   const load = useCallback(async () => {
     setLoading(true);
-    const [{ data: aData }, { data: cData }, { data: fData }] = await Promise.all([
+    const [{ data: aData }, { data: cData }, { data: fData }, { data: sData }] = await Promise.all([
       supabase.from("client_file_assignments").select("*, file:files(display_name,mime_type), client:clients(name), stage:stages(name,color)").order("created_at", { ascending: false }),
       supabase.from("clients").select("*").order("name"),
       supabase.from("files").select("*").is("deleted_at", null).order("display_name"),
+      supabase.from("stages").select("*").eq("status", "active").order("display_order"),
     ]);
     setAssignments((aData as Assignment[]) ?? []);
     setClients((cData as Client[]) ?? []);
     setFiles((fData as File[]) ?? []);
+    setStages((sData as Stage[]) ?? []);
     setLoading(false);
   }, []);
 
@@ -139,6 +145,7 @@ export function AssignmentsPage() {
     setForm({
       file_id: a.file_id,
       client_id: a.client_id,
+      stage_id: a.stage_id ?? "",
       client_title: a.client_title,
       client_description: a.client_description ?? "",
       category: a.category ?? "",
@@ -158,44 +165,32 @@ export function AssignmentsPage() {
     }
     setSaving(true);
     try {
+      const payload = {
+        file_id: form.file_id,
+        client_id: form.client_id,
+        stage_id: form.stage_id || null,
+        client_title: form.client_title,
+        client_description: form.client_description || null,
+        category: form.category || null,
+        display_order: form.display_order,
+        can_preview: form.can_preview,
+        can_download: form.can_download,
+        visible_from: form.visible_from || null,
+        expires_at: form.expires_at || null,
+      };
       if (editItem) {
-        const { error } = await supabase.from("client_file_assignments").update({
-          file_id: form.file_id,
-          client_id: form.client_id,
-          client_title: form.client_title,
-          client_description: form.client_description || null,
-          category: form.category || null,
-          display_order: form.display_order,
-          can_preview: form.can_preview,
-          can_download: form.can_download,
-          visible_from: form.visible_from || null,
-          expires_at: form.expires_at || null,
-          updated_by: profile?.id ?? null,
-        }).eq("id", editItem.id);
+        const { error } = await supabase.from("client_file_assignments").update({ ...payload, updated_by: profile?.id ?? null }).eq("id", editItem.id);
         if (error) throw error;
         toast.success("Assignment updated");
       } else {
-        const { error } = await supabase.from("client_file_assignments").insert({
-          file_id: form.file_id,
-          client_id: form.client_id,
-          client_title: form.client_title,
-          client_description: form.client_description || null,
-          category: form.category || null,
-          display_order: form.display_order,
-          can_preview: form.can_preview,
-          can_download: form.can_download,
-          visible_from: form.visible_from || null,
-          expires_at: form.expires_at || null,
-          created_by: profile?.id ?? null,
-        });
+        const { error } = await supabase.from("client_file_assignments").insert({ ...payload, created_by: profile?.id ?? null });
         if (error) throw error;
         toast.success("Assignment created");
       }
       setShowForm(false);
       load();
     } catch (err) {
-      const msg = (err as { message?: string })?.message ?? "Save failed";
-      toast.error("Error", msg);
+      toast.error("Error", (err as { message?: string })?.message ?? "Save failed");
     }
     setSaving(false);
   }
@@ -303,7 +298,7 @@ export function AssignmentsPage() {
                 <h2 className="font-bold text-lg">{editItem ? "Edit Assignment" : "New Assignment"}</h2>
                 <button onClick={() => setShowForm(false)} className="grid h-8 w-8 place-items-center rounded-lg hover:bg-slate-100"><X className="h-4 w-4" /></button>
               </div>
-              <div className="p-6 space-y-4">
+              <div className="p-6 space-y-5">
                 <SearchSelect
                   label="Client *"
                   value={form.client_id}
@@ -318,6 +313,39 @@ export function AssignmentsPage() {
                   onChange={(id) => setForm({ ...form, file_id: id })}
                   placeholder="Search and select file..."
                 />
+
+                {/* Stage tiles */}
+                {stages.length > 0 && (
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">Stage</label>
+                    <div className="flex flex-wrap gap-2">
+                      {stages.map((s) => {
+                        const active = form.stage_id === s.id;
+                        return (
+                          <button
+                            key={s.id}
+                            type="button"
+                            onClick={() => setForm({ ...form, stage_id: active ? "" : s.id })}
+                            className={cn(
+                              "flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold transition-all",
+                              active
+                                ? "border-transparent text-white shadow-sm"
+                                : "border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50"
+                            )}
+                            style={active ? { backgroundColor: s.color ?? "#64748b", borderColor: s.color ?? "#64748b" } : {}}
+                          >
+                            <span
+                              className="h-2 w-2 rounded-full shrink-0"
+                              style={{ backgroundColor: active ? "rgba(255,255,255,0.7)" : (s.color ?? "#94a3b8") }}
+                            />
+                            {s.name}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">Client-Facing Title *</label>
                   <Input value={form.client_title} onChange={(e) => setForm({ ...form, client_title: e.target.value })} placeholder="Title shown to client" />

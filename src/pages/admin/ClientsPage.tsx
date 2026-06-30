@@ -259,9 +259,11 @@ export function ClientsPage() {
         if (error) throw error;
         // Set new credentials if provided while editing
         if (portalEmail && portalPassword) {
-          const { data: fn } = await supabase.functions.invoke("create-portal-user", {
+          if (portalPassword.length < 8) throw new Error("Password must be at least 8 characters");
+          const { data: fn, error: fnErr } = await supabase.functions.invoke("create-portal-user", {
             body: { email: portalEmail, password: portalPassword, full_name: form.name },
           });
+          if (fnErr) throw new Error(fnErr.message);
           if (fn?.error) throw new Error(fn.error);
           if (fn?.user_id) {
             await supabase.from("clients").update({ auth_user_id: fn.user_id }).eq("id", editClient.id);
@@ -274,9 +276,11 @@ export function ClientsPage() {
         const clientId = (newClient as { id: string }).id;
         // Create portal credentials if provided
         if (portalEmail && portalPassword) {
-          const { data: fn } = await supabase.functions.invoke("create-portal-user", {
+          if (portalPassword.length < 8) throw new Error("Password must be at least 8 characters");
+          const { data: fn, error: fnErr } = await supabase.functions.invoke("create-portal-user", {
             body: { email: portalEmail, password: portalPassword, full_name: form.name },
           });
+          if (fnErr) throw new Error(fnErr.message);
           if (fn?.error) throw new Error(fn.error);
           if (fn?.user_id) {
             await supabase.from("clients").update({ auth_user_id: fn.user_id }).eq("id", clientId);

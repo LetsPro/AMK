@@ -17,11 +17,11 @@ type Assignment = TableRow<"client_blueprint_assignments"> & {
   client: { name: string } | null;
 };
 
-type FormData = { title: string; url: string; description: string; is_active: boolean };
-type AssignFormData = { client_id: string; client_project_id: string; stage_id: string; display_order: number; is_visible: boolean };
+type FormData = { title: string; url: string; description: string; is_active: boolean; client_id: string };
+type AssignFormData = { client_id: string; display_order: number; is_visible: boolean };
 
-const defaultForm: FormData = { title: "", url: "", description: "", is_active: true };
-const defaultAssignForm: AssignFormData = { client_id: "", client_project_id: "", stage_id: "", display_order: 0, is_visible: true };
+const defaultForm: FormData = { title: "", url: "", description: "", is_active: true, client_id: "" };
+const defaultAssignForm: AssignFormData = { client_id: "", display_order: 0, is_visible: true };
 
 export function BlueprintsAdminPage() {
   const toast = useToast();
@@ -59,27 +59,36 @@ export function BlueprintsAdminPage() {
   }
 
   function openAdd() { setEditItem(null); setForm(defaultForm); setShowForm(true); }
-  function openEdit(b: Blueprint) { setEditItem(b); setForm({ title: b.title, url: b.url, description: b.description ?? "", is_active: b.is_active }); setShowForm(true); }
+  function openEdit(b: Blueprint) { setEditItem(b); setForm({ title: b.title, url: b.url, description: b.description ?? "", is_active: b.is_active, client_id: "" }); setShowForm(true); }
   function openAssign(b: Blueprint) { setAssignTarget(b); setAssignForm(defaultAssignForm); loadAssignments(b.id); setShowAssignForm(true); }
 
   async function save() {
     if (!form.title.trim() || !form.url.trim()) { toast.error("Title and URL are required"); return; }
     setSaving(true);
     try {
-      const payload = { ...form, updated_by: profile?.id };
       if (editItem) {
-        const { error } = await supabase.from("blueprint_links").update(payload).eq("id", editItem.id);
+        const { error } = await supabase.from("blueprint_links").update({ title: form.title, url: form.url, description: form.description, is_active: form.is_active, updated_by: profile?.id }).eq("id", editItem.id);
         if (error) throw error;
         toast.success("Blueprint updated");
       } else {
-        const { error } = await supabase.from("blueprint_links").insert({ ...payload, created_by: profile?.id });
+        const { data: newBp, error } = await supabase.from("blueprint_links").insert({ title: form.title, url: form.url, description: form.description, is_active: form.is_active, created_by: profile?.id }).select("id").single();
         if (error) throw error;
-        toast.success("Blueprint created");
+        // Immediately assign to selected client if provided
+        if (form.client_id && newBp) {
+          await supabase.from("client_blueprint_assignments").insert({
+            blueprint_id: (newBp as { id: string }).id,
+            client_id: form.client_id,
+            is_visible: true,
+            display_order: 0,
+            created_by: profile?.id,
+          });
+        }
+        toast.success("Blueprint created" + (form.client_id ? " and assigned" : ""));
       }
       setShowForm(false);
       load();
     } catch (err) {
-      toast.error("Error", err instanceof Error ? err.message : "Save failed");
+      toast.error("Error", (err as { message?: string })?.message ?? "Save failed");
     }
     setSaving(false);
   }
@@ -106,8 +115,6 @@ export function BlueprintsAdminPage() {
       const { error } = await supabase.from("client_blueprint_assignments").insert({
         blueprint_id: assignTarget.id,
         client_id: assignForm.client_id,
-        client_project_id: assignForm.client_project_id || null,
-        stage_id: assignForm.stage_id || null,
         display_order: assignForm.display_order,
         is_visible: assignForm.is_visible,
         created_by: profile?.id,
@@ -117,7 +124,7 @@ export function BlueprintsAdminPage() {
       loadAssignments(assignTarget.id);
       setAssignForm(defaultAssignForm);
     } catch (err) {
-      toast.error("Error", err instanceof Error ? err.message : "Assignment failed");
+      toast.error("Error", (err as { message?: string })?.message ?? "Assignment failed");
     }
     setSaving(false);
   }
@@ -228,6 +235,15 @@ export function BlueprintsAdminPage() {
                   <input type="checkbox" checked={form.is_active} onChange={(e) => setForm({ ...form, is_active: e.target.checked })} className="h-4 w-4 rounded accent-brand-primary" />
                   <span className="text-sm text-slate-700">Active (visible to clients)</span>
                 </label>
+                {!editItem && (
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Assign to Client <span className="text-slate-400 font-normal">(optional)</span></label>
+                    <select value={form.client_id} onChange={(e) => setForm({ ...form, client_id: e.target.value })} className="h-10 w-full rounded-md border border-slate-200 bg-white px-3 text-sm focus:border-brand-primary focus:outline-none">
+                      <option value="">No client — assign later</option>
+                      {clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                    </select>
+                  </div>
+                )}
                 <div className="flex gap-3 pt-2">
                   <Button onClick={save} disabled={saving} className="flex-1">{saving ? "Saving..." : editItem ? "Update" : "Create"}</Button>
                   <Button variant="secondary" onClick={() => setShowForm(false)}>Cancel</Button>
