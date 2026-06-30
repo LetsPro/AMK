@@ -40,6 +40,25 @@ type ClientFormData = {
 
 const defaultForm: ClientFormData = { name: "", email: "", mobile: "", address: "", notes: "", admin_notes: "", status: "Active" };
 
+function errorMessage(error: unknown) {
+  if (error instanceof Error && error.message && error.message !== "{}") return error.message;
+  if (typeof error === "string" && error && error !== "{}") return error;
+  if (error && typeof error === "object") {
+    const record = error as Record<string, unknown>;
+    for (const key of ["message", "error", "details", "hint", "code"]) {
+      const value = record[key];
+      if (typeof value === "string" && value && value !== "{}") return value;
+    }
+    try {
+      const json = JSON.stringify(error);
+      if (json && json !== "{}") return json;
+    } catch {
+      return "Save failed";
+    }
+  }
+  return "Save failed";
+}
+
 function formatSize(bytes: number | null) {
   if (!bytes) return "";
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
@@ -257,6 +276,17 @@ export function ClientsPage() {
     setShowForm(true);
   }
 
+  function generatePortalPassword() {
+    const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789";
+    const symbols = "!@#$";
+    let password = "AMK";
+    for (let i = 0; i < 9; i += 1) password += chars[Math.floor(Math.random() * chars.length)];
+    password += symbols[Math.floor(Math.random() * symbols.length)];
+    setPortalEmail(portalEmail || form.email);
+    setPortalPassword(password);
+    setShowPortalPassword(true);
+  }
+
   async function saveClient() {
     if (!form.name.trim()) { toast.error("Name required"); return; }
     setSaving(true);
@@ -272,16 +302,12 @@ export function ClientsPage() {
           if (!effectivePortalEmail) throw new Error("Portal email is required to set credentials");
           if (portalPassword.length < 8) throw new Error("Password must be at least 8 characters");
           const { data: fn, error: fnErr } = await supabase.functions.invoke("create-portal-user", {
-            body: { email: effectivePortalEmail, password: portalPassword, full_name: form.name, existing_user_id: editClient.auth_user_id ?? null },
+            body: { email: effectivePortalEmail, password: portalPassword, full_name: form.name, existing_user_id: editClient.auth_user_id ?? null, client_id: editClient.id },
           });
-          if (fnErr) throw new Error(fnErr.message);
+          if (fnErr) throw new Error(errorMessage(fnErr));
           if (fn?.error) throw new Error(fn.error);
-          if (fn?.user_id) {
-            const { error: upErr } = await supabase.from("clients").update({ auth_user_id: fn.user_id }).eq("id", editClient.id);
-            if (upErr) throw upErr;
-          }
         }
-        toast.success("Client updated");
+        toast.success(portalPassword.trim() ? "Client and portal credentials updated" : "Client updated");
       } else {
         const { data: newClient, error } = await supabase.from("clients").insert(form).select("id").single();
         if (error) throw error;
@@ -291,21 +317,17 @@ export function ClientsPage() {
           if (!effectivePortalEmail) throw new Error("Portal email is required to set credentials");
           if (portalPassword.length < 8) throw new Error("Password must be at least 8 characters");
           const { data: fn, error: fnErr } = await supabase.functions.invoke("create-portal-user", {
-            body: { email: effectivePortalEmail, password: portalPassword, full_name: form.name },
+            body: { email: effectivePortalEmail, password: portalPassword, full_name: form.name, client_id: clientId },
           });
-          if (fnErr) throw new Error(fnErr.message);
+          if (fnErr) throw new Error(errorMessage(fnErr));
           if (fn?.error) throw new Error(fn.error);
-          if (fn?.user_id) {
-            const { error: upErr } = await supabase.from("clients").update({ auth_user_id: fn.user_id }).eq("id", clientId);
-            if (upErr) throw upErr;
-          }
         }
-        toast.success("Client created");
+        toast.success(portalPassword.trim() ? "Client and portal credentials created" : "Client created");
       }
       setShowForm(false);
       fetchClients();
     } catch (err) {
-      toast.error("Error", (err as { message?: string })?.message ?? "Save failed");
+      toast.error("Error", errorMessage(err));
     }
     setSaving(false);
   }
@@ -723,6 +745,9 @@ export function ClientsPage() {
                     <KeyRound className="h-4 w-4 text-slate-400" />
                     <span className="text-sm font-semibold text-slate-700">Portal Access</span>
                     {editClient?.auth_user_id && <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-700">Active</span>}
+                    <button type="button" onClick={generatePortalPassword} className="ml-auto rounded-md border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-600 hover:border-brand-primary hover:text-brand-primary">
+                      Generate Credentials
+                    </button>
                   </div>
                   <p className="text-xs text-slate-500">
                     {editClient?.auth_user_id

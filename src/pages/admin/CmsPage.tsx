@@ -70,7 +70,7 @@ export function CmsPage() {
           {table !== "website_pages" && table !== "testimonials" ? <MediaPicker label="Image" value={form[mediaField] ?? ""} onChange={(url) => setForm({ ...form, [mediaField]: url })} /> : <Input placeholder="SEO title or testimonial company" value={form.image_url ?? ""} onChange={(e) => setForm({ ...form, image_url: e.target.value })} />}
           <Select value={form.status ?? "draft"} onChange={(e) => setForm({ ...form, status: e.target.value })}><option value="draft">draft</option><option value="published">published</option></Select>
           {table === "banners" && <Input placeholder="CTA label" value={form.cta_label ?? ""} onChange={(e) => setForm({ ...form, cta_label: e.target.value })} />}
-          {table === "banners" && <Input placeholder="CTA URL e.g. /customer-register" value={form.cta_url ?? ""} onChange={(e) => setForm({ ...form, cta_url: e.target.value })} />}
+          {table === "banners" && <Input placeholder="CTA URL e.g. #enquiry" value={form.cta_url ?? ""} onChange={(e) => setForm({ ...form, cta_url: e.target.value })} />}
           <Textarea className="md:col-span-2" placeholder="Rich text content / description / SEO description" value={form.content ?? ""} onChange={(e) => setForm({ ...form, content: e.target.value })} />
           <Button>{editingId ? "Update" : "Publish / Save Draft"}</Button>
         </form>

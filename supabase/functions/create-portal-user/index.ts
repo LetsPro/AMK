@@ -1,7 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 
-// v3 — no client_id required, always 200
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
@@ -15,13 +14,36 @@ function ok(body: Record<string, unknown>) {
   });
 }
 
+async function upsertProfile(
+  supabaseAdmin: ReturnType<typeof createClient>,
+  userId: string,
+  email: string,
+  fullName?: string
+) {
+  const { error } = await supabaseAdmin.from("profiles").upsert(
+    { id: userId, full_name: fullName ?? email, email, role_id: null, is_active: true },
+    { onConflict: "id" }
+  );
+  if (error) throw error;
+}
+
+async function linkClient(
+  supabaseAdmin: ReturnType<typeof createClient>,
+  clientId: string | undefined,
+  userId: string
+) {
+  if (!clientId) return;
+  const { error } = await supabaseAdmin.from("clients").update({ auth_user_id: userId }).eq("id", clientId);
+  if (error) throw error;
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { status: 200, headers: corsHeaders });
   }
 
   try {
-    const { email, password, full_name, existing_user_id } = await req.json();
+    const { email, password, full_name, existing_user_id, client_id } = await req.json();
 
     if (!email || !password) {
       return ok({ error: "Email and password are required" });
@@ -39,6 +61,8 @@ Deno.serve(async (req: Request) => {
         { email, password, email_confirm: true }
       );
       if (error) return ok({ error: error.message });
+      await upsertProfile(supabaseAdmin, updated.user.id, email, full_name);
+      await linkClient(supabaseAdmin, client_id, updated.user.id);
       return ok({ user_id: updated.user.id });
     }
 
@@ -61,6 +85,8 @@ Deno.serve(async (req: Request) => {
             { password, email_confirm: true }
           );
           if (updErr) return ok({ error: updErr.message });
+          await upsertProfile(supabaseAdmin, updated.user.id, email, full_name);
+          await linkClient(supabaseAdmin, client_id, updated.user.id);
           return ok({ user_id: updated.user.id });
         }
       }
@@ -69,14 +95,12 @@ Deno.serve(async (req: Request) => {
 
     const userId = created.user.id;
 
-    // Create profile row (ignore error — may already exist from trigger)
-    await supabaseAdmin.from("profiles").upsert(
-      { id: userId, full_name: full_name ?? email, email },
-      { onConflict: "id", ignoreDuplicates: true }
-    );
+    await upsertProfile(supabaseAdmin, userId, email, full_name);
+    await linkClient(supabaseAdmin, client_id, userId);
 
     return ok({ user_id: userId });
   } catch (err) {
-    return ok({ error: String(err) });
+    const message = err instanceof Error ? err.message : JSON.stringify(err);
+    return ok({ error: message || "Unable to create portal user" });
   }
 });

@@ -3,7 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Building2, Lock, Mail } from "lucide-react";
+import { Building2, Home, Lock, Mail } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { useAuth } from "@/contexts/AuthContext";
@@ -13,7 +13,7 @@ const schema = z.object({ email: z.string().email("Enter a valid email"), passwo
 type FormData = z.infer<typeof schema>;
 
 export function LoginPage() {
-  const { signIn, isAdmin, isClient } = useAuth();
+  const { signIn } = useAuth();
   const navigate = useNavigate();
   const toast = useToast();
   const [error, setError] = useState("");
@@ -22,14 +22,9 @@ export function LoginPage() {
   async function onSubmit(values: FormData) {
     setError("");
     try {
-      await signIn(values.email, values.password);
+      const destination = await signIn(values.email, values.password);
       toast.success("Welcome back!", "You have signed in successfully.");
-      // Small delay to let auth state update
-      setTimeout(() => {
-        if (isAdmin) navigate("/app");
-        else if (isClient) navigate("/client");
-        else navigate("/app");
-      }, 100);
+      navigate(destination, { replace: true });
     } catch (err) {
       const message = err instanceof Error ? err.message : "Login failed. Please check your credentials.";
       setError(message);
@@ -57,14 +52,17 @@ export function LoginPage() {
       {/* Right panel */}
       <div className="flex items-center justify-center p-6 bg-slate-50">
         <div className="w-full max-w-md">
+          <Link to="/" className="mb-6 inline-flex items-center gap-2 rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:border-brand-primary hover:text-brand-primary">
+            <Home className="h-4 w-4" />
+            Home
+          </Link>
           <div className="mb-8 flex items-center gap-3 lg:hidden">
             <div className="grid h-10 w-10 place-items-center rounded-lg bg-gradient-to-br from-brand-primary to-brand-accent text-white"><Building2 className="h-5 w-5" /></div>
-            <div><div className="font-bold">AMK Architects & Engineers</div><div className="text-xs text-slate-500">Secure portal login</div></div>
+            <div><div className="font-bold">AMK Architects & Engineers</div></div>
           </div>
 
           <div className="mb-8">
             <h2 className="text-2xl font-black text-slate-900">Sign in to your account</h2>
-            <p className="mt-2 text-sm text-slate-500">Enter your credentials to access the platform.</p>
           </div>
 
           <form className="space-y-4" onSubmit={form.handleSubmit(onSubmit)}>
@@ -74,7 +72,6 @@ export function LoginPage() {
                 <Mail className="pointer-events-none absolute left-3 top-2.5 h-4.5 w-4.5 text-slate-400" />
                 <Input
                   type="email"
-                  placeholder="your@email.com"
                   className="pl-10"
                   {...form.register("email")}
                 />
@@ -88,7 +85,6 @@ export function LoginPage() {
                 <Lock className="pointer-events-none absolute left-3 top-2.5 h-4.5 w-4.5 text-slate-400" />
                 <Input
                   type="password"
-                  placeholder="••••••••"
                   className="pl-10"
                   {...form.register("password")}
                 />

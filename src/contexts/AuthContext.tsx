@@ -14,7 +14,7 @@ type AuthContextValue = {
   isClient: boolean;
   clientId: string | null;
   loading: boolean;
-  signIn: (email: string, password: string) => Promise<void>;
+  signIn: (email: string, password: string) => Promise<"/app" | "/client">;
   signOut: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
   updatePassword: (password: string) => Promise<void>;
@@ -31,6 +31,12 @@ async function loadProfile(userId: string) {
 async function loadClientId(userId: string): Promise<string | null> {
   const { data } = await supabase.from("clients").select("id").eq("auth_user_id", userId).maybeSingle();
   return (data as { id: string } | null)?.id ?? null;
+}
+
+function isAdminProfile(profile: Profile | null) {
+  const role = profile?.roles?.name ?? null;
+  const adminRoles: RoleName[] = ["Super Admin", "Sales Manager", "Sales Executive", "Accountant", "Project Manager", "Staff", "Support Executive"];
+  return role !== null && adminRoles.includes(role);
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -74,7 +80,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const value = useMemo<AuthContextValue>(() => {
     const role = profile?.roles?.name ?? null;
     const adminRoles: RoleName[] = ["Super Admin", "Sales Manager", "Sales Executive", "Accountant", "Project Manager", "Staff", "Support Executive"];
-    const isAdmin = role !== null && adminRoles.includes(role);
+    const isAdmin = clientId === null && role !== null && adminRoles.includes(role);
     const isClient = clientId !== null;
     return {
       session,
@@ -86,8 +92,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       clientId,
       loading,
       async signIn(email, password) {
-        const { error } = await supabase.auth.signInWithPassword({ email, password });
+        const { data, error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
+        if (!data.session?.user) return "/app";
+
+        const [nextProfile, nextClientId] = await Promise.all([
+          loadProfile(data.session.user.id),
+          loadClientId(data.session.user.id),
+        ]);
+
+        setSession(data.session);
+        setProfile(nextProfile);
+        setClientId(nextClientId);
+
+        if (nextClientId) return "/client";
+        if (isAdminProfile(nextProfile)) return "/app";
+        return "/app";
       },
       async signOut() {
         const { error } = await supabase.auth.signOut();

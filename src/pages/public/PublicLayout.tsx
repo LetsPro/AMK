@@ -1,14 +1,60 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import type { FormEvent } from "react";
 import { Link, Outlet } from "react-router-dom";
-import { Building2, Facebook, Instagram, Linkedin, LogIn, Mail, MapPin, Menu, Phone, UserPlus, X } from "lucide-react";
+import { Building2, Facebook, Instagram, Linkedin, LogIn, Mail, MapPin, Menu, Phone, Send, UserPlus, X } from "lucide-react";
 import { Button } from "@/components/ui/Button";
+import { Input, Textarea } from "@/components/ui/Input";
 import { useAppSettings } from "@/hooks/useAppSettings";
+import { supabase } from "@/lib/supabase";
+
+function phoneForWhatsapp(phone: string) {
+  const digits = phone.replace(/\D/g, "");
+  if (digits.length === 10) return `91${digits}`;
+  return digits;
+}
 
 export function PublicLayout() {
   const [open, setOpen] = useState(false);
+  const [enquiryOpen, setEnquiryOpen] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [enquiry, setEnquiry] = useState({ name: "", mobile: "", email: "", subject: "", message: "" });
   const { branding } = useAppSettings();
   const navItems = ["home", "about", "projects", "services", "gallery", "contact"];
   const hrefFor = (item: string) => item === "home" ? "/" : `/${item}`;
+
+  useEffect(() => {
+    const listener = () => setEnquiryOpen(true);
+    window.addEventListener("open-enquiry-modal", listener);
+    return () => window.removeEventListener("open-enquiry-modal", listener);
+  }, []);
+
+  async function submitEnquiry(event: FormEvent) {
+    event.preventDefault();
+    setSending(true);
+    const payload = {
+      name: enquiry.name,
+      mobile: enquiry.mobile || null,
+      email: enquiry.email || null,
+      subject: enquiry.subject || "Website enquiry",
+      message: enquiry.message,
+      source: "website_whatsapp",
+    };
+    const text = [
+      "New AMK website enquiry",
+      `Name: ${enquiry.name}`,
+      enquiry.mobile ? `Mobile: ${enquiry.mobile}` : "",
+      enquiry.email ? `Email: ${enquiry.email}` : "",
+      payload.subject ? `Subject: ${payload.subject}` : "",
+      `Message: ${enquiry.message}`,
+    ].filter(Boolean).join("\n");
+    const insertPromise = supabase.from("enquiries").insert(payload);
+    window.open(`https://wa.me/${phoneForWhatsapp(branding.phone)}?text=${encodeURIComponent(text)}`, "_blank", "noopener,noreferrer");
+    await insertPromise;
+    setSending(false);
+    setEnquiryOpen(false);
+    setEnquiry({ name: "", mobile: "", email: "", subject: "", message: "" });
+  }
+
   return (
     <div className="min-h-screen bg-white text-slate-900">
       <header className="sticky top-0 z-20 border-b border-slate-200 bg-white/90 backdrop-blur">
@@ -23,7 +69,7 @@ export function PublicLayout() {
           </nav>
           <div className="hidden items-center gap-2 xl:flex">
             <Button variant="secondary" onClick={() => location.href = "/login"}><LogIn className="h-4 w-4" /> Login</Button>
-            <Button onClick={() => location.href = "/customer-register"}><UserPlus className="h-4 w-4" /> Get Started</Button>
+            <Button onClick={() => setEnquiryOpen(true)}><UserPlus className="h-4 w-4" /> Get Started</Button>
           </div>
           <button className="grid h-10 w-10 place-items-center rounded-md border border-slate-200 bg-white text-slate-800 xl:hidden" onClick={() => setOpen((value) => !value)} aria-label="Toggle menu">
             {open ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
@@ -36,7 +82,7 @@ export function PublicLayout() {
             </nav>
             <div className="mt-4 grid grid-cols-2 gap-2">
               <Button variant="secondary" onClick={() => { setOpen(false); location.href = "/login"; }}><LogIn className="h-4 w-4" /> Login</Button>
-              <Button onClick={() => { setOpen(false); location.href = "/customer-register"; }}><UserPlus className="h-4 w-4" /> Get Started</Button>
+              <Button onClick={() => { setOpen(false); setEnquiryOpen(true); }}><UserPlus className="h-4 w-4" /> Get Started</Button>
             </div>
           </div>
         )}
@@ -70,7 +116,7 @@ export function PublicLayout() {
               <span className="flex items-center gap-2"><Phone className="h-4 w-4 text-brand-accent" />{branding.phone}</span>
               <span className="flex items-start gap-2"><MapPin className="mt-0.5 h-4 w-4 text-brand-accent" />{branding.location}</span>
             </div>
-            <Button className="mt-5" onClick={() => location.href = "/customer-register"}>Get Started</Button>
+            <Button className="mt-5" onClick={() => setEnquiryOpen(true)}>Get Started</Button>
           </div>
         </div>
         <div className="mx-auto flex max-w-7xl flex-col gap-2 py-5 text-xs text-slate-500 md:flex-row md:items-center md:justify-between">
@@ -78,6 +124,43 @@ export function PublicLayout() {
           <span>Powered by <a className="font-semibold text-brand-accent hover:text-white" href="https://dreambuzz.in" target="_blank" rel="noreferrer">Dreambuzz Solutions</a></span>
         </div>
       </footer>
+      {enquiryOpen && (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/70 p-4">
+          <div className="w-full max-w-xl rounded-lg bg-white shadow-2xl">
+            <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
+              <h2 className="text-xl font-black text-slate-950">Start a Project</h2>
+              <button className="grid h-9 w-9 place-items-center rounded-md hover:bg-slate-100" onClick={() => setEnquiryOpen(false)} aria-label="Close enquiry form">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <form className="grid gap-4 p-5 sm:grid-cols-2" onSubmit={submitEnquiry}>
+              <label>
+                <span className="mb-1 block text-sm font-medium text-slate-700">Name</span>
+                <Input required value={enquiry.name} onChange={(event) => setEnquiry({ ...enquiry, name: event.target.value })} />
+              </label>
+              <label>
+                <span className="mb-1 block text-sm font-medium text-slate-700">Mobile</span>
+                <Input required value={enquiry.mobile} onChange={(event) => setEnquiry({ ...enquiry, mobile: event.target.value })} />
+              </label>
+              <label>
+                <span className="mb-1 block text-sm font-medium text-slate-700">Email</span>
+                <Input type="email" value={enquiry.email} onChange={(event) => setEnquiry({ ...enquiry, email: event.target.value })} />
+              </label>
+              <label>
+                <span className="mb-1 block text-sm font-medium text-slate-700">Subject</span>
+                <Input value={enquiry.subject} onChange={(event) => setEnquiry({ ...enquiry, subject: event.target.value })} />
+              </label>
+              <label className="sm:col-span-2">
+                <span className="mb-1 block text-sm font-medium text-slate-700">Project Brief</span>
+                <Textarea required className="min-h-32" value={enquiry.message} onChange={(event) => setEnquiry({ ...enquiry, message: event.target.value })} />
+              </label>
+              <div className="sm:col-span-2">
+                <Button disabled={sending} className="w-full"><Send className="h-4 w-4" /> {sending ? "Sending..." : "Send to WhatsApp"}</Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

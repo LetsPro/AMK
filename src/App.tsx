@@ -7,7 +7,7 @@ import { LoginPage } from "@/pages/auth/LoginPage";
 import { ForgotPasswordPage } from "@/pages/auth/ForgotPasswordPage";
 import { ResetPasswordPage } from "@/pages/auth/ResetPasswordPage";
 import { PublicLayout } from "@/pages/public/PublicLayout";
-import { ContactPage, CustomerRegisterPage, HomePage, ListingPage, ProjectDetailPage } from "@/pages/public/PublicPages";
+import { ContactPage, HomePage, ListingPage, ProjectDetailPage } from "@/pages/public/PublicPages";
 import { PortfolioListingPage, PortfolioDetailPage } from "@/pages/public/PortfolioPages";
 
 // Admin pages
@@ -58,7 +58,6 @@ export function App() {
           <Route path="services" element={<ListingPage type="services" />} />
           <Route path="gallery" element={<ListingPage type="gallery" />} />
           <Route path="contact" element={<ContactPage />} />
-          <Route path="customer-register" element={<CustomerRegisterPage />} />
         </Route>
 
         {/* Auth */}
