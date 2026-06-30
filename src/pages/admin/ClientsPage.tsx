@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useSearchParams } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { Eye, Pencil, Plus, Search, Trash2, X } from "lucide-react";
+import { Download, Eye, FileText, Pencil, Plus, Search, Trash2, X } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/Button";
@@ -10,6 +10,10 @@ import { useToast } from "@/contexts/ToastContext";
 import type { TableRow, ClientStatus } from "@/types/database";
 
 type Client = TableRow<"clients">;
+type FileAssignment = TableRow<"client_file_assignments"> & {
+  file: { display_name: string; public_url: string; mime_type: string | null; size: number | null } | null;
+  stage: { name: string; color: string | null } | null;
+};
 
 const STATUS_OPTIONS: ClientStatus[] = ["Active", "On Hold", "Completed", "Inactive"];
 
@@ -32,8 +36,14 @@ type ClientFormData = {
 
 const defaultForm: ClientFormData = { name: "", email: "", mobile: "", address: "", notes: "", admin_notes: "", status: "Active" };
 
+function formatSize(bytes: number | null) {
+  if (!bytes) return "";
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+}
+
 export function ClientsPage() {
-  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const toast = useToast();
   const [clients, setClients] = useState<Client[]>([]);
@@ -45,6 +55,11 @@ export function ClientsPage() {
   const [deleteTarget, setDeleteTarget] = useState<Client | null>(null);
   const [form, setForm] = useState<ClientFormData>(defaultForm);
   const [saving, setSaving] = useState(false);
+
+  // Detail modal state
+  const [viewClient, setViewClient] = useState<Client | null>(null);
+  const [clientFiles, setClientFiles] = useState<FileAssignment[]>([]);
+  const [loadingFiles, setLoadingFiles] = useState(false);
 
   const fetchClients = useCallback(async () => {
     setLoading(true);
@@ -59,6 +74,19 @@ export function ClientsPage() {
     if (searchParams.get("new") === "1") { openAdd(); setSearchParams({}); }
   }, [searchParams, setSearchParams]);
 
+  async function openDetail(client: Client) {
+    setViewClient(client);
+    setClientFiles([]);
+    setLoadingFiles(true);
+    const { data } = await supabase
+      .from("client_file_assignments")
+      .select("*, file:files(display_name,public_url,mime_type,size), stage:stages(name,color)")
+      .eq("client_id", client.id)
+      .order("display_order");
+    setClientFiles((data as FileAssignment[]) ?? []);
+    setLoadingFiles(false);
+  }
+
   const filtered = clients.filter((c) => {
     const matchSearch = `${c.name} ${c.email ?? ""} ${c.mobile ?? ""}`.toLowerCase().includes(search.toLowerCase());
     const matchStatus = statusFilter === "All" || c.status === statusFilter;
@@ -66,7 +94,11 @@ export function ClientsPage() {
   });
 
   function openAdd() { setEditClient(null); setForm(defaultForm); setShowForm(true); }
-  function openEdit(client: Client) { setEditClient(client); setForm({ name: client.name, email: client.email ?? "", mobile: client.mobile ?? "", address: client.address ?? "", notes: client.notes ?? "", admin_notes: client.admin_notes ?? "", status: client.status as ClientStatus }); setShowForm(true); }
+  function openEdit(client: Client) {
+    setEditClient(client);
+    setForm({ name: client.name, email: client.email ?? "", mobile: client.mobile ?? "", address: client.address ?? "", notes: client.notes ?? "", admin_notes: client.admin_notes ?? "", status: client.status as ClientStatus });
+    setShowForm(true);
+  }
 
   async function saveClient() {
     if (!form.name.trim()) { toast.error("Name required", "Client name cannot be empty."); return; }
@@ -172,7 +204,7 @@ export function ClientsPage() {
                     </td>
                     <td className="px-5 py-3.5">
                       <div className="flex items-center justify-end gap-1">
-                        <button onClick={() => navigate(`/app/clients/${client.id}`)} className="grid h-8 w-8 place-items-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors" title="View details">
+                        <button onClick={() => openDetail(client)} className="grid h-8 w-8 place-items-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors" title="View details">
                           <Eye className="h-4 w-4" />
                         </button>
                         <button onClick={() => openEdit(client)} className="grid h-8 w-8 place-items-center rounded-lg text-slate-400 hover:bg-blue-50 hover:text-blue-600 transition-colors" title="Edit">
@@ -190,6 +222,147 @@ export function ClientsPage() {
           </div>
         )}
       </div>
+
+      {/* Client Detail Modal */}
+      <AnimatePresence>
+        {viewClient && (
+          <>
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-40 bg-slate-950/50" onClick={() => setViewClient(null)} />
+            <motion.div initial={{ opacity: 0, scale: 0.97, y: 12 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.97, y: 12 }} transition={{ type: "spring", stiffness: 340, damping: 30 }} className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
+              <div className="w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-2xl bg-white shadow-2xl pointer-events-auto">
+                {/* Header */}
+                <div className="flex items-start justify-between border-b border-slate-100 px-6 py-5">
+                  <div className="flex items-center gap-4">
+                    <div className="grid h-14 w-14 shrink-0 place-items-center rounded-full bg-gradient-to-br from-brand-primary/20 to-brand-accent/20 text-xl font-black text-brand-primary">
+                      {viewClient.name[0].toUpperCase()}
+                    </div>
+                    <div>
+                      <h2 className="text-xl font-black text-slate-900">{viewClient.name}</h2>
+                      <div className="flex items-center gap-2 mt-1">
+                        <span className={cn("rounded-full border px-2.5 py-0.5 text-xs font-semibold", statusColor[viewClient.status as ClientStatus] ?? "bg-slate-100 text-slate-500")}>
+                          {viewClient.status}
+                        </span>
+                        {viewClient.customer_id && <span className="text-xs text-slate-400 font-mono">{viewClient.customer_id}</span>}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button onClick={() => { setViewClient(null); openEdit(viewClient); }} className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition-colors">
+                      Edit
+                    </button>
+                    <button onClick={() => setViewClient(null)} className="grid h-8 w-8 place-items-center rounded-lg hover:bg-slate-100 transition-colors">
+                      <X className="h-4 w-4 text-slate-500" />
+                    </button>
+                  </div>
+                </div>
+
+                <div className="p-6 space-y-6">
+                  {/* Contact Info */}
+                  <div>
+                    <h3 className="text-xs font-bold uppercase tracking-wide text-slate-400 mb-3">Contact Information</h3>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <div className="text-xs text-slate-400 mb-0.5">Email</div>
+                        <div className="text-sm font-medium text-slate-800">{viewClient.email || "—"}</div>
+                      </div>
+                      <div>
+                        <div className="text-xs text-slate-400 mb-0.5">Phone</div>
+                        <div className="text-sm font-medium text-slate-800">{viewClient.mobile || "—"}</div>
+                      </div>
+                      <div className="col-span-2">
+                        <div className="text-xs text-slate-400 mb-0.5">Address</div>
+                        <div className="text-sm font-medium text-slate-800">{viewClient.address || "—"}</div>
+                      </div>
+                      {viewClient.contract_value != null && (
+                        <div>
+                          <div className="text-xs text-slate-400 mb-0.5">Contract Value</div>
+                          <div className="text-sm font-medium text-slate-800">
+                            {new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(viewClient.contract_value)}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Notes */}
+                  {(viewClient.notes || viewClient.admin_notes) && (
+                    <div>
+                      <h3 className="text-xs font-bold uppercase tracking-wide text-slate-400 mb-3">Notes</h3>
+                      <div className="space-y-3">
+                        {viewClient.notes && (
+                          <div className="rounded-lg bg-slate-50 px-4 py-3">
+                            <div className="text-xs font-semibold text-slate-500 mb-1">Client Notes</div>
+                            <p className="text-sm text-slate-700 whitespace-pre-wrap">{viewClient.notes}</p>
+                          </div>
+                        )}
+                        {viewClient.admin_notes && (
+                          <div className="rounded-lg bg-amber-50 border border-amber-100 px-4 py-3">
+                            <div className="text-xs font-semibold text-amber-600 mb-1">Internal Notes (admin only)</div>
+                            <p className="text-sm text-slate-700 whitespace-pre-wrap">{viewClient.admin_notes}</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Assigned Files */}
+                  <div>
+                    <h3 className="text-xs font-bold uppercase tracking-wide text-slate-400 mb-3">
+                      Assigned Files {!loadingFiles && `(${clientFiles.length})`}
+                    </h3>
+                    {loadingFiles ? (
+                      <div className="space-y-2">
+                        {Array.from({ length: 3 }).map((_, i) => <div key={i} className="h-12 animate-pulse rounded-lg bg-slate-100" />)}
+                      </div>
+                    ) : clientFiles.length === 0 ? (
+                      <div className="rounded-lg border border-dashed border-slate-200 py-8 text-center">
+                        <FileText className="mx-auto h-8 w-8 text-slate-300 mb-2" />
+                        <p className="text-sm text-slate-400">No files assigned to this client yet.</p>
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        {clientFiles.map((fa) => (
+                          <div key={fa.id} className="flex items-center gap-3 rounded-lg border border-slate-100 bg-slate-50 px-3 py-2.5">
+                            <div className="grid h-8 w-8 shrink-0 place-items-center rounded-md bg-white border border-slate-200 text-slate-400">
+                              <FileText className="h-4 w-4" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="text-sm font-semibold text-slate-800 truncate">{fa.client_title || fa.file?.display_name}</div>
+                              <div className="flex items-center gap-2 mt-0.5">
+                                {fa.category && <span className="text-xs text-slate-400">{fa.category}</span>}
+                                {fa.file?.size && <span className="text-xs text-slate-400">{formatSize(fa.file.size)}</span>}
+                                {fa.stage && (
+                                  <span className="flex items-center gap-1 text-xs text-slate-400">
+                                    <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: fa.stage.color ?? "#94a3b8" }} />
+                                    {fa.stage.name}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                            {fa.can_download && fa.file && (
+                              <a href={fa.file.public_url} download target="_blank" rel="noopener noreferrer" className="grid h-7 w-7 place-items-center rounded-md text-slate-400 hover:bg-emerald-50 hover:text-emerald-600 transition-colors" title="Download">
+                                <Download className="h-3.5 w-3.5" />
+                              </a>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Meta */}
+                  <div className="border-t border-slate-100 pt-4">
+                    <div className="flex items-center gap-4 text-xs text-slate-400">
+                      <span>Added {new Date(viewClient.created_at).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}</span>
+                      {viewClient.auth_user_id && <span className="font-mono">Portal access enabled</span>}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
 
       {/* Add/Edit Drawer */}
       <AnimatePresence>
@@ -250,7 +423,7 @@ export function ClientsPage() {
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 grid place-items-center bg-slate-950/50 p-4">
             <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }} className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl">
               <h3 className="font-bold text-lg text-slate-900">Delete Client?</h3>
-              <p className="mt-2 text-sm text-slate-600">This will permanently delete <strong>{deleteTarget.name}</strong> and all associated data including projects and file assignments.</p>
+              <p className="mt-2 text-sm text-slate-600">This will permanently delete <strong>{deleteTarget.name}</strong> and all associated data including file assignments.</p>
               <div className="mt-5 flex gap-3">
                 <Button variant="danger" onClick={deleteClient} className="flex-1">Delete Client</Button>
                 <Button variant="secondary" onClick={() => setDeleteTarget(null)}>Cancel</Button>

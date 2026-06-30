@@ -9,7 +9,9 @@ import { useToast } from "@/contexts/ToastContext";
 import { useAuth } from "@/contexts/AuthContext";
 import type { TableRow } from "@/types/database";
 
-type Blueprint = TableRow<"blueprint_links">;
+type Blueprint = TableRow<"blueprint_links"> & {
+  _assignments?: { client: { name: string } | null }[];
+};
 type Client = TableRow<"clients">;
 type Assignment = TableRow<"client_blueprint_assignments"> & {
   client: { name: string } | null;
@@ -41,7 +43,7 @@ export function BlueprintsAdminPage() {
   const load = useCallback(async () => {
     setLoading(true);
     const [{ data: bData }, { data: cData }] = await Promise.all([
-      supabase.from("blueprint_links").select("*").order("created_at", { ascending: false }),
+      supabase.from("blueprint_links").select("*, _assignments:client_blueprint_assignments(client:clients(name))").order("created_at", { ascending: false }),
       supabase.from("clients").select("*").order("name"),
     ]);
     setBlueprints((bData as Blueprint[]) ?? []);
@@ -158,6 +160,7 @@ export function BlueprintsAdminPage() {
               <tr>
                 <th className="px-5 py-3 text-left text-xs font-bold uppercase tracking-wide text-slate-500">Title</th>
                 <th className="hidden px-5 py-3 text-left text-xs font-bold uppercase tracking-wide text-slate-500 md:table-cell">URL</th>
+                <th className="px-5 py-3 text-left text-xs font-bold uppercase tracking-wide text-slate-500">Assigned To</th>
                 <th className="px-5 py-3 text-left text-xs font-bold uppercase tracking-wide text-slate-500">Status</th>
                 <th className="px-5 py-3 text-right text-xs font-bold uppercase tracking-wide text-slate-500">Actions</th>
               </tr>
@@ -173,6 +176,20 @@ export function BlueprintsAdminPage() {
                     <a href={b.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-blue-600 hover:underline truncate max-w-xs text-xs">
                       <ExternalLink className="h-3 w-3 shrink-0" />{b.url}
                     </a>
+                  </td>
+                  <td className="px-5 py-3.5">
+                    {b._assignments && b._assignments.length > 0 ? (
+                      <div className="flex flex-wrap gap-1">
+                        {b._assignments.slice(0, 3).map((a, i) => (
+                          <span key={i} className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-600 font-medium">{a.client?.name ?? "—"}</span>
+                        ))}
+                        {b._assignments.length > 3 && (
+                          <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-400">+{b._assignments.length - 3} more</span>
+                        )}
+                      </div>
+                    ) : (
+                      <span className="text-xs text-slate-400">—</span>
+                    )}
                   </td>
                   <td className="px-5 py-3.5">
                     <button onClick={() => toggleActive(b)} className={cn("rounded-full px-2.5 py-1 text-xs font-semibold transition-colors", b.is_active ? "bg-emerald-100 text-emerald-700 hover:bg-emerald-200" : "bg-slate-100 text-slate-500 hover:bg-slate-200")}>
