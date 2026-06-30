@@ -74,12 +74,10 @@ type Assignment = TableRow<"client_file_assignments"> & {
 };
 type Client = TableRow<"clients">;
 type File = TableRow<"files">;
-type Stage = TableRow<"stages">;
 
 type FormData = {
   file_id: string;
   client_id: string;
-  stage_id: string;
   client_title: string;
   client_description: string;
   category: string;
@@ -93,7 +91,6 @@ type FormData = {
 const defaultForm: FormData = {
   file_id: "",
   client_id: "",
-  stage_id: "",
   client_title: "",
   client_description: "",
   category: "",
@@ -112,7 +109,6 @@ export function AssignmentsPage() {
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
   const [files, setFiles] = useState<File[]>([]);
-  const [stages, setStages] = useState<Stage[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [filterClient, setFilterClient] = useState("");
@@ -124,16 +120,14 @@ export function AssignmentsPage() {
 
   const load = useCallback(async () => {
     setLoading(true);
-    const [{ data: aData }, { data: cData }, { data: fData }, { data: sData }] = await Promise.all([
+    const [{ data: aData }, { data: cData }, { data: fData }] = await Promise.all([
       supabase.from("client_file_assignments").select("*, file:files(display_name,mime_type), client:clients(name), stage:stages(name,color)").order("created_at", { ascending: false }),
       supabase.from("clients").select("*").order("name"),
       supabase.from("files").select("*").is("deleted_at", null).order("display_name"),
-      supabase.from("stages").select("*").eq("status", "active").order("display_order"),
     ]);
     setAssignments((aData as Assignment[]) ?? []);
     setClients((cData as Client[]) ?? []);
     setFiles((fData as File[]) ?? []);
-    setStages((sData as Stage[]) ?? []);
     setLoading(false);
   }, []);
 
@@ -145,7 +139,6 @@ export function AssignmentsPage() {
     setForm({
       file_id: a.file_id,
       client_id: a.client_id,
-      stage_id: a.stage_id ?? "",
       client_title: a.client_title,
       client_description: a.client_description ?? "",
       category: a.category ?? "",
@@ -169,7 +162,6 @@ export function AssignmentsPage() {
         const { error } = await supabase.from("client_file_assignments").update({
           file_id: form.file_id,
           client_id: form.client_id,
-          stage_id: form.stage_id || null,
           client_title: form.client_title,
           client_description: form.client_description || null,
           category: form.category || null,
@@ -186,7 +178,6 @@ export function AssignmentsPage() {
         const { error } = await supabase.from("client_file_assignments").insert({
           file_id: form.file_id,
           client_id: form.client_id,
-          stage_id: form.stage_id || null,
           client_title: form.client_title,
           client_description: form.client_description || null,
           category: form.category || null,
@@ -320,13 +311,6 @@ export function AssignmentsPage() {
                   onChange={(id) => setForm({ ...form, client_id: id })}
                   placeholder="Search and select client..."
                 />
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Stage</label>
-                  <select value={form.stage_id} onChange={(e) => setForm({ ...form, stage_id: e.target.value })} className="h-10 w-full rounded-md border border-slate-200 bg-white px-3 text-sm focus:border-brand-primary focus:outline-none">
-                    <option value="">No stage</option>
-                    {stages.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-                  </select>
-                </div>
                 <SearchSelect
                   label="File *"
                   value={form.file_id}
