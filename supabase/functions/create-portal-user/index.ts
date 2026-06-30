@@ -13,7 +13,7 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    const { email, password, full_name } = await req.json();
+    const { email, password, full_name, existing_user_id } = await req.json();
 
     if (!email || !password) {
       return new Response(JSON.stringify({ error: "Email and password are required" }), {
@@ -28,36 +28,45 @@ Deno.serve(async (req: Request) => {
       { auth: { autoRefreshToken: false, persistSession: false } }
     );
 
-    // Create auth user
-    const { data: userData, error: createError } = await supabaseAdmin.auth.admin.createUser({
-      email,
-      password,
-      email_confirm: true,
-      user_metadata: { full_name },
-    });
+    let userId: string;
 
-    if (createError) {
-      return new Response(JSON.stringify({ error: createError.message }), {
-        status: 400,
-        headers: { "Content-Type": "application/json", ...corsHeaders },
+    if (existing_user_id) {
+      // Update existing user's credentials
+      const { data: updated, error: updateError } = await supabaseAdmin.auth.admin.updateUserById(existing_user_id, {
+        email,
+        password,
+        email_confirm: true,
       });
+      if (updateError) {
+        return new Response(JSON.stringify({ error: updateError.message }), {
+          status: 400,
+          headers: { "Content-Type": "application/json", ...corsHeaders },
+        });
+      }
+      userId = updated.user.id;
+    } else {
+      // Create new auth user
+      const { data: userData, error: createError } = await supabaseAdmin.auth.admin.createUser({
+        email,
+        password,
+        email_confirm: true,
+        user_metadata: { full_name },
+      });
+      if (createError) {
+        return new Response(JSON.stringify({ error: createError.message }), {
+          status: 400,
+          headers: { "Content-Type": "application/json", ...corsHeaders },
+        });
+      }
+      userId = userData.user.id;
+
+      // Insert profile row — ignore error if trigger already created it
+      await supabaseAdmin.from("profiles").upsert({
+        id: userId,
+        full_name: full_name ?? email,
+        email,
+      }, { onConflict: "id", ignoreDuplicates: false });
     }
-
-    const userId = userData.user.id;
-
-    // Upsert profile with client role
-    const { data: roleData } = await supabaseAdmin
-      .from("roles")
-      .select("id")
-      .eq("name", "client")
-      .maybeSingle();
-
-    await supabaseAdmin.from("profiles").upsert({
-      id: userId,
-      full_name: full_name ?? email,
-      email,
-      role_id: roleData?.id ?? null,
-    });
 
     return new Response(JSON.stringify({ user_id: userId }), {
       status: 200,
