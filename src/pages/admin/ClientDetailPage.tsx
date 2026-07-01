@@ -3,7 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   ArrowLeft, Bookmark, CheckCircle2, ChevronDown, ChevronUp, Clock, FileText,
-  Pencil, Plus, Trash2, X
+  IndianRupee, Pencil, Plus, Trash2, X
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
@@ -33,6 +33,11 @@ const statusColor: Record<string, string> = {
   "Revision Required": "bg-red-100 text-red-700",
   Skipped: "bg-slate-100 text-slate-400",
 };
+
+function formatCurrency(value: number | null | undefined) {
+  if (value === null || value === undefined) return "Not set";
+  return new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(value);
+}
 
 export function ClientDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -124,6 +129,21 @@ export function ClientDetailPage() {
       {/* Tab Content */}
       {activeTab === "Overview" && (
         <div className="grid gap-4 md:grid-cols-2">
+          <div className="md:col-span-2 grid gap-3 md:grid-cols-3">
+            {[
+              ["Quoted Price", formatCurrency(client.contract_value), "bg-orange-50 text-brand-primary"],
+              ["Payment Received", formatCurrency(client.payment_received), "bg-emerald-50 text-emerald-700"],
+              ["Balance", formatCurrency((client.contract_value ?? 0) - (client.payment_received ?? 0)), "bg-slate-50 text-slate-700"],
+            ].map(([label, value, tone]) => (
+              <div key={label} className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+                <div className={cn("mb-4 grid h-10 w-10 place-items-center rounded-xl", tone)}>
+                  <IndianRupee className="h-5 w-5" />
+                </div>
+                <div className="text-2xl font-black text-slate-950">{value}</div>
+                <div className="mt-1 text-xs font-semibold uppercase tracking-wide text-slate-400">{label}</div>
+              </div>
+            ))}
+          </div>
           <div className="rounded-xl border border-slate-200 bg-white p-5 space-y-3">
             <h3 className="font-bold text-slate-800">Client Information</h3>
             <div className="space-y-2 text-sm">

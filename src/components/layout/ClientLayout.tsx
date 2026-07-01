@@ -1,7 +1,7 @@
 import { Outlet, NavLink, useNavigate } from "react-router-dom";
 import { useState, useEffect, useMemo } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { Bell, Bookmark, FileText, LayoutDashboard, LogOut, Menu, TrendingUp, User, X } from "lucide-react";
+import { Bell, Bookmark, ChevronLeft, ChevronRight, FileText, IndianRupee, LayoutDashboard, LogOut, Menu, TrendingUp, User, X } from "lucide-react";
 import { cn, initials } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
 import { useAppSettings } from "@/hooks/useAppSettings";
@@ -16,12 +16,20 @@ const navItems = [
 ];
 
 type Notification = { id: string; title: string; message: string; is_read: boolean; created_at: string };
+type ClientCommercials = { name: string; contract_value: number | null; payment_received: number | null };
+
+function formatCurrency(value: number | null | undefined) {
+  if (value === null || value === undefined) return "Not set";
+  return new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(value);
+}
 
 export function ClientLayout() {
+  const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>([]);
-  const { profile, signOut } = useAuth();
+  const [clientCommercials, setClientCommercials] = useState<ClientCommercials | null>(null);
+  const { clientId, profile, signOut } = useAuth();
   const { branding } = useAppSettings();
   const navigate = useNavigate();
 
@@ -36,6 +44,16 @@ export function ClientLayout() {
       .then(({ data }) => setNotifications((data as Notification[]) ?? []));
   }, [profile?.id]);
 
+  useEffect(() => {
+    if (!clientId) return;
+    supabase
+      .from("clients")
+      .select("name,contract_value,payment_received")
+      .eq("id", clientId)
+      .maybeSingle()
+      .then(({ data }) => setClientCommercials((data as ClientCommercials | null) ?? null));
+  }, [clientId]);
+
   async function markAllRead() {
     if (!profile?.id) return;
     await supabase.from("notifications").update({ is_read: true } as never).eq("user_id", profile.id).eq("is_read", false);
@@ -43,16 +61,17 @@ export function ClientLayout() {
   }
 
   const unread = useMemo(() => notifications.filter((n) => !n.is_read).length, [notifications]);
+  const showCommercials = Boolean(clientCommercials && (clientCommercials.contract_value !== null || clientCommercials.payment_received !== null));
+  const balance = (clientCommercials?.contract_value ?? 0) - (clientCommercials?.payment_received ?? 0);
 
   const Sidebar = (
-    <aside className="flex h-full flex-col bg-slate-950 text-white border-r border-white/10">
-      <div className="flex h-16 items-center gap-3 border-b border-white/10 px-4 shrink-0">
-        <div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-gradient-to-br from-brand-primary to-brand-accent font-black text-sm overflow-hidden">
-          {branding.logoUrl ? <img src={branding.logoUrl} alt="logo" className="h-full w-full object-cover" /> : "A"}
-        </div>
-        <div className="min-w-0">
-          <div className="truncate text-sm font-bold">{branding.companyName}</div>
-          <div className="truncate text-xs text-slate-400">Client Portal</div>
+    <aside className={cn(
+      "flex h-full flex-col border-r border-white/10 bg-slate-950 text-white transition-all duration-300",
+      collapsed ? "w-20" : "w-64"
+    )}>
+      <div className={cn("flex items-center border-b border-white/10 px-4 shrink-0", collapsed ? "h-20 justify-center" : "h-24 justify-start")}>
+        <div className={cn("flex shrink-0 items-center justify-center overflow-hidden rounded-xl bg-white p-2 shadow-lg shadow-black/20", collapsed ? "h-12 w-12" : "h-[4.5rem] w-40 max-w-full")}>
+          {branding.logoUrl ? <img src={branding.logoUrl} alt={branding.companyName} className="block h-full w-full object-contain object-center" /> : <span className="text-lg font-black text-brand-primary">A</span>}
         </div>
       </div>
 
@@ -66,41 +85,50 @@ export function ClientLayout() {
             className={({ isActive }) => cn(
               "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all",
               isActive
-                ? "bg-gradient-to-r from-brand-primary/90 to-brand-accent/90 text-white shadow-lg"
+                ? "bg-gradient-to-r from-brand-primary/90 to-brand-accent/90 text-white shadow-lg shadow-brand-primary/20"
                 : "text-slate-400 hover:bg-white/8 hover:text-white"
             )}
           >
             <item.icon className="h-4.5 w-4.5 shrink-0" />
-            <span>{item.label}</span>
+            {!collapsed && <span>{item.label}</span>}
           </NavLink>
         ))}
       </nav>
 
       <div className="shrink-0 border-t border-white/10 p-3">
-        <div className="flex items-center gap-3 rounded-lg p-2">
+        <div className={cn("flex items-center gap-3 rounded-lg p-2", collapsed && "justify-center")}>
           <div className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-brand-primary/20 text-xs font-bold text-brand-accent">
             {initials(profile?.full_name)}
           </div>
-          <div className="min-w-0 flex-1">
+          {!collapsed && <div className="min-w-0 flex-1">
             <div className="truncate text-sm font-semibold">{profile?.full_name ?? "Client"}</div>
             <div className="truncate text-xs text-slate-500">Client</div>
-          </div>
+          </div>}
         </div>
       </div>
+
+      <button
+        onClick={() => setCollapsed((v) => !v)}
+        className="absolute -right-3.5 top-24 hidden lg:grid h-7 w-7 place-items-center rounded-full border border-slate-200 bg-white text-slate-700 shadow-md hover:shadow-lg transition-shadow"
+      >
+        {collapsed ? <ChevronRight className="h-3.5 w-3.5" /> : <ChevronLeft className="h-3.5 w-3.5" />}
+      </button>
     </aside>
   );
 
   return (
     <div className="flex min-h-screen bg-slate-50 dark:bg-slate-950">
-      <div className="hidden lg:flex w-60 shrink-0 fixed inset-y-0 left-0 z-30">
-        {Sidebar}
+      <div className={cn("relative hidden lg:flex shrink-0 transition-all duration-300", collapsed ? "w-20" : "w-64")}>
+        <div className="fixed inset-y-0 left-0 z-30" style={{ width: collapsed ? "5rem" : "16rem" }}>
+          {Sidebar}
+        </div>
       </div>
 
       <AnimatePresence>
         {mobileOpen && (
           <>
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-40 bg-slate-950/60 lg:hidden" onClick={() => setMobileOpen(false)} />
-            <motion.div initial={{ x: -260 }} animate={{ x: 0 }} exit={{ x: -260 }} transition={{ type: "spring", stiffness: 320, damping: 32 }} className="fixed inset-y-0 left-0 z-50 w-60 lg:hidden">
+            <motion.div initial={{ x: -280 }} animate={{ x: 0 }} exit={{ x: -280 }} transition={{ type: "spring", stiffness: 320, damping: 32 }} className="fixed inset-y-0 left-0 z-50 w-64 lg:hidden">
               {Sidebar}
               <button onClick={() => setMobileOpen(false)} className="absolute right-3 top-4 grid h-8 w-8 place-items-center rounded-full bg-white/10 text-white"><X className="h-4 w-4" /></button>
             </motion.div>
@@ -108,9 +136,9 @@ export function ClientLayout() {
         )}
       </AnimatePresence>
 
-      <div className="lg:pl-60 flex min-h-screen flex-1 flex-col min-w-0 w-full">
+      <div className="flex min-h-screen flex-1 flex-col min-w-0 w-full">
         <header className="sticky top-0 z-20 flex h-14 items-center gap-3 border-b border-slate-200 bg-white/90 px-4 backdrop-blur dark:border-slate-800 dark:bg-slate-950/90">
-          <button onClick={() => setMobileOpen(true)} className="grid h-9 w-9 place-items-center rounded-lg hover:bg-slate-100 lg:hidden">
+          <button onClick={() => { setCollapsed(false); setMobileOpen(true); }} className="grid h-9 w-9 place-items-center rounded-lg hover:bg-slate-100 lg:hidden">
             <Menu className="h-5 w-5" />
           </button>
           <div className="flex-1" />
@@ -150,6 +178,27 @@ export function ClientLayout() {
         </header>
 
         <main className="flex-1 p-4 md:p-6">
+          {showCommercials && (
+            <section className="mb-5 rounded-3xl border border-slate-200 bg-white p-4 shadow-sm">
+              <div className="grid gap-3 md:grid-cols-3">
+                {[
+                  ["Quoted Price", formatCurrency(clientCommercials?.contract_value), "bg-orange-50 text-brand-primary"],
+                  ["Payment Received", formatCurrency(clientCommercials?.payment_received), "bg-emerald-50 text-emerald-700"],
+                  ["Balance", formatCurrency(balance), "bg-slate-50 text-slate-700"],
+                ].map(([label, value, tone]) => (
+                  <div key={label} className="flex items-center gap-3 rounded-2xl bg-slate-50 p-3">
+                    <span className={cn("grid h-10 w-10 shrink-0 place-items-center rounded-xl", tone)}>
+                      <IndianRupee className="h-5 w-5" />
+                    </span>
+                    <span className="min-w-0">
+                      <span className="block text-xs font-semibold uppercase tracking-wide text-slate-400">{label}</span>
+                      <span className="block truncate text-lg font-black text-slate-950">{value}</span>
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
           <Outlet />
         </main>
       </div>

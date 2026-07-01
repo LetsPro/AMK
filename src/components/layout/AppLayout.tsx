@@ -60,16 +60,10 @@ export function AppLayout() {
       "flex h-full flex-col border-r border-white/10 bg-slate-950 text-white transition-all duration-300",
       collapsed ? "w-20" : "w-64"
     )}>
-      <div className="flex h-16 items-center gap-3 border-b border-white/10 px-4 shrink-0">
-        <div className="grid h-9 w-9 shrink-0 place-items-center overflow-hidden rounded-lg bg-gradient-to-br from-brand-primary to-brand-accent font-black text-sm">
-          {branding.logoUrl ? <img src={branding.logoUrl} alt={branding.companyName} className="h-full w-full object-cover" /> : "A"}
+      <div className={cn("flex items-center border-b border-white/10 px-4 shrink-0", collapsed ? "h-20 justify-center" : "h-24 justify-start")}>
+        <div className={cn("flex shrink-0 items-center justify-center overflow-hidden rounded-xl bg-white p-2 shadow-lg shadow-black/20", collapsed ? "h-12 w-12" : "h-[4.5rem] w-40 max-w-full")}>
+          {branding.logoUrl ? <img src={branding.logoUrl} alt={branding.companyName} className="block h-full w-full object-contain object-center" /> : <span className="text-lg font-black text-brand-primary">A</span>}
         </div>
-        {!collapsed && (
-          <div className="min-w-0">
-            <div className="truncate text-sm font-bold">{branding.companyName}</div>
-            <div className="truncate text-xs text-slate-400">{branding.companySuffix}</div>
-          </div>
-        )}
       </div>
 
       <nav className="flex-1 overflow-y-auto p-2 py-4 space-y-0.5">
@@ -108,7 +102,7 @@ export function AppLayout() {
 
       <button
         onClick={() => setCollapsed((v) => !v)}
-        className="absolute -right-3.5 top-20 hidden lg:grid h-7 w-7 place-items-center rounded-full border border-slate-200 bg-white text-slate-700 shadow-md hover:shadow-lg transition-shadow"
+        className="absolute -right-3.5 top-24 hidden lg:grid h-7 w-7 place-items-center rounded-full border border-slate-200 bg-white text-slate-700 shadow-md hover:shadow-lg transition-shadow"
       >
         {collapsed ? <ChevronRight className="h-3.5 w-3.5" /> : <ChevronLeft className="h-3.5 w-3.5" />}
       </button>
@@ -155,7 +149,7 @@ export function AppLayout() {
         <header className="sticky top-0 z-20 flex h-14 items-center gap-3 border-b border-slate-200 bg-white/90 px-4 backdrop-blur-xl dark:border-slate-800 dark:bg-slate-950/90">
           <button
             className="grid h-9 w-9 place-items-center rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 lg:hidden"
-            onClick={() => setMobileOpen(true)}
+            onClick={() => { setCollapsed(false); setMobileOpen(true); }}
           >
             <Menu className="h-5 w-5" />
           </button>

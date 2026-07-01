@@ -73,17 +73,22 @@ function FlipInfoCard({ title, text, detail, icon: Icon }: { title: string; text
   return (
     <div className="flip-card h-72">
       <div className="flip-card-inner h-full">
-        <div className="flip-card-face rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+        <div className="flip-card-face flex flex-col rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
           <div className="grid h-12 w-12 place-items-center rounded-md bg-orange-50 text-brand-primary">
             <Icon className="h-6 w-6" />
           </div>
-          <h3 className="mt-5 text-xl font-black text-slate-950">{title}</h3>
-          <p className="mt-3 text-sm leading-6 text-slate-500">{text}</p>
-          <span className="mt-5 inline-flex items-center gap-2 text-sm font-bold text-brand-primary">Details <ArrowRight className="h-4 w-4" /></span>
+          <div className="mt-auto">
+            <h3 className="text-xl font-black text-slate-950">{title}</h3>
+            <p className="mt-3 text-sm leading-6 text-slate-500">{detail}</p>
+          </div>
         </div>
-        <div className="flip-card-face flip-card-back rounded-lg bg-slate-950 p-6 text-white shadow-sm">
-          <div className="text-xs font-bold uppercase tracking-wide text-brand-accent">Studio Method</div>
-          <p className="mt-5 text-lg font-semibold leading-8">{detail}</p>
+        <div className="flip-card-face flip-card-back flex flex-col justify-between rounded-lg bg-slate-950 p-6 text-white shadow-sm">
+          <div>
+            <div className="text-xs font-bold uppercase tracking-wide text-brand-accent">Studio Method</div>
+            <h3 className="mt-4 text-xl font-black">{title}</h3>
+            <p className="mt-4 text-sm leading-7 text-slate-200">{text}</p>
+          </div>
+          <p className="mt-5 border-t border-white/10 pt-4 text-sm font-semibold leading-6 text-brand-accent">{detail}</p>
         </div>
       </div>
     </div>

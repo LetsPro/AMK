@@ -4,10 +4,11 @@ import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/contexts/AuthContext";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/Input";
+import { attachFileAccessUrls } from "@/lib/fileUrls";
 import type { TableRow } from "@/types/database";
 
 type Assignment = TableRow<"client_file_assignments"> & {
-  file: { display_name: string; public_url: string; mime_type: string | null; size: number | null } | null;
+  file: { display_name: string; public_url: string; preview_url?: string; download_url?: string; mime_type: string | null; size: number | null; storage_path: string; bucket: string } | null;
   stage: { name: string; color: string | null } | null;
 };
 
@@ -29,6 +30,8 @@ function formatSize(bytes: number | null) {
 
 function isImage(mime: string | null) { return mime?.startsWith("image/") ?? false; }
 function isPdf(mime: string | null) { return mime === "application/pdf"; }
+function fileUrl(file: Assignment["file"]) { return file?.preview_url || file?.public_url || ""; }
+function downloadUrl(file: Assignment["file"]) { return file?.download_url || fileUrl(file); }
 
 export function ClientFilesPage() {
   const { clientId } = useAuth();
@@ -44,12 +47,12 @@ export function ClientFilesPage() {
       const now = new Date().toISOString();
       const { data } = await supabase
         .from("client_file_assignments")
-        .select("*, file:files(display_name,public_url,mime_type,size), stage:stages(name,color)")
+        .select("*, file:files(display_name,public_url,mime_type,size,storage_path,bucket), stage:stages(name,color)")
         .eq("client_id", clientId)
         .or(`visible_from.is.null,visible_from.lte.${now}`)
         .or(`expires_at.is.null,expires_at.gte.${now}`)
         .order("display_order");
-      setFiles((data as Assignment[]) ?? []);
+      setFiles(await attachFileAccessUrls((data as Assignment[]) ?? []));
       setLoading(false);
     })();
   }, [clientId]);
@@ -97,7 +100,7 @@ export function ClientFilesPage() {
             <div key={f.id} className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white p-4 hover:border-brand-primary/30 hover:shadow-sm transition-all">
               <div className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-slate-100 text-slate-400">
                 {isImage(f.file?.mime_type ?? null)
-                  ? <img src={f.file?.public_url} alt="" className="h-10 w-10 rounded-lg object-cover" />
+                  ? <img src={fileUrl(f.file)} alt="" className="h-10 w-10 rounded-lg object-cover" />
                   : <FileText className="h-5 w-5" />}
               </div>
               <div className="flex-1 min-w-0">
@@ -119,7 +122,7 @@ export function ClientFilesPage() {
                   </button>
                 )}
                 {f.can_download && f.file && (
-                  <a href={f.file.public_url} download target="_blank" rel="noopener noreferrer" className="grid h-8 w-8 place-items-center rounded-lg text-slate-400 hover:bg-emerald-50 hover:text-emerald-600 transition-colors" title="Download">
+                  <a href={downloadUrl(f.file)} download target="_blank" rel="noopener noreferrer" className="grid h-8 w-8 place-items-center rounded-lg text-slate-400 hover:bg-emerald-50 hover:text-emerald-600 transition-colors" title="Download">
                     <Download className="h-4 w-4" />
                   </a>
                 )}
@@ -138,15 +141,15 @@ export function ClientFilesPage() {
           </div>
           <div className="flex-1 overflow-auto p-4 flex items-center justify-center" onClick={(e) => e.stopPropagation()}>
             {isImage(preview.file.mime_type) ? (
-              <img src={preview.file.public_url} alt={preview.client_title} className="max-w-full max-h-full rounded-lg object-contain" />
+              <img src={fileUrl(preview.file)} alt={preview.client_title} className="max-w-full max-h-full rounded-lg object-contain" />
             ) : isPdf(preview.file.mime_type) ? (
-              <iframe src={preview.file.public_url} className="w-full h-full rounded-lg" title={preview.client_title} />
+              <iframe src={fileUrl(preview.file)} className="w-full h-full rounded-lg" title={preview.client_title} />
             ) : (
               <div className="text-center text-white">
                 <FileText className="mx-auto h-16 w-16 text-slate-400 mb-4" />
                 <p className="text-slate-300">Preview not available for this file type.</p>
                 {preview.can_download && (
-                  <a href={preview.file.public_url} download className="mt-4 inline-flex items-center gap-2 rounded-lg bg-brand-primary px-4 py-2 text-sm font-semibold text-white hover:bg-brand-primary/90">
+                  <a href={downloadUrl(preview.file)} download target="_blank" rel="noopener noreferrer" className="mt-4 inline-flex items-center gap-2 rounded-lg bg-brand-primary px-4 py-2 text-sm font-semibold text-white hover:bg-brand-primary/90">
                     <Download className="h-4 w-4" /> Download
                   </a>
                 )}

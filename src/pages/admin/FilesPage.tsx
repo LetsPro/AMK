@@ -11,10 +11,11 @@ import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { useToast } from "@/contexts/ToastContext";
 import { useAuth } from "@/contexts/AuthContext";
+import { attachStoredFileAccessUrls } from "@/lib/fileUrls";
 import type { TableRow } from "@/types/database";
 
 type Folder = TableRow<"folders">;
-type FileRecord = TableRow<"files">;
+type FileRecord = TableRow<"files"> & { preview_url?: string; download_url?: string };
 
 const ACCEPTED = "*";
 
@@ -34,6 +35,14 @@ function formatBytes(bytes: number | null) {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1048576) return `${(bytes / 1024).toFixed(1)} KB`;
   return `${(bytes / 1048576).toFixed(1)} MB`;
+}
+
+function previewUrl(file: FileRecord) {
+  return file.preview_url || file.public_url;
+}
+
+function downloadUrl(file: FileRecord) {
+  return file.download_url || previewUrl(file);
 }
 
 export function FilesPage() {
@@ -70,7 +79,7 @@ export function FilesPage() {
       : supabase.from("files").select("*").is("folder_id", null).is("deleted_at", null).order("created_at", { ascending: false });
     const [foldersRes, filesRes] = await Promise.all([foldersQuery, filesQuery]);
     setFolders((foldersRes.data as Folder[]) ?? []);
-    setFiles((filesRes.data as FileRecord[]) ?? []);
+    setFiles(await attachStoredFileAccessUrls((filesRes.data as FileRecord[]) ?? []));
     setLoading(false);
     setSelected(new Set());
   }, [currentFolder]);
@@ -283,7 +292,7 @@ export function FilesPage() {
                       </label>
                       <div className="flex h-28 items-center justify-center bg-slate-50">
                         {file.mime_type?.startsWith("image/") ? (
-                          <img src={file.public_url} alt={file.display_name} className="h-full w-full object-cover" />
+                          <img src={previewUrl(file)} alt={file.display_name} className="h-full w-full object-cover" />
                         ) : (
                           fileIcon(file.mime_type)
                         )}
@@ -299,7 +308,7 @@ export function FilesPage() {
                         <div className="absolute right-1.5 top-8 z-20 w-40 rounded-xl border border-slate-200 bg-white py-1 shadow-xl" onClick={(e) => e.stopPropagation()}>
                           {[
                             { label: "Rename", icon: Pencil, action: () => { setRenameTarget(file); setRenameName(file.display_name); setShowMenu(null); } },
-                            { label: "Download", icon: Download, action: () => { window.open(file.public_url, "_blank"); setShowMenu(null); } },
+                            { label: "Download", icon: Download, action: () => { window.open(downloadUrl(file), "_blank"); setShowMenu(null); } },
                             { label: "Delete", icon: Trash2, danger: true, action: () => { setDeleteTarget(file); setShowMenu(null); } },
                           ].map((item) => (
                             <button key={item.label} onClick={item.action} className={cn("flex w-full items-center gap-2 px-3 py-2 text-sm hover:bg-slate-50", item.danger ? "text-red-600" : "text-slate-700")}>
@@ -340,7 +349,7 @@ export function FilesPage() {
                           <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
                             <div className="flex items-center justify-end gap-1">
                               <button onClick={() => { setRenameTarget(file); setRenameName(file.display_name); }} className="grid h-7 w-7 place-items-center rounded text-slate-400 hover:bg-slate-100"><Pencil className="h-3.5 w-3.5" /></button>
-                              <a href={file.public_url} download={file.display_name} target="_blank" rel="noopener noreferrer" className="grid h-7 w-7 place-items-center rounded text-slate-400 hover:bg-slate-100"><Download className="h-3.5 w-3.5" /></a>
+                              <a href={downloadUrl(file)} download={file.display_name} target="_blank" rel="noopener noreferrer" className="grid h-7 w-7 place-items-center rounded text-slate-400 hover:bg-slate-100"><Download className="h-3.5 w-3.5" /></a>
                               <button onClick={() => setDeleteTarget(file)} className="grid h-7 w-7 place-items-center rounded text-slate-400 hover:bg-red-50 hover:text-red-600"><Trash2 className="h-3.5 w-3.5" /></button>
                             </div>
                           </td>
@@ -377,24 +386,24 @@ export function FilesPage() {
                   <div className="text-xs text-slate-400">{previewFile.mime_type} · {formatBytes(previewFile.size)}</div>
                 </div>
                 <div className="flex items-center gap-2">
-                  <a href={previewFile.public_url} download target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-medium hover:bg-slate-50"><Download className="h-4 w-4" /> Download</a>
+                  <a href={downloadUrl(previewFile)} download target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-medium hover:bg-slate-50"><Download className="h-4 w-4" /> Download</a>
                   <button onClick={() => setPreviewFile(null)} className="grid h-8 w-8 place-items-center rounded-lg hover:bg-slate-100"><X className="h-4 w-4" /></button>
                 </div>
               </div>
               <div className="flex max-h-[70vh] items-center justify-center overflow-hidden bg-slate-950 p-4">
                 {previewFile.mime_type?.startsWith("image/") ? (
-                  <img src={previewFile.public_url} alt={previewFile.display_name} className="max-h-full max-w-full object-contain" />
+                  <img src={previewUrl(previewFile)} alt={previewFile.display_name} className="max-h-full max-w-full object-contain" />
                 ) : previewFile.mime_type === "application/pdf" ? (
-                  <iframe src={previewFile.public_url} className="h-[65vh] w-full" title={previewFile.display_name} />
+                  <iframe src={previewUrl(previewFile)} className="h-[65vh] w-full" title={previewFile.display_name} />
                 ) : previewFile.mime_type?.startsWith("video/") ? (
-                  <video src={previewFile.public_url} controls className="max-h-full max-w-full" />
+                  <video src={previewUrl(previewFile)} controls className="max-h-full max-w-full" />
                 ) : previewFile.mime_type?.startsWith("audio/") ? (
-                  <audio src={previewFile.public_url} controls />
+                  <audio src={previewUrl(previewFile)} controls />
                 ) : (
                   <div className="text-center text-white">
                     <div className="mb-4 text-6xl">{fileIcon(previewFile.mime_type)}</div>
                     <p className="text-slate-300">{previewFile.display_name}</p>
-                    <a href={previewFile.public_url} download target="_blank" rel="noopener noreferrer" className="mt-4 inline-flex items-center gap-2 rounded-lg bg-white px-4 py-2 text-sm font-medium text-slate-900 hover:bg-slate-100"><Download className="h-4 w-4" /> Download File</a>
+                    <a href={downloadUrl(previewFile)} download target="_blank" rel="noopener noreferrer" className="mt-4 inline-flex items-center gap-2 rounded-lg bg-white px-4 py-2 text-sm font-medium text-slate-900 hover:bg-slate-100"><Download className="h-4 w-4" /> Download File</a>
                   </div>
                 )}
               </div>

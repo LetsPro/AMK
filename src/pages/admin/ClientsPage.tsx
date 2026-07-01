@@ -1,18 +1,20 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useSearchParams } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { Download, Eye, EyeOff, ExternalLink, FileText, KeyRound, Link2, Pencil, Plus, Search, Trash2, Upload, X } from "lucide-react";
+import { Download, Eye, EyeOff, ExternalLink, FileText, IndianRupee, KeyRound, Link2, Pencil, Plus, Search, Trash2, Upload, X } from "lucide-react";
+import { createClient } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { useToast } from "@/contexts/ToastContext";
 import { useAuth } from "@/contexts/AuthContext";
-import type { TableRow, ClientStatus } from "@/types/database";
+import { attachFileAccessUrls } from "@/lib/fileUrls";
+import type { Database, TableRow, ClientStatus } from "@/types/database";
 
 type Client = TableRow<"clients">;
 type FileAssignment = TableRow<"client_file_assignments"> & {
-  file: { display_name: string; public_url: string; mime_type: string | null; size: number | null } | null;
+  file: { display_name: string; public_url: string; preview_url?: string; mime_type: string | null; size: number | null; storage_path: string; bucket: string } | null;
 };
 type BlueprintAssignment = TableRow<"client_blueprint_assignments"> & {
   blueprint: { title: string; url: string } | null;
@@ -30,15 +32,18 @@ const statusColor: Record<ClientStatus, string> = {
 
 type ClientFormData = {
   name: string;
+  contact_person: string;
   email: string;
   mobile: string;
   address: string;
+  contract_value: string;
+  payment_received: string;
   notes: string;
   admin_notes: string;
   status: ClientStatus;
 };
 
-const defaultForm: ClientFormData = { name: "", email: "", mobile: "", address: "", notes: "", admin_notes: "", status: "Active" };
+const defaultForm: ClientFormData = { name: "", contact_person: "", email: "", mobile: "", address: "", contract_value: "", payment_received: "", notes: "", admin_notes: "", status: "Active" };
 
 function errorMessage(error: unknown) {
   if (error instanceof Error && error.message && error.message !== "{}") return error.message;
@@ -67,29 +72,76 @@ function errorMessage(error: unknown) {
 }
 
 async function createPortalUser(body: Record<string, unknown>) {
-  const { data, error } = await supabase.functions.invoke("create-portal-user", { body });
-  if (error) {
-    const context = (error as { context?: unknown }).context;
-    if (context instanceof Response) {
-      const text = await context.clone().text();
-      console.error("create-portal-user failed", {
-        status: context.status,
-        statusText: context.statusText,
-        body: text,
-      });
-      let parsedMessage = "";
-      try {
-        const json = JSON.parse(text) as { error?: string; message?: string };
-        parsedMessage = json.error || json.message || "";
-      } catch {
-        parsedMessage = "";
-      }
-      throw new Error(parsedMessage || text || `Edge function failed with HTTP ${context.status}`);
-    }
-    throw new Error(errorMessage(error));
+  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined;
+  const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
+  if (!supabaseUrl || !supabaseAnonKey) throw new Error("Supabase environment variables are missing");
+
+  const { data: sessionData } = await supabase.auth.getSession();
+  const token = sessionData.session?.access_token;
+  if (!token) throw new Error("Admin session expired. Please login again.");
+
+  const response = await fetch(`${supabaseUrl}/functions/v1/create-portal-user`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "apikey": supabaseAnonKey,
+      "Authorization": `Bearer ${token}`,
+    },
+    body: JSON.stringify(body),
+  });
+
+  const text = await response.text();
+  let data: { error?: string; message?: string; user_id?: string } | null = null;
+  try {
+    data = text ? JSON.parse(text) as { error?: string; message?: string; user_id?: string } : null;
+  } catch {
+    data = null;
   }
+
+  if (!response.ok) {
+    console.error("create-portal-user failed", { status: response.status, statusText: response.statusText, body: text });
+    throw new Error(data?.error || data?.message || text || `Edge function failed with HTTP ${response.status}`);
+  }
+
   if (data?.error) throw new Error(String(data.error));
   return data;
+}
+
+async function createPortalUserWithSignup(params: { email: string; password: string; fullName: string; clientId: string }) {
+  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined;
+  const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
+  if (!supabaseUrl || !supabaseAnonKey) throw new Error("Supabase environment variables are missing");
+
+  const signupClient = createClient<Database>(supabaseUrl, supabaseAnonKey, {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+      detectSessionInUrl: false,
+      storageKey: `portal-credential-${params.clientId}`,
+    },
+  });
+
+  const { data, error } = await signupClient.auth.signUp({
+    email: params.email,
+    password: params.password,
+    options: {
+      data: {
+        full_name: params.fullName,
+        client_id: params.clientId,
+        account_type: "client",
+      },
+    },
+  });
+
+  if (error) throw error;
+  const userId = data.user?.id;
+  if (!userId) throw new Error("Auth user was not created");
+
+  const { error: clientError } = await supabase.from("clients").update({ auth_user_id: userId }).eq("id", params.clientId);
+  if (clientError) throw clientError;
+
+  await signupClient.auth.signOut();
+  return { user_id: userId };
 }
 
 function normalizeEmail(email: string) {
@@ -100,6 +152,25 @@ function formatSize(bytes: number | null) {
   if (!bytes) return "";
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+}
+
+function formatCurrency(value: number | null | undefined) {
+  if (value === null || value === undefined) return "Not set";
+  return new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(value);
+}
+
+function optionalMoney(value: string) {
+  if (!value.trim()) return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function fileUrl(file: FileAssignment["file"]) {
+  return file?.preview_url || file?.public_url || "";
+}
+
+function isPreviewableFile(file: FileAssignment["file"]) {
+  return Boolean(file?.mime_type?.startsWith("image/") || file?.mime_type === "application/pdf" || file?.mime_type?.startsWith("video/") || file?.mime_type?.startsWith("audio/"));
 }
 
 export function ClientsPage() {
@@ -127,6 +198,7 @@ export function ClientsPage() {
   const [clientFiles, setClientFiles] = useState<FileAssignment[]>([]);
   const [clientBlueprints, setClientBlueprints] = useState<BlueprintAssignment[]>([]);
   const [loadingDetail, setLoadingDetail] = useState(false);
+  const [previewAssignment, setPreviewAssignment] = useState<FileAssignment | null>(null);
 
   // File upload per stage
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -161,7 +233,7 @@ export function ClientsPage() {
 
     const [{ data: fData }, { data: bData }, { data: sData }] = await Promise.all([
       supabase.from("client_file_assignments")
-        .select("*, file:files(display_name,public_url,mime_type,size)")
+        .select("*, file:files(display_name,public_url,mime_type,size,storage_path,bucket)")
         .eq("client_id", client.id)
         .order("display_order"),
       supabase.from("client_blueprint_assignments")
@@ -171,7 +243,7 @@ export function ClientsPage() {
       supabase.from("stages").select("*").eq("status", "active").order("display_order"),
     ]);
 
-    setClientFiles((fData as FileAssignment[]) ?? []);
+    setClientFiles(await attachFileAccessUrls((fData as FileAssignment[]) ?? []));
     setClientBlueprints((bData as BlueprintAssignment[]) ?? []);
     setStages((sData as Stage[]) ?? []);
     setLoadingDetail(false);
@@ -180,7 +252,7 @@ export function ClientsPage() {
   async function reloadDetail(clientId: string) {
     const [{ data: fData }, { data: bData }] = await Promise.all([
       supabase.from("client_file_assignments")
-        .select("*, file:files(display_name,public_url,mime_type,size)")
+        .select("*, file:files(display_name,public_url,mime_type,size,storage_path,bucket)")
         .eq("client_id", clientId)
         .order("display_order"),
       supabase.from("client_blueprint_assignments")
@@ -188,7 +260,7 @@ export function ClientsPage() {
         .eq("client_id", clientId)
         .order("display_order"),
     ]);
-    setClientFiles((fData as FileAssignment[]) ?? []);
+    setClientFiles(await attachFileAccessUrls((fData as FileAssignment[]) ?? []));
     setClientBlueprints((bData as BlueprintAssignment[]) ?? []);
   }
 
@@ -305,7 +377,18 @@ export function ClientsPage() {
 
   function openEdit(client: Client) {
     setEditClient(client);
-    setForm({ name: client.name, email: client.email ?? "", mobile: client.mobile ?? "", address: client.address ?? "", notes: client.notes ?? "", admin_notes: client.admin_notes ?? "", status: client.status as ClientStatus });
+    setForm({
+      name: client.name,
+      contact_person: client.contact_person ?? "",
+      email: client.email ?? "",
+      mobile: client.mobile ?? "",
+      address: client.address ?? "",
+      contract_value: client.contract_value?.toString() ?? "",
+      payment_received: client.payment_received?.toString() ?? "",
+      notes: client.notes ?? "",
+      admin_notes: client.admin_notes ?? "",
+      status: client.status as ClientStatus,
+    });
     // Pre-fill portal email with client email so user only needs to enter password
     setPortalEmail(client.email ?? "");
     setPortalPassword("");
@@ -328,11 +411,23 @@ export function ClientsPage() {
     if (!form.name.trim()) { toast.error("Name required"); return; }
     setSaving(true);
     try {
+      const clientPayload = {
+        name: form.name.trim(),
+        contact_person: form.contact_person.trim() || null,
+        email: form.email.trim() || null,
+        mobile: form.mobile.trim() || null,
+        address: form.address.trim() || null,
+        contract_value: optionalMoney(form.contract_value),
+        payment_received: optionalMoney(form.payment_received),
+        notes: form.notes.trim() || null,
+        admin_notes: form.admin_notes.trim() || null,
+        status: form.status,
+      };
       // Resolve portal email: explicit entry or fall back to client email
       const effectivePortalEmail = portalEmail.trim() || form.email.trim();
 
       if (editClient) {
-        const { error } = await supabase.from("clients").update(form).eq("id", editClient.id);
+        const { error } = await supabase.from("clients").update(clientPayload).eq("id", editClient.id);
         if (error) throw error;
         let portalError = "";
 
@@ -342,7 +437,15 @@ export function ClientsPage() {
           try {
             await createPortalUser({ email: normalizeEmail(effectivePortalEmail), password: portalPassword, full_name: form.name, existing_user_id: editClient.auth_user_id ?? null, client_id: editClient.id });
           } catch (credentialError) {
-            portalError = errorMessage(credentialError);
+            if (!editClient.auth_user_id) {
+              try {
+                await createPortalUserWithSignup({ email: normalizeEmail(effectivePortalEmail), password: portalPassword, fullName: form.name, clientId: editClient.id });
+              } catch (fallbackError) {
+                portalError = `${errorMessage(credentialError)}; fallback failed: ${errorMessage(fallbackError)}`;
+              }
+            } else {
+              portalError = errorMessage(credentialError);
+            }
           }
         }
 
@@ -352,7 +455,7 @@ export function ClientsPage() {
           toast.success(portalPassword.trim() ? "Client and portal credentials updated" : "Client updated");
         }
       } else {
-        const { data: newClient, error } = await supabase.from("clients").insert(form).select("id").single();
+        const { data: newClient, error } = await supabase.from("clients").insert(clientPayload).select("id").single();
         if (error) throw error;
         const clientId = (newClient as { id: string }).id;
         let portalError = "";
@@ -363,7 +466,11 @@ export function ClientsPage() {
           try {
             await createPortalUser({ email: normalizeEmail(effectivePortalEmail), password: portalPassword, full_name: form.name, client_id: clientId });
           } catch (credentialError) {
-            portalError = errorMessage(credentialError);
+            try {
+              await createPortalUserWithSignup({ email: normalizeEmail(effectivePortalEmail), password: portalPassword, fullName: form.name, clientId });
+            } catch (fallbackError) {
+              portalError = `${errorMessage(credentialError)}; fallback failed: ${errorMessage(fallbackError)}`;
+            }
           }
         }
 
@@ -435,6 +542,7 @@ export function ClientsPage() {
                 <tr>
                   <th className="px-5 py-3 text-left text-xs font-bold uppercase tracking-wide text-slate-500">Client</th>
                   <th className="px-5 py-3 text-left text-xs font-bold uppercase tracking-wide text-slate-500">Contact</th>
+                  <th className="px-5 py-3 text-left text-xs font-bold uppercase tracking-wide text-slate-500">Commercials</th>
                   <th className="px-5 py-3 text-left text-xs font-bold uppercase tracking-wide text-slate-500">Status</th>
                   <th className="px-5 py-3 text-right text-xs font-bold uppercase tracking-wide text-slate-500">Actions</th>
                 </tr>
@@ -456,6 +564,10 @@ export function ClientsPage() {
                     <td className="px-5 py-3.5">
                       <div className="text-slate-700">{client.email ?? "—"}</div>
                       <div className="text-xs text-slate-400">{client.mobile ?? ""}</div>
+                    </td>
+                    <td className="px-5 py-3.5">
+                      <div className="text-slate-700">{formatCurrency(client.contract_value)}</div>
+                      <div className="text-xs text-slate-400">Paid {formatCurrency(client.payment_received)}</div>
                     </td>
                     <td className="px-5 py-3.5" onClick={(e) => e.stopPropagation()}>
                       <span className={cn("rounded-full border px-2.5 py-1 text-xs font-semibold", statusColor[client.status as ClientStatus] ?? "bg-slate-100 text-slate-500")}>
@@ -495,7 +607,7 @@ export function ClientsPage() {
               transition={{ type: "spring", stiffness: 340, damping: 30 }}
               className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none"
             >
-              <div className="w-full max-w-2xl max-h-[92vh] overflow-y-auto rounded-2xl bg-white shadow-2xl pointer-events-auto">
+              <div className="w-full max-w-7xl max-h-[92vh] overflow-y-auto rounded-2xl bg-white shadow-2xl pointer-events-auto">
 
                 {/* Header */}
                 <div className="sticky top-0 z-10 flex items-start justify-between border-b border-slate-100 bg-white px-6 py-4 rounded-t-2xl">
@@ -528,7 +640,25 @@ export function ClientsPage() {
                   <div className="grid grid-cols-2 gap-4 text-sm">
                     <div><div className="text-xs text-slate-400 mb-0.5">Email</div><div className="font-medium text-slate-800">{viewClient.email || "—"}</div></div>
                     <div><div className="text-xs text-slate-400 mb-0.5">Phone</div><div className="font-medium text-slate-800">{viewClient.mobile || "—"}</div></div>
+                    <div><div className="text-xs text-slate-400 mb-0.5">Contact Person</div><div className="font-medium text-slate-800">{viewClient.contact_person || "—"}</div></div>
+                    <div><div className="text-xs text-slate-400 mb-0.5">Status</div><div className="font-medium text-slate-800">{viewClient.status}</div></div>
                     {viewClient.address && <div className="col-span-2"><div className="text-xs text-slate-400 mb-0.5">Address</div><div className="font-medium text-slate-800">{viewClient.address}</div></div>}
+                  </div>
+
+                  <div className="grid gap-3 sm:grid-cols-3">
+                    {[
+                      ["Quoted Price", formatCurrency(viewClient.contract_value), "bg-orange-50 text-brand-primary"],
+                      ["Payment Received", formatCurrency(viewClient.payment_received), "bg-emerald-50 text-emerald-700"],
+                      ["Balance", formatCurrency((viewClient.contract_value ?? 0) - (viewClient.payment_received ?? 0)), "bg-slate-50 text-slate-700"],
+                    ].map(([label, value, tone]) => (
+                      <div key={label} className="rounded-xl border border-slate-100 bg-white p-4 shadow-sm">
+                        <div className={cn("mb-3 grid h-9 w-9 place-items-center rounded-lg", tone)}>
+                          <IndianRupee className="h-4 w-4" />
+                        </div>
+                        <div className="text-lg font-black text-slate-950">{value}</div>
+                        <div className="mt-1 text-xs font-semibold text-slate-400">{label}</div>
+                      </div>
+                    ))}
                   </div>
 
                   {/* Notes */}
@@ -555,23 +685,24 @@ export function ClientsPage() {
                     {loadingDetail ? (
                       <div className="space-y-3">{Array.from({ length: 3 }).map((_, i) => <div key={i} className="h-16 animate-pulse rounded-xl bg-slate-100" />)}</div>
                     ) : (
-                      <div className="space-y-3">
+                      <>
+                      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
                         {stages.map((stage) => {
                           const stageFiles = clientFiles.filter((f) => f.stage_id === stage.id);
                           const isUploading = uploadingStageId === stage.id;
                           return (
-                            <div key={stage.id} className="rounded-xl border border-slate-100 bg-slate-50 overflow-hidden">
+                            <div key={stage.id} className="flex min-h-44 flex-col overflow-hidden rounded-xl border border-slate-100 bg-slate-50">
                               {/* Stage header */}
-                              <div className="flex items-center justify-between px-4 py-2.5 border-b border-slate-100">
-                                <div className="flex items-center gap-2">
+                              <div className="flex items-center justify-between gap-2 border-b border-slate-100 px-4 py-2.5">
+                                <div className="flex min-w-0 items-center gap-2">
                                   <span className="h-2.5 w-2.5 rounded-full shrink-0" style={{ backgroundColor: stage.color ?? "#94a3b8" }} />
-                                  <span className="text-sm font-semibold text-slate-700">{stage.name}</span>
+                                  <span className="truncate text-sm font-semibold text-slate-700">{stage.name}</span>
                                   {stageFiles.length > 0 && <span className="rounded-full bg-slate-200 px-1.5 py-0.5 text-xs text-slate-500">{stageFiles.length}</span>}
                                 </div>
                                 <button
                                   onClick={() => triggerUpload(stage.id)}
                                   disabled={isUploading}
-                                  className="flex items-center gap-1.5 rounded-lg bg-white border border-slate-200 px-2.5 py-1 text-xs font-semibold text-slate-600 hover:border-brand-primary hover:text-brand-primary transition-colors disabled:opacity-50"
+                                  className="flex shrink-0 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-600 transition-colors hover:border-brand-primary hover:text-brand-primary disabled:opacity-50"
                                 >
                                   {isUploading ? (
                                     <span className="h-3.5 w-3.5 border-2 border-brand-primary/30 border-t-brand-primary rounded-full animate-spin" />
@@ -584,14 +715,14 @@ export function ClientsPage() {
 
                               {/* Files grid */}
                               {stageFiles.length > 0 && (
-                                <div className="p-3 grid grid-cols-2 sm:grid-cols-3 gap-2">
+                                <div className="grid grid-cols-2 gap-2 p-3">
                                   {stageFiles.map((fa) => {
                                     const isImage = fa.file?.mime_type?.startsWith("image/");
                                     return (
                                       <div key={fa.id} className="group relative rounded-lg bg-white border border-slate-100 overflow-hidden">
                                         {isImage ? (
                                           <div className="aspect-video bg-slate-100">
-                                            <img src={fa.file!.public_url} alt={fa.client_title} className="h-full w-full object-cover" />
+                                            <img src={fileUrl(fa.file)} alt={fa.client_title} className="h-full w-full object-cover" />
                                           </div>
                                         ) : (
                                           <div className="aspect-video bg-slate-100 flex items-center justify-center">
@@ -603,8 +734,13 @@ export function ClientsPage() {
                                           {fa.file?.size && <p className="text-xs text-slate-400">{formatSize(fa.file.size)}</p>}
                                         </div>
                                         <div className="absolute inset-0 flex items-center justify-center gap-1 bg-slate-900/60 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg">
+                                          {fa.can_preview && fa.file && isPreviewableFile(fa.file) && (
+                                            <button onClick={() => setPreviewAssignment(fa)} className="grid h-8 w-8 place-items-center rounded-lg bg-white/20 text-white hover:bg-white/30 transition-colors">
+                                              <Eye className="h-4 w-4" />
+                                            </button>
+                                          )}
                                           {fa.can_download && fa.file && (
-                                            <a href={fa.file.public_url} download target="_blank" rel="noopener noreferrer" className="grid h-8 w-8 place-items-center rounded-lg bg-white/20 text-white hover:bg-white/30 transition-colors">
+                                            <a href={fileUrl(fa.file)} download target="_blank" rel="noopener noreferrer" className="grid h-8 w-8 place-items-center rounded-lg bg-white/20 text-white hover:bg-white/30 transition-colors">
                                               <Download className="h-4 w-4" />
                                             </a>
                                           )}
@@ -619,59 +755,65 @@ export function ClientsPage() {
                               )}
 
                               {stageFiles.length === 0 && !isUploading && (
-                                <div className="px-4 py-3 text-xs text-slate-400">No files for this stage</div>
+                                <div className="flex flex-1 items-center justify-center px-4 py-6 text-center text-xs text-slate-400">No files for this stage</div>
                               )}
                             </div>
                           );
                         })}
-
-                        {/* Unassigned files */}
-                        {(() => {
-                          const unassigned = clientFiles.filter((f) => !f.stage_id);
-                          if (unassigned.length === 0) return null;
-                          return (
-                            <div className="rounded-xl border border-slate-100 bg-slate-50 overflow-hidden">
-                              <div className="flex items-center gap-2 px-4 py-2.5 border-b border-slate-100">
-                                <span className="h-2.5 w-2.5 rounded-full bg-slate-300 shrink-0" />
-                                <span className="text-sm font-semibold text-slate-500">General / Unassigned</span>
-                                <span className="rounded-full bg-slate-200 px-1.5 py-0.5 text-xs text-slate-500">{unassigned.length}</span>
-                              </div>
-                              <div className="p-3 grid grid-cols-2 sm:grid-cols-3 gap-2">
-                                {unassigned.map((fa) => {
-                                  const isImage = fa.file?.mime_type?.startsWith("image/");
-                                  return (
-                                    <div key={fa.id} className="group relative rounded-lg bg-white border border-slate-100 overflow-hidden">
-                                      {isImage ? (
-                                        <div className="aspect-video bg-slate-100">
-                                          <img src={fa.file!.public_url} alt={fa.client_title} className="h-full w-full object-cover" />
-                                        </div>
-                                      ) : (
-                                        <div className="aspect-video bg-slate-100 flex items-center justify-center">
-                                          <FileText className="h-8 w-8 text-slate-300" />
-                                        </div>
-                                      )}
-                                      <div className="px-2 py-1.5">
-                                        <p className="text-xs font-medium text-slate-700 truncate">{fa.client_title}</p>
-                                        {fa.file?.size && <p className="text-xs text-slate-400">{formatSize(fa.file.size)}</p>}
-                                      </div>
-                                      <div className="absolute inset-0 flex items-center justify-center gap-1 bg-slate-900/60 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg">
-                                        {fa.can_download && fa.file && (
-                                          <a href={fa.file.public_url} download target="_blank" rel="noopener noreferrer" className="grid h-8 w-8 place-items-center rounded-lg bg-white/20 text-white hover:bg-white/30 transition-colors">
-                                            <Download className="h-4 w-4" />
-                                          </a>
-                                        )}
-                                        <button onClick={() => removeFileAssignment(fa.id)} className="grid h-8 w-8 place-items-center rounded-lg bg-white/20 text-white hover:bg-red-500/80 transition-colors">
-                                          <Trash2 className="h-4 w-4" />
-                                        </button>
-                                      </div>
-                                    </div>
-                                  );
-                                })}
-                              </div>
-                            </div>
-                          );
-                        })()}
                       </div>
+
+                      {/* Unassigned files */}
+                      {(() => {
+                        const unassigned = clientFiles.filter((f) => !f.stage_id);
+                        if (unassigned.length === 0) return null;
+                        return (
+                          <div className="mt-3 overflow-hidden rounded-xl border border-slate-100 bg-slate-50">
+                            <div className="flex items-center gap-2 border-b border-slate-100 px-4 py-2.5">
+                              <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-slate-300" />
+                              <span className="text-sm font-semibold text-slate-500">General / Unassigned</span>
+                              <span className="rounded-full bg-slate-200 px-1.5 py-0.5 text-xs text-slate-500">{unassigned.length}</span>
+                            </div>
+                            <div className="grid grid-cols-2 gap-2 p-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
+                              {unassigned.map((fa) => {
+                                const isImage = fa.file?.mime_type?.startsWith("image/");
+                                return (
+                                  <div key={fa.id} className="group relative overflow-hidden rounded-lg border border-slate-100 bg-white">
+                                    {isImage ? (
+                                      <div className="aspect-video bg-slate-100">
+                                        <img src={fileUrl(fa.file)} alt={fa.client_title} className="h-full w-full object-cover" />
+                                      </div>
+                                    ) : (
+                                      <div className="flex aspect-video items-center justify-center bg-slate-100">
+                                        <FileText className="h-8 w-8 text-slate-300" />
+                                      </div>
+                                    )}
+                                    <div className="px-2 py-1.5">
+                                      <p className="truncate text-xs font-medium text-slate-700">{fa.client_title}</p>
+                                      {fa.file?.size && <p className="text-xs text-slate-400">{formatSize(fa.file.size)}</p>}
+                                    </div>
+                                    <div className="absolute inset-0 flex items-center justify-center gap-1 rounded-lg bg-slate-900/60 opacity-0 transition-opacity group-hover:opacity-100">
+                                      {fa.can_preview && fa.file && isPreviewableFile(fa.file) && (
+                                        <button onClick={() => setPreviewAssignment(fa)} className="grid h-8 w-8 place-items-center rounded-lg bg-white/20 text-white transition-colors hover:bg-white/30">
+                                          <Eye className="h-4 w-4" />
+                                        </button>
+                                      )}
+                                      {fa.can_download && fa.file && (
+                                        <a href={fileUrl(fa.file)} download target="_blank" rel="noopener noreferrer" className="grid h-8 w-8 place-items-center rounded-lg bg-white/20 text-white transition-colors hover:bg-white/30">
+                                          <Download className="h-4 w-4" />
+                                        </a>
+                                      )}
+                                      <button onClick={() => removeFileAssignment(fa.id)} className="grid h-8 w-8 place-items-center rounded-lg bg-white/20 text-white transition-colors hover:bg-red-500/80">
+                                        <Trash2 className="h-4 w-4" />
+                                      </button>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        );
+                      })()}
+                      </>
                     )}
                   </div>
 
@@ -744,6 +886,67 @@ export function ClientsPage() {
         )}
       </AnimatePresence>
 
+      {/* File Preview */}
+      <AnimatePresence>
+        {previewAssignment?.file && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[70] grid place-items-center bg-slate-950/90 p-4"
+            onClick={() => setPreviewAssignment(null)}
+          >
+            <motion.div
+              initial={{ scale: 0.96 }}
+              animate={{ scale: 1 }}
+              exit={{ scale: 0.96 }}
+              onClick={(e) => e.stopPropagation()}
+              className="max-h-[92vh] w-full max-w-5xl overflow-hidden rounded-2xl bg-white shadow-2xl"
+            >
+              <div className="flex items-center justify-between gap-4 border-b border-slate-200 px-5 py-4">
+                <div className="min-w-0">
+                  <div className="truncate font-bold text-slate-900">{previewAssignment.client_title}</div>
+                  <div className="truncate text-xs text-slate-400">
+                    {previewAssignment.file.display_name} {previewAssignment.file.size ? `· ${formatSize(previewAssignment.file.size)}` : ""}
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  {previewAssignment.can_download && (
+                    <a href={fileUrl(previewAssignment.file)} download target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-semibold text-slate-700 hover:bg-slate-50">
+                      <Download className="h-4 w-4" /> Download
+                    </a>
+                  )}
+                  <button onClick={() => setPreviewAssignment(null)} className="grid h-8 w-8 place-items-center rounded-lg hover:bg-slate-100">
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+              <div className="flex h-[72vh] items-center justify-center overflow-hidden bg-slate-950 p-4">
+                {previewAssignment.file.mime_type?.startsWith("image/") ? (
+                  <img src={fileUrl(previewAssignment.file)} alt={previewAssignment.client_title} className="max-h-full max-w-full object-contain" />
+                ) : previewAssignment.file.mime_type === "application/pdf" ? (
+                  <iframe src={fileUrl(previewAssignment.file)} className="h-full w-full rounded-lg bg-white" title={previewAssignment.client_title} />
+                ) : previewAssignment.file.mime_type?.startsWith("video/") ? (
+                  <video src={fileUrl(previewAssignment.file)} controls className="max-h-full max-w-full" />
+                ) : previewAssignment.file.mime_type?.startsWith("audio/") ? (
+                  <audio src={fileUrl(previewAssignment.file)} controls />
+                ) : (
+                  <div className="text-center text-white">
+                    <FileText className="mx-auto mb-4 h-16 w-16 text-slate-400" />
+                    <p className="text-slate-300">Preview is not available for this file type.</p>
+                    {previewAssignment.can_download && (
+                      <a href={fileUrl(previewAssignment.file)} download target="_blank" rel="noopener noreferrer" className="mt-4 inline-flex items-center gap-2 rounded-lg bg-white px-4 py-2 text-sm font-semibold text-slate-900 hover:bg-slate-100">
+                        <Download className="h-4 w-4" /> Download File
+                      </a>
+                    )}
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Add/Edit Drawer */}
       <AnimatePresence>
         {showForm && (
@@ -759,6 +962,10 @@ export function ClientsPage() {
                   <label className="block text-sm font-medium text-slate-700 mb-1">Client Name *</label>
                   <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Full name or company name" />
                 </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Contact Person</label>
+                  <Input value={form.contact_person} onChange={(e) => setForm({ ...form, contact_person: e.target.value })} placeholder="Primary contact name" />
+                </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-1">Email</label>
@@ -772,6 +979,16 @@ export function ClientsPage() {
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">Address</label>
                   <Input value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} placeholder="Project or billing address" />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Quoted Price</label>
+                    <Input type="number" min="0" step="0.01" value={form.contract_value} onChange={(e) => setForm({ ...form, contract_value: e.target.value })} placeholder="Optional" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Payment Received</label>
+                    <Input type="number" min="0" step="0.01" value={form.payment_received} onChange={(e) => setForm({ ...form, payment_received: e.target.value })} placeholder="Optional" />
+                  </div>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">Status</label>

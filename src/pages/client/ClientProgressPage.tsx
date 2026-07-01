@@ -1,144 +1,225 @@
-import { useState, useEffect } from "react";
-import { ChevronDown, ChevronRight } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { Download, Eye, FileText, X } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/contexts/AuthContext";
 import { cn } from "@/lib/utils";
-import type { TableRow, StageStatus } from "@/types/database";
+import { attachFileAccessUrls } from "@/lib/fileUrls";
+import type { TableRow } from "@/types/database";
 
-type Project = TableRow<"client_projects">;
-type ProjectStage = TableRow<"client_project_stages"> & {
-  stage: { name: string; color: string | null; icon: string | null } | null;
+type Stage = TableRow<"stages">;
+type Assignment = TableRow<"client_file_assignments"> & {
+  file: {
+    display_name: string;
+    public_url: string;
+    preview_url?: string;
+    download_url?: string;
+    mime_type: string | null;
+    size: number | null;
+    storage_path: string;
+    bucket: string;
+  } | null;
 };
 
-const STAGE_STATUS_COLOR: Record<StageStatus, string> = {
-  "Not Started": "bg-slate-100 text-slate-500",
-  "In Progress": "bg-blue-100 text-blue-700",
-  "Awaiting Client Approval": "bg-amber-100 text-amber-700",
-  "Revision Required": "bg-red-100 text-red-700",
-  Completed: "bg-emerald-100 text-emerald-700",
-  Skipped: "bg-slate-100 text-slate-400",
-};
+function formatSize(bytes: number | null) {
+  if (!bytes) return "";
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+}
 
-const PROJECT_STATUS_COLOR: Record<string, string> = {
-  Active: "bg-emerald-100 text-emerald-700",
-  "On Hold": "bg-amber-100 text-amber-700",
-  Completed: "bg-blue-100 text-blue-700",
-  Cancelled: "bg-red-100 text-red-700",
-};
+function fileUrl(file: Assignment["file"]) {
+  return file?.preview_url || file?.public_url || "";
+}
+
+function downloadUrl(file: Assignment["file"]) {
+  return file?.download_url || fileUrl(file);
+}
+
+function canInlinePreview(file: Assignment["file"]) {
+  return Boolean(file?.mime_type?.startsWith("image/") || file?.mime_type === "application/pdf");
+}
 
 export function ClientProgressPage() {
   const { clientId } = useAuth();
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [stagesByProject, setStagesByProject] = useState<Record<string, ProjectStage[]>>({});
-  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [stages, setStages] = useState<Stage[]>([]);
+  const [assignments, setAssignments] = useState<Assignment[]>([]);
+  const [preview, setPreview] = useState<Assignment | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (!clientId) return;
     (async () => {
-      const { data: pData } = await supabase.from("client_projects").select("*").eq("client_id", clientId).order("created_at");
-      const projects = (pData as Project[]) ?? [];
-      setProjects(projects);
-      if (projects.length > 0) {
-        const { data: sData } = await supabase.from("client_project_stages").select("*, stage:stages(name,color,icon)").in("client_project_id", projects.map((p) => p.id)).order("display_order");
-        const byProject: Record<string, ProjectStage[]> = {};
-        ((sData as ProjectStage[]) ?? []).forEach((s) => {
-          if (!byProject[s.client_project_id]) byProject[s.client_project_id] = [];
-          byProject[s.client_project_id].push(s);
-        });
-        setStagesByProject(byProject);
-        if (projects.length === 1) setExpanded(new Set([projects[0].id]));
-      }
+      setLoading(true);
+      const now = new Date().toISOString();
+      const [{ data: stageData }, { data: fileData }] = await Promise.all([
+        supabase.from("stages").select("*").eq("status", "active").order("display_order"),
+        supabase
+          .from("client_file_assignments")
+          .select("*, file:files(display_name,public_url,mime_type,size,storage_path,bucket)")
+          .eq("client_id", clientId)
+          .or(`visible_from.is.null,visible_from.lte.${now}`)
+          .or(`expires_at.is.null,expires_at.gte.${now}`)
+          .order("display_order"),
+      ]);
+
+      setStages((stageData as Stage[]) ?? []);
+      setAssignments(await attachFileAccessUrls((fileData as Assignment[]) ?? []));
       setLoading(false);
     })();
   }, [clientId]);
 
-  function toggleProject(id: string) {
-    setExpanded((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  }
+  const filesByStage = useMemo(() => {
+    return assignments.reduce<Record<string, Assignment[]>>((acc, item) => {
+      const key = item.stage_id ?? "general";
+      if (!acc[key]) acc[key] = [];
+      acc[key].push(item);
+      return acc;
+    }, {});
+  }, [assignments]);
+
+  const activeStageCount = stages.filter((stage) => (filesByStage[stage.id] ?? []).length > 0).length;
+  const generalFiles = filesByStage.general ?? [];
 
   return (
     <div className="space-y-5">
       <div>
         <h1 className="text-2xl font-black text-slate-900">Project Progress</h1>
-        <p className="text-sm text-slate-500 mt-1">{projects.length} project{projects.length !== 1 ? "s" : ""} in total</p>
+        <p className="mt-1 text-sm text-slate-500">
+          {assignments.length} file{assignments.length !== 1 ? "s" : ""} shared across {activeStageCount} active stage{activeStageCount !== 1 ? "s" : ""}
+        </p>
       </div>
 
       {loading ? (
-        <div className="space-y-3">{Array.from({ length: 3 }).map((_, i) => <div key={i} className="h-20 animate-pulse rounded-xl bg-slate-100" />)}</div>
-      ) : projects.length === 0 ? (
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} className="h-40 animate-pulse rounded-2xl bg-slate-100" />
+          ))}
+        </div>
+      ) : stages.length === 0 && assignments.length === 0 ? (
         <div className="rounded-xl border border-dashed border-slate-200 py-16 text-center">
-          <p className="text-slate-500">No projects assigned yet. Check back soon!</p>
+          <FileText className="mx-auto mb-3 h-10 w-10 text-slate-300" />
+          <p className="text-slate-500">No project stages or files are available yet.</p>
         </div>
       ) : (
-        <div className="space-y-3">
-          {projects.map((project) => {
-            const stages = stagesByProject[project.id] ?? [];
-            const isOpen = expanded.has(project.id);
-            return (
-              <div key={project.id} className="rounded-xl border border-slate-200 bg-white overflow-hidden">
-                <button className="flex w-full items-center gap-4 px-5 py-4 text-left hover:bg-slate-50 transition-colors" onClick={() => toggleProject(project.id)}>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-bold text-slate-900">{project.name}</span>
-                      <span className={cn("rounded-full px-2 py-0.5 text-xs font-semibold", PROJECT_STATUS_COLOR[project.status] ?? "bg-slate-100 text-slate-500")}>
-                        {project.status}
-                      </span>
+        <div className="space-y-4">
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+            {stages.map((stage, index) => {
+              const stageFiles = filesByStage[stage.id] ?? [];
+              const hasFiles = stageFiles.length > 0;
+              return (
+                <section
+                  key={stage.id}
+                  className={cn(
+                    "overflow-hidden rounded-2xl border bg-white transition-all",
+                    hasFiles
+                      ? "border-brand-primary/30 shadow-sm shadow-orange-100"
+                      : "border-slate-200 opacity-80 grayscale-[0.1]",
+                  )}
+                >
+                  <div className={cn("flex items-center gap-3 border-b px-4 py-3", hasFiles ? "border-orange-100 bg-orange-50/60" : "border-slate-100 bg-slate-50")}>
+                    <div
+                      className={cn(
+                        "grid h-10 w-10 shrink-0 place-items-center rounded-full text-sm font-black",
+                        hasFiles ? "bg-brand-primary text-white shadow-lg shadow-orange-200" : "bg-white text-slate-400 ring-1 ring-slate-200",
+                      )}
+                    >
+                      {String(index + 1).padStart(2, "0")}
                     </div>
-                    <div className="mt-2 flex items-center gap-3">
-                      <div className="flex-1 max-w-xs h-2 rounded-full bg-slate-100">
-                        <div className="h-full rounded-full bg-brand-primary transition-all" style={{ width: `${project.progress}%` }} />
-                      </div>
-                      <span className="text-sm font-semibold text-brand-primary">{project.progress}%</span>
+                    <div className="min-w-0 flex-1">
+                      <h2 className={cn("truncate text-sm font-black", hasFiles ? "text-slate-950" : "text-slate-500")}>{stage.name}</h2>
+                      <p className="text-xs text-slate-400">
+                        {hasFiles ? `${stageFiles.length} uploaded file${stageFiles.length !== 1 ? "s" : ""}` : "No uploaded files"}
+                      </p>
                     </div>
+                    <span className={cn("h-2.5 w-2.5 rounded-full", hasFiles ? "bg-brand-primary" : "bg-slate-300")} style={hasFiles ? { backgroundColor: stage.color ?? "#F86A0D" } : undefined} />
                   </div>
-                  {isOpen ? <ChevronDown className="h-4 w-4 text-slate-400 shrink-0" /> : <ChevronRight className="h-4 w-4 text-slate-400 shrink-0" />}
-                </button>
 
-                {isOpen && (
-                  <div className="border-t border-slate-100 px-5 py-4">
-                    {project.description && <p className="text-sm text-slate-600 mb-4">{project.description}</p>}
-                    {stages.length === 0 ? (
-                      <p className="text-sm text-slate-400">No stages defined for this project.</p>
-                    ) : (
-                      <div className="space-y-3">
-                        {stages.map((s, idx) => (
-                          <div key={s.id} className="flex items-start gap-3">
-                            <div className="flex flex-col items-center">
-                              <div className={cn("flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold", s.status === "Completed" ? "bg-emerald-500 text-white" : s.status === "In Progress" ? "bg-brand-primary text-white" : "bg-slate-200 text-slate-500")}>
-                                {s.status === "Completed" ? "✓" : idx + 1}
-                              </div>
-                              {idx < stages.length - 1 && <div className="mt-1 w-0.5 h-8 bg-slate-200" />}
+                  <div className="min-h-28 p-3">
+                    {hasFiles ? (
+                      <div className="space-y-2">
+                        {stageFiles.map((item) => (
+                          <div key={item.id} className="flex items-center gap-3 rounded-xl border border-slate-100 bg-white p-2 shadow-sm">
+                            <div className="grid h-11 w-11 shrink-0 place-items-center overflow-hidden rounded-lg bg-slate-100 text-slate-400">
+                              {item.file?.mime_type?.startsWith("image/") ? (
+                                <img src={fileUrl(item.file)} alt="" className="h-full w-full object-cover" />
+                              ) : (
+                                <FileText className="h-5 w-5" />
+                              )}
                             </div>
-                            <div className="flex-1 pt-0.5">
-                              <div className="flex items-center gap-2 flex-wrap">
-                                <span className="font-medium text-slate-800">{s.stage?.name}</span>
-                                <span className={cn("rounded-full px-2 py-0.5 text-xs font-medium", STAGE_STATUS_COLOR[s.status])}>
-                                  {s.status}
-                                </span>
-                              </div>
-                              {s.client_notes && <p className="mt-1 text-xs text-slate-500">{s.client_notes}</p>}
-                              <div className="mt-1.5 flex items-center gap-2">
-                                <div className="w-32 h-1.5 rounded-full bg-slate-100">
-                                  <div className="h-full rounded-full transition-all" style={{ width: `${s.progress}%`, backgroundColor: s.stage?.color ?? "#F86A0D" }} />
-                                </div>
-                                <span className="text-xs text-slate-400">{s.progress}%</span>
-                              </div>
+                            <div className="min-w-0 flex-1">
+                              <p className="truncate text-sm font-semibold text-slate-800">{item.client_title}</p>
+                              <p className="text-xs text-slate-400">{item.file?.size ? formatSize(item.file.size) : item.file?.mime_type ?? "File"}</p>
+                            </div>
+                            <div className="flex shrink-0 items-center gap-1">
+                              {item.can_preview && item.file && canInlinePreview(item.file) && (
+                                <button onClick={() => setPreview(item)} className="grid h-8 w-8 place-items-center rounded-lg text-slate-400 hover:bg-blue-50 hover:text-blue-600">
+                                  <Eye className="h-4 w-4" />
+                                </button>
+                              )}
+                              {item.can_download && item.file && (
+                                <a href={downloadUrl(item.file)} download target="_blank" rel="noopener noreferrer" className="grid h-8 w-8 place-items-center rounded-lg text-slate-400 hover:bg-emerald-50 hover:text-emerald-600">
+                                  <Download className="h-4 w-4" />
+                                </a>
+                              )}
                             </div>
                           </div>
                         ))}
                       </div>
+                    ) : (
+                      <div className="flex h-24 items-center justify-center rounded-xl border border-dashed border-slate-200 text-sm text-slate-400">
+                        Waiting for files
+                      </div>
                     )}
                   </div>
-                )}
+                </section>
+              );
+            })}
+          </div>
+
+          {generalFiles.length > 0 && (
+            <section className="rounded-2xl border border-slate-200 bg-white p-4">
+              <h2 className="mb-3 text-sm font-black text-slate-900">General Files</h2>
+              <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+                {generalFiles.map((item) => (
+                  <div key={item.id} className="flex items-center gap-3 rounded-xl border border-slate-100 bg-slate-50 p-3">
+                    <FileText className="h-5 w-5 shrink-0 text-slate-400" />
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-semibold text-slate-800">{item.client_title}</p>
+                      <p className="text-xs text-slate-400">{item.file?.size ? formatSize(item.file.size) : "File"}</p>
+                    </div>
+                    {item.can_download && item.file && (
+                      <a href={downloadUrl(item.file)} download target="_blank" rel="noopener noreferrer" className="grid h-8 w-8 place-items-center rounded-lg text-slate-400 hover:bg-emerald-50 hover:text-emerald-600">
+                        <Download className="h-4 w-4" />
+                      </a>
+                    )}
+                  </div>
+                ))}
               </div>
-            );
-          })}
+            </section>
+          )}
+        </div>
+      )}
+
+      {preview?.file && (
+        <div className="fixed inset-0 z-50 flex flex-col bg-slate-950/90" onClick={() => setPreview(null)}>
+          <div className="flex items-center justify-between bg-slate-900 px-4 py-3" onClick={(e) => e.stopPropagation()}>
+            <span className="truncate font-semibold text-white">{preview.client_title}</span>
+            <button onClick={() => setPreview(null)} className="grid h-8 w-8 place-items-center rounded-lg text-slate-400 hover:text-white">
+              <X className="h-5 w-5" />
+            </button>
+          </div>
+          <div className="flex flex-1 items-center justify-center overflow-auto p-4" onClick={(e) => e.stopPropagation()}>
+            {preview.file.mime_type?.startsWith("image/") ? (
+              <img src={fileUrl(preview.file)} alt={preview.client_title} className="max-h-full max-w-full rounded-lg object-contain" />
+            ) : preview.file.mime_type === "application/pdf" ? (
+              <iframe src={fileUrl(preview.file)} className="h-full w-full rounded-lg bg-white" title={preview.client_title} />
+            ) : (
+              <div className="text-center text-white">
+                <FileText className="mx-auto mb-4 h-16 w-16 text-slate-400" />
+                <p className="text-slate-300">Preview is not available for this file type.</p>
+              </div>
+            )}
+          </div>
         </div>
       )}
     </div>
