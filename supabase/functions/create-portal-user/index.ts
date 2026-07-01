@@ -14,19 +14,6 @@ function ok(body: Record<string, unknown>) {
   });
 }
 
-async function upsertProfile(
-  supabaseAdmin: ReturnType<typeof createClient>,
-  userId: string,
-  email: string,
-  fullName?: string
-) {
-  const { error } = await supabaseAdmin.from("profiles").upsert(
-    { id: userId, full_name: fullName ?? email, email, role_id: null, is_active: true },
-    { onConflict: "id" }
-  );
-  if (error) throw error;
-}
-
 async function linkClient(
   supabaseAdmin: ReturnType<typeof createClient>,
   clientId: string | undefined,
@@ -37,6 +24,22 @@ async function linkClient(
   if (error) throw error;
 }
 
+async function findUserByEmail(supabaseAdmin: ReturnType<typeof createClient>, email: string) {
+  const normalized = email.trim().toLowerCase();
+  let page = 1;
+
+  while (page <= 20) {
+    const { data, error } = await supabaseAdmin.auth.admin.listUsers({ page, perPage: 1000 });
+    if (error) throw error;
+    const user = data.users.find((item) => item.email?.toLowerCase() === normalized);
+    if (user) return user;
+    if (data.users.length < 1000) return null;
+    page += 1;
+  }
+
+  return null;
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { status: 200, headers: corsHeaders });
@@ -44,9 +47,14 @@ Deno.serve(async (req: Request) => {
 
   try {
     const { email, password, full_name, existing_user_id, client_id } = await req.json();
+    const normalizedEmail = typeof email === "string" ? email.trim().toLowerCase() : "";
 
-    if (!email || !password) {
+    if (!normalizedEmail || !password) {
       return ok({ error: "Email and password are required" });
+    }
+
+    if (String(password).length < 8) {
+      return ok({ error: "Password must be at least 8 characters" });
     }
 
     const supabaseAdmin = createClient(
@@ -58,44 +66,35 @@ Deno.serve(async (req: Request) => {
     if (existing_user_id) {
       const { data: updated, error } = await supabaseAdmin.auth.admin.updateUserById(
         existing_user_id,
-        { email, password, email_confirm: true }
+        { email: normalizedEmail, password, email_confirm: true, user_metadata: { full_name: full_name ?? normalizedEmail, client_id: client_id ?? null } }
       );
       if (error) return ok({ error: error.message });
-      await upsertProfile(supabaseAdmin, updated.user.id, email, full_name);
       await linkClient(supabaseAdmin, client_id, updated.user.id);
       return ok({ user_id: updated.user.id });
     }
 
-    // Try to create new user
+    const existing = await findUserByEmail(supabaseAdmin, normalizedEmail);
+    if (existing) {
+      const { data: updated, error } = await supabaseAdmin.auth.admin.updateUserById(
+        existing.id,
+        { password, email_confirm: true, user_metadata: { ...(existing.user_metadata ?? {}), full_name: full_name ?? normalizedEmail, client_id: client_id ?? null } }
+      );
+      if (error) return ok({ error: error.message });
+      await linkClient(supabaseAdmin, client_id, updated.user.id);
+      return ok({ user_id: updated.user.id });
+    }
+
     const { data: created, error: createErr } = await supabaseAdmin.auth.admin.createUser({
-      email,
+      email: normalizedEmail,
       password,
       email_confirm: true,
-      user_metadata: { full_name: full_name ?? email },
+      user_metadata: { full_name: full_name ?? normalizedEmail, client_id: client_id ?? null, account_type: "client" },
     });
 
-    if (createErr) {
-      // If email already registered, find and update that user
-      if (createErr.message.includes("already") || createErr.message.includes("registered")) {
-        const { data: list } = await supabaseAdmin.auth.admin.listUsers({ perPage: 1000 });
-        const existing = list?.users?.find((u) => u.email === email);
-        if (existing) {
-          const { data: updated, error: updErr } = await supabaseAdmin.auth.admin.updateUserById(
-            existing.id,
-            { password, email_confirm: true }
-          );
-          if (updErr) return ok({ error: updErr.message });
-          await upsertProfile(supabaseAdmin, updated.user.id, email, full_name);
-          await linkClient(supabaseAdmin, client_id, updated.user.id);
-          return ok({ user_id: updated.user.id });
-        }
-      }
-      return ok({ error: createErr.message });
-    }
+    if (createErr) return ok({ error: createErr.message });
 
     const userId = created.user.id;
 
-    await upsertProfile(supabaseAdmin, userId, email, full_name);
     await linkClient(supabaseAdmin, client_id, userId);
 
     return ok({ user_id: userId });

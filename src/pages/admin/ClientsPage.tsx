@@ -47,8 +47,10 @@ function errorMessage(error: unknown) {
     const record = error as Record<string, unknown>;
     const context = record.context;
     if (context && typeof context === "object" && "statusText" in context) {
+      const status = (context as { status?: unknown }).status;
       const statusText = (context as { statusText?: unknown }).statusText;
       if (typeof statusText === "string" && statusText) return statusText;
+      if (typeof status === "number") return `Edge function failed with HTTP ${status}`;
     }
     for (const key of ["message", "error", "details", "hint", "code"]) {
       const value = record[key];
@@ -66,9 +68,32 @@ function errorMessage(error: unknown) {
 
 async function createPortalUser(body: Record<string, unknown>) {
   const { data, error } = await supabase.functions.invoke("create-portal-user", { body });
-  if (error) throw new Error(errorMessage(error));
+  if (error) {
+    const context = (error as { context?: unknown }).context;
+    if (context instanceof Response) {
+      const text = await context.clone().text();
+      console.error("create-portal-user failed", {
+        status: context.status,
+        statusText: context.statusText,
+        body: text,
+      });
+      let parsedMessage = "";
+      try {
+        const json = JSON.parse(text) as { error?: string; message?: string };
+        parsedMessage = json.error || json.message || "";
+      } catch {
+        parsedMessage = "";
+      }
+      throw new Error(parsedMessage || text || `Edge function failed with HTTP ${context.status}`);
+    }
+    throw new Error(errorMessage(error));
+  }
   if (data?.error) throw new Error(String(data.error));
   return data;
+}
+
+function normalizeEmail(email: string) {
+  return email.trim().toLowerCase();
 }
 
 function formatSize(bytes: number | null) {
@@ -309,13 +334,23 @@ export function ClientsPage() {
       if (editClient) {
         const { error } = await supabase.from("clients").update(form).eq("id", editClient.id);
         if (error) throw error;
+        let portalError = "";
 
         if (portalPassword.trim()) {
           if (!effectivePortalEmail) throw new Error("Portal email is required to set credentials");
           if (portalPassword.length < 8) throw new Error("Password must be at least 8 characters");
-          await createPortalUser({ email: effectivePortalEmail, password: portalPassword, full_name: form.name, existing_user_id: editClient.auth_user_id ?? null, client_id: editClient.id });
+          try {
+            await createPortalUser({ email: normalizeEmail(effectivePortalEmail), password: portalPassword, full_name: form.name, existing_user_id: editClient.auth_user_id ?? null, client_id: editClient.id });
+          } catch (credentialError) {
+            portalError = errorMessage(credentialError);
+          }
         }
-        toast.success(portalPassword.trim() ? "Client and portal credentials updated" : "Client updated");
+
+        if (portalError) {
+          toast.error("Client updated, portal credentials failed", portalError);
+        } else {
+          toast.success(portalPassword.trim() ? "Client and portal credentials updated" : "Client updated");
+        }
       } else {
         const { data: newClient, error } = await supabase.from("clients").insert(form).select("id").single();
         if (error) throw error;
@@ -326,7 +361,7 @@ export function ClientsPage() {
           if (!effectivePortalEmail) throw new Error("Portal email is required to set credentials");
           if (portalPassword.length < 8) throw new Error("Password must be at least 8 characters");
           try {
-            await createPortalUser({ email: effectivePortalEmail, password: portalPassword, full_name: form.name, client_id: clientId });
+            await createPortalUser({ email: normalizeEmail(effectivePortalEmail), password: portalPassword, full_name: form.name, client_id: clientId });
           } catch (credentialError) {
             portalError = errorMessage(credentialError);
           }
@@ -339,7 +374,7 @@ export function ClientsPage() {
         }
       }
       setShowForm(false);
-      fetchClients();
+      await fetchClients();
     } catch (err) {
       toast.error("Error", errorMessage(err));
     }
