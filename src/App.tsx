@@ -1,5 +1,6 @@
-import { useEffect, lazy, Suspense } from "react";
+import { useEffect, lazy, Suspense, useState } from "react";
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
+import { Building2 } from "lucide-react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { ClientLayout } from "@/components/layout/ClientLayout";
 import { ProtectedRoute } from "@/components/layout/ProtectedRoute";
@@ -9,6 +10,7 @@ import { ResetPasswordPage } from "@/pages/auth/ResetPasswordPage";
 import { PublicLayout } from "@/pages/public/PublicLayout";
 import { ContactPage, HomePage, ListingPage, ProjectDetailPage } from "@/pages/public/PublicPages";
 import { PortfolioListingPage, PortfolioDetailPage } from "@/pages/public/PortfolioPages";
+import { useAppSettings } from "@/hooks/useAppSettings";
 
 // Admin pages
 const AdminDashboard = lazy(() => import("@/pages/admin/AdminDashboard").then((m) => ({ default: m.AdminDashboard })));
@@ -30,12 +32,37 @@ const ClientFilesPage = lazy(() => import("@/pages/client/ClientFilesPage").then
 const ClientBlueprintsPage = lazy(() => import("@/pages/client/ClientBlueprintsPage").then((m) => ({ default: m.ClientBlueprintsPage })));
 const ClientProfilePage = lazy(() => import("@/pages/client/ClientProfilePage").then((m) => ({ default: m.ClientProfilePage })));
 
-function PageLoader() {
+function PageLoader({ fixed = false }: { fixed?: boolean }) {
+  const { branding } = useAppSettings();
+
   return (
-    <div className="flex min-h-[60vh] items-center justify-center">
-      <div className="h-8 w-8 rounded-full border-2 border-brand-primary border-t-transparent animate-spin" />
+    <div className={`${fixed ? "fixed inset-0 z-[999] min-h-screen bg-white/90 backdrop-blur-sm" : "min-h-[60vh]"} flex items-center justify-center`}>
+      <div className="relative grid h-28 w-28 place-items-center rounded-full bg-white shadow-[0_24px_70px_rgba(15,23,42,0.14)] ring-1 ring-orange-100">
+        <div className="absolute inset-0 rounded-full border border-orange-100" />
+        <div className="absolute inset-2 rounded-full border-2 border-brand-primary/20 border-t-brand-primary animate-spin [animation-duration:3s]" />
+        <div className="grid h-20 w-20 place-items-center rounded-full bg-white">
+          {branding.logoUrl ? (
+            <img src={branding.logoUrl} alt={branding.companyName} className="max-h-14 max-w-16 object-contain animate-spin [animation-duration:6s]" />
+          ) : (
+            <Building2 className="h-10 w-10 animate-spin text-brand-primary [animation-duration:6s]" />
+          )}
+        </div>
+      </div>
     </div>
   );
+}
+
+function RouteChangeLoader() {
+  const { pathname } = useLocation();
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    setLoading(true);
+    const timer = window.setTimeout(() => setLoading(false), 650);
+    return () => window.clearTimeout(timer);
+  }, [pathname]);
+
+  return loading ? <PageLoader fixed /> : null;
 }
 
 function ScrollToTop() {
@@ -48,6 +75,7 @@ export function App() {
   return (
     <>
       <ScrollToTop />
+      <RouteChangeLoader />
       <Routes>
         {/* Public website */}
         <Route element={<PublicLayout />}>

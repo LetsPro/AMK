@@ -45,6 +45,11 @@ function errorMessage(error: unknown) {
   if (typeof error === "string" && error && error !== "{}") return error;
   if (error && typeof error === "object") {
     const record = error as Record<string, unknown>;
+    const context = record.context;
+    if (context && typeof context === "object" && "statusText" in context) {
+      const statusText = (context as { statusText?: unknown }).statusText;
+      if (typeof statusText === "string" && statusText) return statusText;
+    }
     for (const key of ["message", "error", "details", "hint", "code"]) {
       const value = record[key];
       if (typeof value === "string" && value && value !== "{}") return value;
@@ -57,6 +62,13 @@ function errorMessage(error: unknown) {
     }
   }
   return "Save failed";
+}
+
+async function createPortalUser(body: Record<string, unknown>) {
+  const { data, error } = await supabase.functions.invoke("create-portal-user", { body });
+  if (error) throw new Error(errorMessage(error));
+  if (data?.error) throw new Error(String(data.error));
+  return data;
 }
 
 function formatSize(bytes: number | null) {
@@ -301,28 +313,30 @@ export function ClientsPage() {
         if (portalPassword.trim()) {
           if (!effectivePortalEmail) throw new Error("Portal email is required to set credentials");
           if (portalPassword.length < 8) throw new Error("Password must be at least 8 characters");
-          const { data: fn, error: fnErr } = await supabase.functions.invoke("create-portal-user", {
-            body: { email: effectivePortalEmail, password: portalPassword, full_name: form.name, existing_user_id: editClient.auth_user_id ?? null, client_id: editClient.id },
-          });
-          if (fnErr) throw new Error(errorMessage(fnErr));
-          if (fn?.error) throw new Error(fn.error);
+          await createPortalUser({ email: effectivePortalEmail, password: portalPassword, full_name: form.name, existing_user_id: editClient.auth_user_id ?? null, client_id: editClient.id });
         }
         toast.success(portalPassword.trim() ? "Client and portal credentials updated" : "Client updated");
       } else {
         const { data: newClient, error } = await supabase.from("clients").insert(form).select("id").single();
         if (error) throw error;
         const clientId = (newClient as { id: string }).id;
+        let portalError = "";
 
         if (portalPassword.trim()) {
           if (!effectivePortalEmail) throw new Error("Portal email is required to set credentials");
           if (portalPassword.length < 8) throw new Error("Password must be at least 8 characters");
-          const { data: fn, error: fnErr } = await supabase.functions.invoke("create-portal-user", {
-            body: { email: effectivePortalEmail, password: portalPassword, full_name: form.name, client_id: clientId },
-          });
-          if (fnErr) throw new Error(errorMessage(fnErr));
-          if (fn?.error) throw new Error(fn.error);
+          try {
+            await createPortalUser({ email: effectivePortalEmail, password: portalPassword, full_name: form.name, client_id: clientId });
+          } catch (credentialError) {
+            portalError = errorMessage(credentialError);
+          }
         }
-        toast.success(portalPassword.trim() ? "Client and portal credentials created" : "Client created");
+
+        if (portalError) {
+          toast.error("Client created, portal credentials failed", portalError);
+        } else {
+          toast.success(portalPassword.trim() ? "Client and portal credentials created" : "Client created");
+        }
       }
       setShowForm(false);
       fetchClients();

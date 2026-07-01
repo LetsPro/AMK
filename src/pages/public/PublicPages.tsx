@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { ArrowRight, BarChart3, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, ClipboardCheck, Eye, Layers3, MapPin, Ruler, Send, ShieldCheck, Sparkles, Star, X } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
@@ -245,7 +245,13 @@ const serviceDetails: Record<string, { intro: string; includes: string[]; signat
   }
 };
 
-const designProcess = [
+type ProcessStep = {
+  title: string;
+  text: string;
+  note: string;
+};
+
+const designProcess: ProcessStep[] = [
   {
     title: "Discovery & Consultation",
     text: "Every successful project begins with understanding. We take the time to understand your vision, requirements, aspirations, site conditions, budget, and project goals to establish a strong foundation for design.",
@@ -360,36 +366,119 @@ function GalleryPreview({ item, onClose }: { item: PublicGallery; onClose: () =>
 }
 
 function DesignProcessSection({ title = "Our Design Process", subtitle = "From first conversation to handover." }: { title?: string; subtitle?: string }) {
+  const [activeProcess, setActiveProcess] = useState(0);
+  const reduceMotion = useReducedMotion();
+  const activeStep = designProcess[activeProcess];
+  const orbitPoints = designProcess.map((step, index) => {
+    const angle = -90 + (360 / designProcess.length) * index;
+    const radius = 43;
+    const x = 50 + radius * Math.cos((angle * Math.PI) / 180);
+    const y = 50 + radius * Math.sin((angle * Math.PI) / 180);
+    return { step, index, x, y };
+  });
+  const goToProcess = (index: number) => {
+    setActiveProcess((index + designProcess.length) % designProcess.length);
+  };
+
   return (
-    <section className="bg-slate-50 px-4 py-16">
-      <div className="mx-auto max-w-7xl">
-        <div className="mb-8 flex flex-col gap-4 border-b border-slate-200 pb-6 lg:flex-row lg:items-end lg:justify-between">
-          <div>
-            <div className="text-sm font-bold uppercase tracking-wide text-brand-primary">{title}</div>
-            <h2 className="mt-3 max-w-3xl text-3xl font-black tracking-tight text-slate-950 md:text-4xl">{subtitle}</h2>
-          </div>
-          <p className="max-w-xl text-sm leading-7 text-slate-600">A structured workflow keeps design ambition, technical coordination, approvals, site quality, and final delivery moving together.</p>
+    <section className="relative overflow-hidden bg-gradient-to-b from-white via-slate-50 to-white px-4 py-20 text-slate-950">
+      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(rgba(15,23,42,0.035)_1px,transparent_1px),linear-gradient(90deg,rgba(15,23,42,0.035)_1px,transparent_1px)] bg-[size:56px_56px]" />
+      <div className="relative mx-auto max-w-7xl">
+        <div className="mx-auto mb-12 max-w-4xl text-center">
+          <div className="text-sm font-bold uppercase tracking-wide text-brand-primary">How We Work</div>
+          <h2 className="mt-3 text-3xl font-black tracking-tight md:text-5xl">A Clear Process From Vision to Handover</h2>
+          <p className="mx-auto mt-4 max-w-2xl text-sm leading-7 text-slate-600">Our structured approach keeps every stage transparent, collaborative and aligned with your project goals.</p>
         </div>
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+
+        <div className="mx-auto hidden w-full max-w-6xl md:block">
+          <div className="relative mx-auto aspect-square w-full max-w-[min(680px,calc(100vw-2rem))]">
+            <div className="absolute inset-[15%] rounded-full border border-dashed border-orange-300/70" />
+            <div className="absolute inset-[24%] rounded-full bg-[radial-gradient(circle,rgba(248,106,13,0.13),rgba(255,255,255,0.74)_58%,rgba(255,255,255,0)_75%)]" />
+
+            <div className="pointer-events-none absolute left-1/2 top-1/2 z-30 -translate-x-1/2 -translate-y-1/2">
+              <AnimatePresence mode="wait">
+                <motion.div
+                  key={activeStep.title}
+                  initial={reduceMotion ? false : { opacity: 0, y: 10, scale: 0.98 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={reduceMotion ? undefined : { opacity: 0, y: -10, scale: 0.98 }}
+                  transition={{ duration: reduceMotion ? 0 : 0.3 }}
+                  className="pointer-events-auto w-[clamp(280px,44vw,330px)] rounded-[24px] border border-orange-100 bg-white/95 p-5 text-center shadow-[0_24px_70px_rgba(15,23,42,0.12)] backdrop-blur-md lg:p-7"
+                >
+                  <div className="mb-4 flex items-center justify-center gap-2">
+                    <span className="text-sm font-extrabold text-brand-primary">{String(activeProcess + 1).padStart(2, "0")}</span>
+                    <span className="h-px w-8 bg-orange-300" />
+                    <span className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">Active Stage</span>
+                  </div>
+                  <h3 className="text-lg font-black leading-tight text-slate-950 lg:text-xl">{activeStep.title}</h3>
+                  <p className="mt-4 text-sm leading-6 text-slate-600">{activeStep.text}</p>
+                  <div className="mt-5 h-1.5 overflow-hidden rounded-full bg-orange-100">
+                    <motion.div className="h-full rounded-full bg-brand-primary" initial={false} animate={{ width: `${((activeProcess + 1) / designProcess.length) * 100}%` }} transition={{ duration: reduceMotion ? 0 : 0.25 }} />
+                  </div>
+                  <div className="mt-5 flex justify-center gap-2">
+                    <button type="button" onClick={() => goToProcess(activeProcess - 1)} className="grid h-9 w-9 place-items-center rounded-full border border-slate-200 text-slate-600 transition hover:border-brand-primary hover:text-brand-primary focus:outline-none focus:ring-2 focus:ring-orange-200" aria-label="Previous process stage">
+                      <ChevronLeft className="h-4 w-4" />
+                    </button>
+                    <button type="button" onClick={() => goToProcess(activeProcess + 1)} className="grid h-9 w-9 place-items-center rounded-full border border-slate-200 text-slate-600 transition hover:border-brand-primary hover:text-brand-primary focus:outline-none focus:ring-2 focus:ring-orange-200" aria-label="Next process stage">
+                      <ChevronRight className="h-4 w-4" />
+                    </button>
+                  </div>
+                </motion.div>
+              </AnimatePresence>
+            </div>
+
+            {orbitPoints.map(({ step, index, x, y }) => {
+              const isActive = index === activeProcess;
+              return (
+                <button
+                  key={step.title}
+                  type="button"
+                  onMouseEnter={() => setActiveProcess(index)}
+                  onFocus={() => setActiveProcess(index)}
+                  onClick={() => setActiveProcess(index)}
+                  aria-label={step.title}
+                  className={`group absolute flex h-10 w-10 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border shadow-sm transition focus:outline-none focus:ring-2 focus:ring-orange-200 md:h-12 md:w-12 lg:h-14 lg:w-14 ${isActive ? "z-40 scale-110 border-brand-primary bg-brand-primary text-white shadow-lg shadow-orange-200" : "z-20 border-orange-100 bg-white text-brand-primary hover:scale-105 hover:border-orange-200 hover:bg-orange-50"}`}
+                  style={{ left: `${x}%`, top: `${y}%` }}
+                >
+                  <span className={`relative z-10 transition ${isActive ? "text-base font-black text-white lg:text-lg" : "text-xs font-extrabold text-brand-primary group-hover:scale-110 group-hover:text-orange-600 md:text-sm"}`}>
+                    {String(index + 1).padStart(2, "0")}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="mx-auto mt-8 grid max-w-5xl grid-cols-2 gap-3 lg:grid-cols-7">
+            {designProcess.map((step, index) => (
+              <button
+                key={step.title}
+                type="button"
+                onMouseEnter={() => setActiveProcess(index)}
+                onFocus={() => setActiveProcess(index)}
+                onClick={() => setActiveProcess(index)}
+                className={`min-h-20 rounded-xl border px-3 py-3 text-center text-xs font-bold leading-tight transition focus:outline-none focus:ring-2 focus:ring-orange-200 ${index === activeProcess ? "border-brand-primary bg-orange-50 text-brand-primary shadow-sm" : "border-slate-200 bg-white text-slate-700 hover:border-orange-200"}`}
+              >
+                <span className="mb-1 block text-brand-primary">{String(index + 1).padStart(2, "0")}</span>
+                {step.title}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="grid gap-3 md:hidden">
           {designProcess.map((step, index) => (
-            <motion.div
+            <button
               key={step.title}
-              className={`group rounded-lg border border-slate-200 bg-white p-5 shadow-sm ${index === 6 ? "md:col-span-2 xl:col-span-3" : ""}`}
-              initial={{ opacity: 0, y: 18 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true, amount: 0.25 }}
-              transition={{ duration: 0.35, delay: Math.min(index * 0.04, 0.24) }}
-              whileHover={{ y: -4, borderColor: "rgba(248, 106, 13, 0.35)", boxShadow: "0 18px 40px rgba(15, 23, 42, 0.1)" }}
+              type="button"
+              onClick={() => setActiveProcess(index)}
+              className={`rounded-lg border p-4 text-left transition ${index === activeProcess ? "border-brand-primary bg-white text-slate-950 shadow-sm" : "border-slate-200 bg-white text-slate-700"}`}
             >
-              <div className="flex gap-4">
-                <div className="grid h-12 w-12 shrink-0 place-items-center rounded-md bg-orange-50 text-lg font-black text-brand-primary ring-1 ring-orange-100">{String(index + 1).padStart(2, "0")}</div>
-                <div>
-                  <h3 className="text-lg font-bold text-slate-950">{step.title}</h3>
-                  <p className="mt-2 text-sm leading-7 text-slate-600">{step.text}</p>
-                  <p className="mt-4 border-l-2 border-brand-primary pl-3 text-sm font-semibold text-slate-700">"{step.note}"</p>
-                </div>
+              <div className="flex items-center gap-3">
+                <span className="grid h-10 w-10 place-items-center rounded-full bg-orange-50 text-sm font-black text-brand-primary">{String(index + 1).padStart(2, "0")}</span>
+                <span className="font-black">{step.title}</span>
               </div>
-            </motion.div>
+              {index === activeProcess && <p className="mt-3 text-sm leading-7 text-slate-600">{step.text}</p>}
+            </button>
           ))}
         </div>
       </div>
@@ -585,30 +674,48 @@ export function HomePage() {
   return (
     <>
       <Seo title="AMK Architects & Engineers Mysuru | Technology-Driven Architecture Studio" description="AMK Architects & Engineers is a Mysuru architecture and engineering studio specializing in Architecture, BIM, Parametric Design, 3D Printed Buildings, Visualization, and Construction Solutions." />
-      <section className="relative min-h-[620px] overflow-hidden bg-slate-950 px-4 py-20 text-white">
+      <section className="relative min-h-[720px] overflow-hidden bg-slate-950 px-4 py-20 text-white">
         {bannerRows.map((item, index) => (
           <motion.div
             key={item.id}
             className="absolute inset-0"
             initial={false}
             animate={{ opacity: index === activeSlide ? 1 : 0, scale: index === activeSlide ? 1 : 1.04 }}
-            transition={{ duration: 0.7 }}
-            style={{ backgroundImage: `linear-gradient(90deg, rgba(15,23,42,0.92), rgba(15,23,42,0.52), rgba(15,23,42,0.18)), url(${item.image_url ?? demoBanners[0].image_url})`, backgroundSize: "cover", backgroundPosition: "center" }}
+            transition={{ duration: 0.9 }}
+            style={{ backgroundImage: `linear-gradient(90deg, rgba(2,6,23,0.82), rgba(15,23,42,0.66)), linear-gradient(180deg, rgba(2,6,23,0.18), rgba(2,6,23,0.74)), url(${item.image_url ?? demoBanners[0].image_url})`, backgroundSize: "cover", backgroundPosition: "center" }}
           />
         ))}
-        <div className="relative mx-auto flex min-h-[460px] max-w-7xl items-center">
-          <div>
-            <motion.h1 key={slide.title} initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} className="max-w-4xl text-5xl font-black tracking-tight md:text-7xl">{slide.title}</motion.h1>
-            <p className="mt-5 max-w-2xl text-lg text-slate-200">{slide.subtitle}</p>
-            <div className="mt-8 flex flex-wrap gap-3">
-              <Button onClick={() => (slide.cta_url === "#enquiry" || slide.cta_url === legacyEnquiryRoute || slide.cta_label?.toLowerCase() === "get started") ? openEnquiryModal() : location.href = slide.cta_url ?? "/contact"}>{slide.cta_label ?? "Start a Project"}</Button>
-              <Button variant="secondary" onClick={() => location.href = "/projects"}>View Projects</Button>
+        <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.035)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.035)_1px,transparent_1px)] bg-[size:72px_72px]" />
+
+        <div className="relative mx-auto flex min-h-[560px] max-w-7xl items-center justify-center">
+          <div className="mx-auto max-w-5xl text-center">
+            <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/10 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-orange-100 backdrop-blur">
+              <span className="h-2 w-2 rounded-full bg-brand-accent shadow-[0_0_20px_rgba(255,155,74,0.9)]" />
+              Technology Driven Studio
+            </motion.div>
+            <motion.h1 key={slide.title} initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} className="mx-auto mt-7 max-w-5xl text-5xl font-bold leading-tight tracking-normal md:text-6xl xl:text-7xl">{slide.title}</motion.h1>
+            <p className="mx-auto mt-6 max-w-3xl text-lg leading-8 text-slate-200 md:text-xl">{slide.subtitle}</p>
+            <div className="mt-9 flex flex-wrap items-center justify-center gap-4">
+              <button
+                type="button"
+                onClick={() => (slide.cta_url === "#enquiry" || slide.cta_url === legacyEnquiryRoute || slide.cta_label?.toLowerCase() === "get started") ? openEnquiryModal() : location.href = slide.cta_url ?? "/contact"}
+                className="group relative overflow-hidden rounded-full bg-white px-6 py-4 text-sm font-semibold text-slate-950 shadow-2xl shadow-orange-950/25 transition hover:-translate-y-1 hover:bg-brand-primary hover:text-white"
+              >
+                <span className="relative z-10 inline-flex items-center gap-2">{slide.cta_label ?? "Start a Project"} <ArrowRight className="h-4 w-4 transition group-hover:translate-x-1" /></span>
+              </button>
+              <button
+                type="button"
+                onClick={() => location.href = "/projects"}
+                className="group rounded-full border border-white/20 bg-white/10 px-6 py-4 text-sm font-semibold text-white backdrop-blur transition hover:-translate-y-1 hover:border-brand-accent hover:bg-white hover:text-slate-950"
+              >
+                <span className="inline-flex items-center gap-2">View Projects <Eye className="h-4 w-4" /></span>
+              </button>
             </div>
           </div>
         </div>
-        <div className="absolute bottom-8 left-1/2 flex -translate-x-1/2 gap-2">
+        <div className="absolute bottom-8 left-1/2 flex -translate-x-1/2 items-center gap-3 rounded-full border border-white/10 bg-slate-950/45 px-4 py-3 backdrop-blur">
           {bannerRows.map((item, index) => (
-            <button key={item.id} aria-label={`Go to slide ${index + 1}`} onClick={() => setActiveSlide(index)} className={`h-2.5 rounded-full transition-all ${index === activeSlide ? "w-9 bg-brand-primary" : "w-2.5 bg-white/60"}`} />
+            <button key={item.id} aria-label={`Go to slide ${index + 1}`} onClick={() => setActiveSlide(index)} className={`h-2.5 rounded-full transition-all ${index === activeSlide ? "w-12 bg-brand-primary" : "w-2.5 bg-white/45 hover:bg-white"}`} />
           ))}
         </div>
       </section>
@@ -706,7 +813,6 @@ export function HomePage() {
         </div>
       </section>
       <TestimonialCarousel items={testimonialRows as PublicTestimonial[]} />
-      <ContactPage compact />
       {selectedProject && <ProjectModal project={selectedProject} onClose={() => setSelectedProject(null)} />}
     </>
   );
