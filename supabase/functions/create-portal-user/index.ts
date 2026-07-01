@@ -14,6 +14,24 @@ function ok(body: Record<string, unknown>) {
   });
 }
 
+async function upsertClientProfile(
+  supabaseAdmin: ReturnType<typeof createClient>,
+  userId: string,
+  email: string,
+  fullName?: string
+) {
+  const payload = {
+    id: userId,
+    full_name: fullName || email.split("@")[0] || email,
+    email,
+    role_id: null,
+    is_active: true,
+  };
+
+  const { error } = await supabaseAdmin.from("profiles").upsert(payload, { onConflict: "id" });
+  if (error) throw error;
+}
+
 async function linkClient(
   supabaseAdmin: ReturnType<typeof createClient>,
   clientId: string | undefined,
@@ -48,6 +66,7 @@ Deno.serve(async (req: Request) => {
   try {
     const { email, password, full_name, existing_user_id, client_id } = await req.json();
     const normalizedEmail = typeof email === "string" ? email.trim().toLowerCase() : "";
+    const fullName = typeof full_name === "string" && full_name.trim() ? full_name.trim() : normalizedEmail;
 
     if (!normalizedEmail || !password) {
       return ok({ error: "Email and password are required" });
@@ -57,18 +76,26 @@ Deno.serve(async (req: Request) => {
       return ok({ error: "Password must be at least 8 characters" });
     }
 
+    const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
+    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+
+    if (!supabaseUrl || !serviceRoleKey) {
+      return ok({ error: "Supabase function is missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY" });
+    }
+
     const supabaseAdmin = createClient(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
+      supabaseUrl,
+      serviceRoleKey,
       { auth: { autoRefreshToken: false, persistSession: false } }
     );
 
     if (existing_user_id) {
       const { data: updated, error } = await supabaseAdmin.auth.admin.updateUserById(
         existing_user_id,
-        { email: normalizedEmail, password, email_confirm: true, user_metadata: { full_name: full_name ?? normalizedEmail, client_id: client_id ?? null } }
+        { email: normalizedEmail, password, email_confirm: true, user_metadata: { full_name: fullName, client_id: client_id ?? null, account_type: "client" } }
       );
       if (error) return ok({ error: error.message });
+      await upsertClientProfile(supabaseAdmin, updated.user.id, normalizedEmail, fullName);
       await linkClient(supabaseAdmin, client_id, updated.user.id);
       return ok({ user_id: updated.user.id });
     }
@@ -77,9 +104,10 @@ Deno.serve(async (req: Request) => {
     if (existing) {
       const { data: updated, error } = await supabaseAdmin.auth.admin.updateUserById(
         existing.id,
-        { password, email_confirm: true, user_metadata: { ...(existing.user_metadata ?? {}), full_name: full_name ?? normalizedEmail, client_id: client_id ?? null } }
+        { password, email_confirm: true, user_metadata: { ...(existing.user_metadata ?? {}), full_name: fullName, client_id: client_id ?? null, account_type: "client" } }
       );
       if (error) return ok({ error: error.message });
+      await upsertClientProfile(supabaseAdmin, updated.user.id, normalizedEmail, fullName);
       await linkClient(supabaseAdmin, client_id, updated.user.id);
       return ok({ user_id: updated.user.id });
     }
@@ -88,13 +116,14 @@ Deno.serve(async (req: Request) => {
       email: normalizedEmail,
       password,
       email_confirm: true,
-      user_metadata: { full_name: full_name ?? normalizedEmail, client_id: client_id ?? null, account_type: "client" },
+      user_metadata: { full_name: fullName, client_id: client_id ?? null, account_type: "client" },
     });
 
     if (createErr) return ok({ error: createErr.message });
 
     const userId = created.user.id;
 
+    await upsertClientProfile(supabaseAdmin, userId, normalizedEmail, fullName);
     await linkClient(supabaseAdmin, client_id, userId);
 
     return ok({ user_id: userId });

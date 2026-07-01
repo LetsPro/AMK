@@ -21,8 +21,16 @@ export function ClientProfilePage() {
 
   async function saveProfile() {
     if (!fullName.trim()) { toast.error("Name cannot be empty"); return; }
+    if (!user?.id) { toast.error("User session not found"); return; }
     setSavingProfile(true);
-    const { error } = await supabase.from("profiles").update({ full_name: fullName, phone }).eq("id", profile!.id);
+    const { error } = await supabase.from("profiles").upsert({
+      id: user.id,
+      full_name: fullName,
+      email: user.email ?? "",
+      phone,
+      role_id: null,
+      is_active: true,
+    }, { onConflict: "id" });
     if (error) toast.error("Error", error.message);
     else toast.success("Profile updated");
     setSavingProfile(false);
