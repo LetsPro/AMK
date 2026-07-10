@@ -97,7 +97,7 @@ export function PublicLayout() {
         <div className="mx-auto flex h-24 max-w-7xl items-center justify-between gap-3 overflow-hidden px-4">
           <Link to="/" className="flex items-center" aria-label={`${branding.companyName} ${branding.companySuffix}`}>
             <span className="grid h-20 w-32 place-items-center bg-transparent text-brand-primary md:w-40">
-              {branding.logoUrl ? <img src={branding.logoUrl} alt={branding.companyName} className="max-h-16 max-w-full object-contain md:max-h-20" /> : <Building2 className="h-12 w-12" />}
+              {branding.logoUrl ? <img src={branding.logoUrl} alt={branding.companyName} loading="eager" decoding="async" className="max-h-16 max-w-full object-contain md:max-h-20" /> : <Building2 className="h-12 w-12" />}
             </span>
           </Link>
           <nav className="hidden gap-5 text-sm font-medium xl:flex">
@@ -127,7 +127,7 @@ export function PublicLayout() {
       <footer className="bg-slate-950 px-4 pt-14 text-white">
         <div className="mx-auto grid max-w-7xl gap-10 border-b border-white/10 pb-10 lg:grid-cols-[1.4fr_0.8fr_0.8fr_1fr]">
           <div>
-            <div className="flex items-center gap-3 text-lg font-bold"><span className="grid h-20 w-32 place-items-center bg-transparent">{branding.logoUrl ? <img src={branding.logoUrl} alt={branding.companyName} className="max-h-20 max-w-full object-contain brightness-0 invert" /> : <Building2 className="text-white" />}</span></div>
+            <div className="flex items-center gap-3 text-lg font-bold"><span className="grid h-20 w-32 place-items-center bg-transparent">{branding.logoUrl ? <img src={branding.logoUrl} alt={branding.companyName} loading="lazy" decoding="async" className="max-h-20 max-w-full object-contain brightness-0 invert" /> : <Building2 className="text-white" />}</span></div>
             <p className="mt-4 max-w-sm text-sm leading-6 text-slate-400">Technology-driven architecture, engineering, BIM, parametric design, visualization, digital fabrication, and project execution support.</p>
             <div className="mt-5 flex gap-3">
               {[Facebook, Instagram, Linkedin].map((Icon, index) => <span key={index} className="grid h-9 w-9 place-items-center rounded-full bg-white/10 text-slate-200"><Icon className="h-4 w-4" /></span>)}

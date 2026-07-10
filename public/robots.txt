@@ -1,0 +1,19 @@
+User-agent: *
+Allow: /
+Allow: /about
+Allow: /projects
+Allow: /services
+Allow: /gallery
+Allow: /contact
+
+Disallow: /app
+Disallow: /client
+Disallow: /login
+Disallow: /forgot-password
+Disallow: /reset-password
+
+# Sitemap
+Sitemap: https://www.amkarchitects.in/sitemap.xml
+
+# Crawl delay
+Crawl-delay: 1

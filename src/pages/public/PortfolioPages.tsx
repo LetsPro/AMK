@@ -3,6 +3,7 @@ import { useParams, Link } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import { ArrowLeft, Calendar, ChevronDown, ExternalLink, MapPin, Sparkles, Tag } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { Seo } from "@/components/seo/Seo";
 import type { TableRow } from "@/types/database";
 
 type Project = TableRow<"portfolio_projects"> & {
@@ -55,7 +56,7 @@ function PortfolioCard({ project }: { project: Project }) {
       <Link to={`/projects/${project.slug}`} className="group block overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm transition-all duration-300 hover:border-orange-200 hover:shadow-xl">
       <div className="relative aspect-video overflow-hidden bg-slate-100">
         {project.cover_image_url ? (
-          <img src={project.cover_image_url} alt={project.title} className="h-full w-full object-cover group-hover:scale-105 transition-transform duration-500" />
+          <img src={project.cover_image_url} alt={project.title} loading="lazy" decoding="async" className="h-full w-full object-cover group-hover:scale-105 transition-transform duration-500" />
         ) : (
           <div className="h-full w-full flex items-center justify-center text-slate-300">
             <svg className="h-12 w-12" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
@@ -107,6 +108,19 @@ export function PortfolioListingPage() {
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
+      <Seo
+        title="Architecture Portfolio Mysuru | AMK Architects & Engineers Projects"
+        description="Explore the AMK Architects & Engineers portfolio — residential, commercial, interior, and institutional architecture projects in Mysuru and across India."
+        keywords={["architecture portfolio Mysuru", "residential architecture India", "commercial architecture Karnataka", "interior design portfolio", "architecture projects Mysuru", "building design India"]}
+        canonical="/projects"
+        jsonLd={{
+          "@context": "https://schema.org",
+          "@type": "CollectionPage",
+          name: "AMK Architects Portfolio",
+          description: "Architecture and engineering project portfolio by AMK Architects & Engineers.",
+          url: "https://www.amkarchitects.in/projects",
+        }}
+      />
       <SectionIntro eyebrow="Portfolio" title="Our Projects" text="A showcase of architectural and engineering work across diverse sectors and scales." />
 
       {categories.length > 0 && (
@@ -175,6 +189,23 @@ export function PortfolioDetailPage() {
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-12 sm:px-6 lg:px-8">
+      <Seo
+        title={`${project.title} | AMK Architects Mysuru Portfolio Project`}
+        description={`${project.title} — ${project.portfolio_categories?.name ?? "Architecture"} project by AMK Architects & Engineers${project.location ? ` in ${project.location}` : ""}. View design details, gallery, and project specifications.`}
+        keywords={[project.title, "architecture project Mysuru", project.portfolio_categories?.name ?? "architecture", project.location ?? "Mysuru", "AMK Architects portfolio", "architecture design India"]}
+        canonical={`/projects/${project.slug}`}
+        ogType="article"
+        ogImage={project.cover_image_url ?? undefined}
+        jsonLd={{
+          "@context": "https://schema.org",
+          "@type": "CreativeWork",
+          name: project.title,
+          description: project.short_description ?? project.detailed_description ?? `${project.title} by AMK Architects & Engineers`,
+          creator: { "@type": "ArchitecturalOrganization", name: "AMK Architects & Engineers", url: "https://www.amkarchitects.in" },
+          contentLocation: project.location ? { "@type": "Place", name: project.location } : undefined,
+          ...(project.portfolio_categories?.name ? { about: { "@type": "Thing", name: project.portfolio_categories.name } } : {}),
+        }}
+      />
       <Link to="/projects" className="inline-flex items-center gap-1 text-sm text-slate-500 hover:text-brand-primary mb-8 transition-colors"><ArrowLeft className="h-4 w-4" /> All Projects</Link>
 
       <div className="grid gap-8 lg:grid-cols-[1fr_320px]">
@@ -183,7 +214,7 @@ export function PortfolioDetailPage() {
           {/* Active image */}
           {activeImage && (
             <motion.div initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} className="aspect-video rounded-lg overflow-hidden bg-slate-100 mb-3">
-              <img src={activeImage} alt={project.title} className="h-full w-full object-cover" />
+              <img src={activeImage} alt={project.title} loading="eager" decoding="async" className="h-full w-full object-cover" />
             </motion.div>
           )}
           {/* Thumbnails */}
@@ -191,7 +222,7 @@ export function PortfolioDetailPage() {
             <div className="flex gap-2 overflow-x-auto pb-2 mb-6">
               {allImages.map((img, i) => (
                 <button key={i} onClick={() => setActiveImage(img)} className={`shrink-0 h-16 w-24 rounded-lg overflow-hidden border-2 transition-all hover:-translate-y-1 ${activeImage === img ? "border-brand-primary" : "border-transparent"}`}>
-                  <img src={img} alt="" className="h-full w-full object-cover" />
+                  <img src={img} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover" />
                 </button>
               ))}
             </div>

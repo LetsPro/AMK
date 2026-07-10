@@ -8,6 +8,7 @@ import { Input, Textarea } from "@/components/ui/Input";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { useAppSettings } from "@/hooks/useAppSettings";
 import { useTable, useTableMutations } from "@/hooks/useSupabaseTable";
+import { Seo } from "@/components/seo/Seo";
 
 function Section({ title, eyebrow = "AMK Studio", description, children }: { title: string; eyebrow?: string; description?: string; children: React.ReactNode }) {
   return (
@@ -107,20 +108,6 @@ function HoverRevealTile({ title, text, image, label }: { title: string; text: s
       </div>
     </motion.div>
   );
-}
-
-function Seo({ title, description }: { title: string; description: string }) {
-  useEffect(() => {
-    document.title = title;
-    let meta = document.querySelector<HTMLMetaElement>('meta[name="description"]');
-    if (!meta) {
-      meta = document.createElement("meta");
-      meta.name = "description";
-      document.head.appendChild(meta);
-    }
-    meta.content = description;
-  }, [description, title]);
-  return null;
 }
 
 type PublicProject = { id: string; name: string; slug?: string; description?: string | null; category?: string | null; location?: string | null; cover_image_url?: string | null; progress?: number | null; status?: string | null; budget?: number | null };
@@ -364,7 +351,7 @@ function GalleryPreview({ item, onClose }: { item: PublicGallery; onClose: () =>
           <div><h2 className="text-xl font-black">{item.title}</h2><p className="text-sm text-slate-500">{item.category}</p></div>
           <button className="grid h-10 w-10 place-items-center rounded-full hover:bg-slate-100" onClick={onClose} aria-label="Close preview"><X className="h-5 w-5" /></button>
         </div>
-        <img src={item.image_url} alt={item.title} className="max-h-[72vh] w-full object-contain bg-slate-950" />
+        <img src={item.image_url} alt={item.title} loading="lazy" decoding="async" className="max-h-[72vh] w-full object-contain bg-slate-950" />
       </motion.div>
     </div>
   );
@@ -678,7 +665,22 @@ export function HomePage() {
   const visibleProjects = [0, 1, 2].map((offset) => projectRows[(activeProjectIndex + offset) % projectRows.length]).filter(Boolean);
   return (
     <>
-      <Seo title="AMK Architects & Engineers Mysuru | Technology-Driven Architecture Studio" description="AMK Architects & Engineers is a Mysuru architecture and engineering studio specializing in Architecture, BIM, Parametric Design, 3D Printed Buildings, Visualization, and Construction Solutions." />
+      <Seo
+        title="AMK Architects & Engineers Mysuru | Architecture, BIM, Parametric Design"
+        description="AMK Architects & Engineers is a Mysuru architecture and engineering studio specializing in architecture, BIM, parametric design, 3D visualization, structural engineering, interiors, and project execution."
+        keywords={["architects in Mysuru", "architecture firm Mysuru", "BIM modelling India", "parametric design architecture", "3D visualization Mysuru", "structural engineering Karnataka", "interior design Mysuru", "project execution India", "construction documentation", "master planning Mysuru"]}
+        canonical="/"
+        jsonLd={{
+          "@context": "https://schema.org",
+          "@type": "ArchitecturalOrganization",
+          name: "AMK Architects & Engineers",
+          description: "Technology-driven architecture and engineering studio in Mysuru.",
+          url: "https://www.amkarchitects.in",
+          telephone: "+91-98458-99066",
+          address: { "@type": "PostalAddress", addressLocality: "Mysuru", addressRegion: "Karnataka", addressCountry: "IN" },
+          knowsAbout: ["Architecture", "BIM", "Parametric Design", "3D Visualization", "Structural Engineering", "Interior Design", "Project Management"],
+        }}
+      />
       <section className="relative min-h-[720px] overflow-hidden bg-slate-950 px-4 py-20 text-white">
         {bannerRows.map((item, index) => (
           <motion.div
@@ -834,7 +836,19 @@ export function ListingPage({ type }: { type: "projects" | "services" | "gallery
   const rows = useMemo(() => sourceRows.filter((item: { name?: string; title?: string; category?: string }) => `${item.name ?? item.title ?? ""} ${item.category ?? ""}`.toLowerCase().includes(filter.toLowerCase())), [sourceRows, filter]);
   if (type === "about") return (
     <>
-      <Seo title="About AMK Architects & Engineers Mysuru | Technology-Driven Architecture Studio" description="AMK Architects & Engineers is a Mysuru-based technology-driven architecture and engineering studio integrating BIM, parametric design, visualization, digital fabrication, and project delivery." />
+      <Seo
+        title="About AMK Architects & Engineers Mysuru | Technology-Driven Architecture Studio"
+        description="AMK Architects & Engineers is a Mysuru-based technology-driven architecture and engineering studio integrating BIM, parametric design, 3D visualization, digital fabrication, and project delivery."
+        keywords={["about AMK Architects", "Mysuru architecture studio", "technology-driven architecture India", "BIM architecture Mysuru", "parametric design studio", "digital fabrication architecture", "computational design India"]}
+        canonical="/about"
+        jsonLd={{
+          "@context": "https://schema.org",
+          "@type": "AboutPage",
+          name: "About AMK Architects & Engineers",
+          description: "Technology-driven architecture and engineering studio in Mysuru integrating BIM, parametric design, visualization, digital fabrication, and project delivery.",
+          url: "https://www.amkarchitects.in/about",
+        }}
+      />
       <section className="bg-slate-950 px-4 py-20 text-white">
         <div className="mx-auto max-w-7xl">
           <div className="max-w-3xl text-sm font-bold uppercase tracking-wide text-brand-accent">About AMK</div>
@@ -907,7 +921,12 @@ export function ListingPage({ type }: { type: "projects" | "services" | "gallery
   );
   if (type === "projects") return (
     <>
-      <Seo title="Architecture Projects in Mysuru | AMK Architects & Engineers Portfolio" description="View AMK Architects & Engineers project portfolio including Mysuru residences, commercial studios, interiors, approvals, and architecture project management." />
+      <Seo
+        title="Architecture Projects in Mysuru | AMK Architects & Engineers Portfolio"
+        description="View AMK Architects & Engineers project portfolio including Mysuru residences, commercial studios, interiors, approvals, and architecture project management."
+        keywords={["architecture projects Mysuru", "residential architecture India", "commercial architecture Karnataka", "interior design projects Mysuru", "architecture portfolio", "building design Mysuru"]}
+        canonical="/projects"
+      />
       <Section title="Projects in Mysuru" description="Selected architecture and engineering projects across Mysuru and surrounding regions.">
         <Input className="mb-6 max-w-md" aria-label="Project filter" value={filter} onChange={(event) => setFilter(event.target.value)} />
         <div className="grid gap-5 md:grid-cols-3">{rows.map((item) => {
@@ -923,7 +942,30 @@ export function ListingPage({ type }: { type: "projects" | "services" | "gallery
   );
   if (type === "services") return (
     <>
-      <Seo title="Architecture Services Mysuru | BIM, Parametric Design & Engineering" description="AMK Architects & Engineers offers architecture, master planning, interiors, BIM, parametric design, engineering, visualization, 3D printing, digital fabrication, and execution support in Mysuru." />
+      <Seo
+        title="Architecture Services Mysuru | BIM, Parametric Design & Engineering"
+        description="AMK Architects & Engineers offers architecture, master planning, interiors, BIM, parametric design, engineering, visualization, 3D printing, digital fabrication, and execution support in Mysuru."
+        keywords={["architecture services Mysuru", "BIM services India", "parametric design services", "master planning Karnataka", "interior design services Mysuru", "3D visualization architecture", "structural engineering Mysuru", "construction documentation", "project management Mysuru", "digital fabrication India"]}
+        canonical="/services"
+        jsonLd={{
+          "@context": "https://schema.org",
+          "@type": "Service",
+          serviceType: "Architecture & Engineering",
+          provider: { "@type": "ArchitecturalOrganization", name: "AMK Architects & Engineers", url: "https://www.amkarchitects.in" },
+          areaServed: { "@type": "City", name: "Mysuru" },
+          hasOfferCatalog: {
+            "@type": "OfferCatalog",
+            name: "Architecture & Engineering Services",
+            itemListElement: [
+              { "@type": "Offer", itemOffered: { "@type": "Service", name: "Architecture & Master Planning" } },
+              { "@type": "Offer", itemOffered: { "@type": "Service", name: "BIM & Digital Engineering" } },
+              { "@type": "Offer", itemOffered: { "@type": "Service", name: "Parametric Design" } },
+              { "@type": "Offer", itemOffered: { "@type": "Service", name: "Interior Design" } },
+              { "@type": "Offer", itemOffered: { "@type": "Service", name: "3D Visualization" } },
+            ],
+          },
+        }}
+      />
       <Section title="Architecture & Engineering Services" description="Comprehensive design, engineering, BIM, visualization, and project delivery support.">
         <div className="grid gap-6">
           {rows.map((item) => {
@@ -968,7 +1010,12 @@ export function ListingPage({ type }: { type: "projects" | "services" | "gallery
   );
   if (type === "gallery") return (
     <>
-      <Seo title="Architecture Gallery Mysuru | AMK Architects Project Albums" description="Explore AMK Architects & Engineers gallery albums featuring residential elevations, interiors, workspaces, material palettes, and approval drawing documentation from Mysuru projects." />
+      <Seo
+        title="Architecture Gallery Mysuru | AMK Architects Project Albums"
+        description="Explore AMK Architects & Engineers gallery albums featuring residential elevations, interiors, workspaces, material palettes, and approval drawing documentation from Mysuru projects."
+        keywords={["architecture gallery Mysuru", "project gallery India", "residential elevation photos", "interior design gallery Karnataka", "architecture photos Mysuru", "building design images"]}
+        canonical="/gallery"
+      />
       <Section title="Project Gallery Albums" description="Residential, commercial, interior, material, and documentation visuals from AMK projects.">
         <Input className="mb-6 max-w-md" aria-label="Gallery filter" value={filter} onChange={(event) => setFilter(event.target.value)} />
         <div className="grid gap-5 md:grid-cols-3">{rows.map((item) => {
@@ -996,7 +1043,7 @@ export function ProjectDetailPage() {
   const rawProject = projects[0] as { id: string; title?: string; name?: string; short_description?: string | null; description?: string | null; location?: string | null; cover_image_url?: string | null } | undefined;
   const project: PublicProject | undefined = rawProject ? { id: rawProject.id, name: rawProject.title ?? rawProject.name ?? "", description: rawProject.short_description ?? rawProject.description, location: rawProject.location, cover_image_url: rawProject.cover_image_url } : demoProjects.find((item) => item.slug === slug);
   if (!project) return <Section title="Project not found"><EmptyState title="No project found" description="The requested project is not published or does not exist." /></Section>;
-  return <><Seo title={`${project.name} | AMK Architects Mysuru Project`} description={`${project.name} by AMK Architects & Engineers in ${project.location}. View architecture project details, scope, and design approach.`} /><Section title={project.name}><Card><div className="aspect-video rounded-lg bg-slate-200 bg-cover" style={{ backgroundImage: `url(${project.cover_image_url ?? ""})` }} /><p className="mt-6 leading-7 text-slate-600">{project.description}</p><p className="mt-3 flex items-center gap-2 text-sm text-slate-500"><MapPin className="h-4 w-4" />{project.location}</p></Card></Section></>;
+  return <><Seo title={`${project.name} | AMK Architects Mysuru Project`} description={`${project.name} by AMK Architects & Engineers in ${project.location ?? "Mysuru"}. View architecture project details, scope, and design approach.`} keywords={[`${project.name} Mysuru`, "architecture project", project.location ?? "Mysuru", "AMK Architects project", "architecture design Mysuru"]} canonical={`/gallery`} ogImage={project.cover_image_url ?? undefined} ogType="article" jsonLd={{ "@context": "https://schema.org", "@type": "CreativeWork", name: project.name, description: project.description ?? `${project.name} by AMK Architects & Engineers`, creator: { "@type": "ArchitecturalOrganization", name: "AMK Architects & Engineers" }, contentLocation: { "@type": "Place", name: project.location ?? "Mysuru" } }} /><Section title={project.name}><Card><div className="aspect-video rounded-lg bg-slate-200 bg-cover" style={{ backgroundImage: `url(${project.cover_image_url ?? ""})` }} /><p className="mt-6 leading-7 text-slate-600">{project.description}</p><p className="mt-3 flex items-center gap-2 text-sm text-slate-500"><MapPin className="h-4 w-4" />{project.location}</p></Card></Section></>;
 }
 
 export function ContactPage({ compact = false }: { compact?: boolean }) {
@@ -1022,7 +1069,19 @@ export function ContactPage({ compact = false }: { compact?: boolean }) {
   );
   return (
     <>
-      <Seo title="Contact AMK Architects Mysuru | Architecture & Engineering Enquiry" description="Contact AMK Architects & Engineers in Mysuru, Karnataka for residential design, approval drawings, structural coordination, interiors, and project execution support." />
+      <Seo
+        title="Contact AMK Architects Mysuru | Architecture & Engineering Enquiry"
+        description="Contact AMK Architects & Engineers in Mysuru, Karnataka for residential design, approval drawings, structural coordination, interiors, and project execution support."
+        keywords={["contact architects Mysuru", "architecture enquiry Karnataka", "residential design Mysuru", "approval drawings Mysuru", "structural coordination India", "architecture consultation Mysuru"]}
+        canonical="/contact"
+        jsonLd={{
+          "@context": "https://schema.org",
+          "@type": "ContactPage",
+          name: "Contact AMK Architects & Engineers",
+          description: "Contact AMK Architects & Engineers in Mysuru for architecture, BIM, interiors, and engineering enquiries.",
+          url: "https://www.amkarchitects.in/contact",
+        }}
+      />
       <section className="bg-slate-950 px-4 py-20 text-white">
         <div className="mx-auto grid max-w-7xl gap-8 lg:grid-cols-[0.95fr_1.05fr]">
           <motion.div initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35 }}>

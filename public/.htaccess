@@ -1,0 +1,128 @@
+# ============================================================
+# AMK Architects & Engineers — .htaccess
+# Apache configuration for SPA, SEO, performance & security
+# ============================================================
+
+# ---------- Enable Rewrite Engine ----------
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+
+  # Force HTTPS (uncomment after SSL is active)
+  # RewriteCond %{HTTPS} off
+  # RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+
+  # Redirect www to non-www (or vice versa — choose one)
+  # RewriteCond %{HTTP_HOST} ^www\.(.*)$ [NC]
+  # RewriteRule ^ https://%1%{REQUEST_URI} [L,R=301]
+
+  # SPA Fallback: serve index.html for all non-file routes
+  RewriteCond %{REQUEST_FILENAME} -f [OR]
+  RewriteCond %{REQUEST_FILENAME} -d
+  RewriteRule ^ - [L]
+  RewriteRule ^ /index.html [L]
+
+  # Redirect /sitemap to sitemap.xml
+  RewriteRule ^sitemap/?$ /sitemap.xml [L,R=301]
+</IfModule>
+
+# ---------- GZIP Compression ----------
+<IfModule mod_deflate.c>
+  AddOutputFilterByType DEFLATE text/html text/plain text/xml text/css text/javascript
+  AddOutputFilterByType DEFLATE application/javascript application/x-javascript
+  AddOutputFilterByType DEFLATE application/json application/xml application/rss+xml
+  AddOutputFilterByType DEFLATE image/svg+xml font/woff font/woff2 application/font-woff
+  AddOutputFilterByType DEFLATE application/vnd.ms-fontobject application/x-font-ttf
+</IfModule>
+
+# ---------- Brotli Compression (if available) ----------
+<IfModule mod_brotli.c>
+  AddOutputFilterByType BROTLI_COMPRESS text/html text/plain text/xml text/css text/javascript
+  AddOutputFilterByType BROTLI_COMPRESS application/javascript application/x-javascript
+  AddOutputFilterByType BROTLI_COMPRESS application/json image/svg+xml
+</IfModule>
+
+# ---------- Browser Caching ----------
+<IfModule mod_expires.c>
+  ExpiresActive On
+
+  # Documents — never cache (SPA shell)
+  ExpiresByType text/html "access plus 0 seconds"
+  ExpiresByType application/json "access plus 0 seconds"
+
+  # JS & CSS — 1 year with cache-busting via hashed filenames
+  ExpiresByType text/javascript "access plus 1 year"
+  ExpiresByType application/javascript "access plus 1 year"
+  ExpiresByType application/x-javascript "access plus 1 year"
+  ExpiresByType text/css "access plus 1 year"
+
+  # Images — 1 year
+  ExpiresByType image/jpeg "access plus 1 year"
+  ExpiresByType image/png "access plus 1 year"
+  ExpiresByType image/gif "access plus 1 year"
+  ExpiresByType image/webp "access plus 1 year"
+  ExpiresByType image/svg+xml "access plus 1 year"
+  ExpiresByType image/x-icon "access plus 1 year"
+
+  # Fonts — 1 year
+  ExpiresByType font/woff "access plus 1 year"
+  ExpiresByType font/woff2 "access plus 1 year"
+  ExpiresByType application/font-woff "access plus 1 year"
+  ExpiresByType application/vnd.ms-fontobject "access plus 1 year"
+  ExpiresByType application/x-font-ttf "access plus 1 year"
+
+  # XML / RSS — 1 hour
+  ExpiresByType application/xml "access plus 1 hour"
+  ExpiresByType application/rss+xml "access plus 1 hour"
+  ExpiresByType text/xml "access plus 1 hour"
+</IfModule>
+
+# ---------- Cache-Control Headers (for CDNs/proxies) ----------
+<IfModule mod_headers.c>
+  # Hashed assets — immutable
+  <FilesMatch "\.(js|css|woff2?|svg|png|jpg|jpeg|gif|webp|ico)$">
+    Header set Cache-Control "public, max-age=31536000, immutable"
+  </FilesMatch>
+
+  # HTML — must revalidate
+  <FilesMatch "\.(html|json)$">
+    Header set Cache-Control "no-cache, must-revalidate"
+  </FilesMatch>
+
+  # sitemap.xml & robots.txt — short cache
+  <FilesMatch "(sitemap\.xml|robots\.txt)$">
+    Header set Cache-Control "public, max-age=3600"
+  </FilesMatch>
+
+  # ---------- Security Headers ----------
+  Header set X-Content-Type-Options "nosniff"
+  Header set X-Frame-Options "SAMEORIGIN"
+  Header set X-XSS-Protection "1; mode=block"
+  Header set Referrer-Policy "strict-origin-when-cross-origin"
+  Header set Permissions-Policy "geolocation=(), microphone=(), camera=()"
+  Header set Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+</IfModule>
+
+# ---------- Content Character Encoding ----------
+AddDefaultCharset UTF-8
+AddCharset UTF-8 .html .css .js .xml .json .svg
+
+# ---------- MIME Types ----------
+<IfModule mod_mime.c>
+  AddType application/javascript .js .mjs
+  AddType text/css .css
+  AddType image/svg+xml .svg
+  AddType font/woff .woff
+  AddType font/woff2 .woff2
+  AddType application/json .json
+</IfModule>
+
+# ---------- Disable Directory Listing ----------
+Options -Indexes
+
+# ---------- Protect sensitive files ----------
+<FilesMatch "(^\.|\.env$|\.git$|package\.json$|package-lock\.json$|tsconfig\.json$|vite\.config\.)">
+  Require all denied
+</FilesMatch>
+
+# ---------- Custom Error Pages (fallback to SPA) ----------
+ErrorDocument 404 /index.html
