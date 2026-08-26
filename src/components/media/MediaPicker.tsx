@@ -2,7 +2,6 @@ import { useRef, useState } from "react";
 import { ImagePlus, Loader2, Trash2, Upload, X } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
-import { Input } from "@/components/ui/Input";
 import { useTable, useTableMutations } from "@/hooks/useSupabaseTable";
 import { removeStoredFile, uploadFile } from "@/services/crud";
 import type { TableRow } from "@/types/database";
@@ -14,11 +13,12 @@ export function MediaPicker({ value, onChange, label = "Image" }: { value?: stri
   const [open, setOpen] = useState(false);
   return (
     <div className="space-y-2">
-      <div className="flex gap-2">
-        <Input readOnly value={value ?? ""} placeholder={`${label} URL`} />
-        <Button type="button" variant="secondary" onClick={() => setOpen(true)}><ImagePlus className="h-4 w-4" /> Media</Button>
+      <div className="flex flex-wrap items-center gap-2">
+        <Button type="button" variant="secondary" onClick={() => setOpen(true)}><ImagePlus className="h-4 w-4" /> {value ? `Replace ${label}` : `Choose ${label}`}</Button>
+        {value && <Button type="button" variant="ghost" onClick={() => onChange("")}><Trash2 className="h-4 w-4" /> Remove</Button>}
+        <span className={`text-xs font-semibold ${value ? "text-emerald-700" : "text-slate-500"}`}>{value ? "Image selected" : "No image selected"}</span>
       </div>
-      {value && <img src={value} alt="" className="h-24 w-40 rounded-md object-cover" />}
+      {value && <img src={value} alt={`${label} preview`} loading="lazy" decoding="async" className="h-24 w-40 rounded-md object-cover" />}
       {open && <MediaLibraryModal onClose={() => setOpen(false)} onSelect={(url) => { onChange(url); setOpen(false); }} />}
     </div>
   );
@@ -81,7 +81,7 @@ function MediaLibraryContent({ onClose, onSelect, embedded = false }: { onClose?
               {(data as MediaAsset[]).map((asset) => (
                 <div key={asset.id} className="overflow-hidden rounded-lg border border-slate-200 bg-white">
                   <button type="button" className="block aspect-[4/3] w-full bg-slate-100" onClick={() => onSelect?.(asset.url)}>
-                    <img src={asset.url} alt={asset.alt_text ?? asset.file_name} className="h-full w-full object-cover" />
+                    <img src={asset.url} alt={asset.alt_text ?? asset.file_name} loading="lazy" decoding="async" className="h-full w-full object-cover" />
                   </button>
                   <div className="space-y-2 p-3">
                     <div className="truncate text-sm font-semibold">{asset.file_name}</div>

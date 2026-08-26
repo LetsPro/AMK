@@ -4,6 +4,7 @@ Allow: /about
 Allow: /projects
 Allow: /services
 Allow: /gallery
+Allow: /360-interiors
 Allow: /contact
 
 Disallow: /app

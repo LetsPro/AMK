@@ -109,7 +109,7 @@ export function PortfolioListingPage() {
   return (
     <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
       <Seo
-        title="Architecture Portfolio Mysuru | AMK Architects & Engineers Projects"
+        title="Architecture Projects Mysuru | AMK Portfolio"
         description="Explore the AMK Architects & Engineers portfolio — residential, commercial, interior, and institutional architecture projects in Mysuru and across India."
         keywords={["architecture portfolio Mysuru", "residential architecture India", "commercial architecture Karnataka", "interior design portfolio", "architecture projects Mysuru", "building design India"]}
         canonical="/projects"
@@ -178,6 +178,7 @@ export function PortfolioDetailPage() {
   if (!project) {
     return (
       <div className="mx-auto max-w-5xl px-4 py-24 text-center sm:px-6">
+        <Seo title="Project Not Found | AMK Architects & Engineers" description="The requested AMK Architects & Engineers project is not available." noIndex />
         <h2 className="text-2xl font-bold text-slate-800">Project not found</h2>
         <Link to="/projects" className="mt-4 inline-flex items-center gap-1 text-brand-primary hover:underline"><ArrowLeft className="h-4 w-4" /> Back to projects</Link>
       </div>
@@ -190,9 +191,9 @@ export function PortfolioDetailPage() {
   return (
     <div className="mx-auto max-w-5xl px-4 py-12 sm:px-6 lg:px-8">
       <Seo
-        title={`${project.title} | AMK Architects Mysuru Portfolio Project`}
-        description={`${project.title} — ${project.portfolio_categories?.name ?? "Architecture"} project by AMK Architects & Engineers${project.location ? ` in ${project.location}` : ""}. View design details, gallery, and project specifications.`}
-        keywords={[project.title, "architecture project Mysuru", project.portfolio_categories?.name ?? "architecture", project.location ?? "Mysuru", "AMK Architects portfolio", "architecture design India"]}
+        title={project.seo_title || `${project.title} | AMK Architects Mysuru Portfolio Project`}
+        description={project.seo_description || `${project.title} — ${project.portfolio_categories?.name ?? "Architecture"} project by AMK Architects & Engineers${project.location ? ` in ${project.location}` : ""}. View design details, gallery, and project specifications.`}
+        keywords={project.seo_keywords ? project.seo_keywords.split(",").map((keyword) => keyword.trim()).filter(Boolean) : [project.title, "architecture project Mysuru", project.portfolio_categories?.name ?? "architecture", project.location ?? "Mysuru", "AMK Architects portfolio", "architecture design India"]}
         canonical={`/projects/${project.slug}`}
         ogType="article"
         ogImage={project.cover_image_url ?? undefined}

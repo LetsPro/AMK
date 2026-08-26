@@ -722,7 +722,7 @@ export function ClientsPage() {
                                       <div key={fa.id} className="group relative rounded-lg bg-white border border-slate-100 overflow-hidden">
                                         {isImage ? (
                                           <div className="aspect-video bg-slate-100">
-                                            <img src={fileUrl(fa.file)} alt={fa.client_title} className="h-full w-full object-cover" />
+                                            <img src={fileUrl(fa.file)} alt={fa.client_title} loading="lazy" decoding="async" className="h-full w-full object-cover" />
                                           </div>
                                         ) : (
                                           <div className="aspect-video bg-slate-100 flex items-center justify-center">
@@ -780,7 +780,7 @@ export function ClientsPage() {
                                   <div key={fa.id} className="group relative overflow-hidden rounded-lg border border-slate-100 bg-white">
                                     {isImage ? (
                                       <div className="aspect-video bg-slate-100">
-                                        <img src={fileUrl(fa.file)} alt={fa.client_title} className="h-full w-full object-cover" />
+                                        <img src={fileUrl(fa.file)} alt={fa.client_title} loading="lazy" decoding="async" className="h-full w-full object-cover" />
                                       </div>
                                     ) : (
                                       <div className="flex aspect-video items-center justify-center bg-slate-100">
@@ -923,13 +923,13 @@ export function ClientsPage() {
               </div>
               <div className="flex h-[72vh] items-center justify-center overflow-hidden bg-slate-950 p-4">
                 {previewAssignment.file.mime_type?.startsWith("image/") ? (
-                  <img src={fileUrl(previewAssignment.file)} alt={previewAssignment.client_title} className="max-h-full max-w-full object-contain" />
+                  <img src={fileUrl(previewAssignment.file)} alt={previewAssignment.client_title} loading="eager" decoding="async" className="max-h-full max-w-full object-contain" />
                 ) : previewAssignment.file.mime_type === "application/pdf" ? (
-                  <iframe src={fileUrl(previewAssignment.file)} className="h-full w-full rounded-lg bg-white" title={previewAssignment.client_title} />
+                  <iframe src={fileUrl(previewAssignment.file)} loading="lazy" className="h-full w-full rounded-lg bg-white" title={previewAssignment.client_title} />
                 ) : previewAssignment.file.mime_type?.startsWith("video/") ? (
-                  <video src={fileUrl(previewAssignment.file)} controls className="max-h-full max-w-full" />
+                  <video src={fileUrl(previewAssignment.file)} controls preload="metadata" className="max-h-full max-w-full" />
                 ) : previewAssignment.file.mime_type?.startsWith("audio/") ? (
-                  <audio src={fileUrl(previewAssignment.file)} controls />
+                  <audio src={fileUrl(previewAssignment.file)} controls preload="metadata" />
                 ) : (
                   <div className="text-center text-white">
                     <FileText className="mx-auto mb-4 h-16 w-16 text-slate-400" />

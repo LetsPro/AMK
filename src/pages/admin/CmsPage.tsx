@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Edit3, ImageIcon, LayoutTemplate, MessageSquareQuote, Plus, Save, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
@@ -52,17 +52,41 @@ export function CmsPage() {
   const { create, update, remove } = useTableMutations(table);
   const [form, setForm] = useState<Record<string, string>>({});
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [editorOpen, setEditorOpen] = useState(false);
   const details = tableDetails[table];
   const EmptyIcon = details.icon;
+
+  useEffect(() => {
+    if (!editorOpen) return;
+    const previousOverflow = document.body.style.overflow;
+    const closeOnEscape = (event: KeyboardEvent) => event.key === "Escape" && closeEditor();
+    document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [editorOpen]);
 
   function resetForm() {
     setForm({});
     setEditingId(null);
   }
 
+  function openNewEditor() {
+    resetForm();
+    setEditorOpen(true);
+  }
+
+  function closeEditor() {
+    resetForm();
+    setEditorOpen(false);
+  }
+
   function changeTable(next: CmsTable) {
     setTable(next);
     resetForm();
+    setEditorOpen(false);
   }
 
   async function submit(event: React.FormEvent) {
@@ -82,7 +106,7 @@ export function CmsPage() {
 
     if (editingId) await update.mutateAsync({ id: editingId, payload: payload as never });
     else await create.mutateAsync(payload as never);
-    resetForm();
+    closeEditor();
   }
 
   function editRecord(record: CmsRecord) {
@@ -102,7 +126,7 @@ export function CmsPage() {
       cta_url: value(record, "cta_url"),
       display_order: value(record, "display_order") || "0"
     });
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    setEditorOpen(true);
   }
 
   function deleteRecord(record: CmsRecord) {
@@ -138,13 +162,16 @@ export function CmsPage() {
         })}
       </div>
 
-      <Card>
+      {editorOpen && (
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-slate-950/75 p-3 backdrop-blur-sm md:p-6" onMouseDown={(event) => event.target === event.currentTarget && closeEditor()}>
+          <Card className="max-h-[92vh] w-full max-w-4xl overflow-y-auto bg-white p-5 shadow-2xl md:p-6" role="dialog" aria-modal="true" aria-labelledby="cms-editor-title">
         <div className="mb-5 flex flex-wrap items-start justify-between gap-3 border-b border-slate-200 pb-4">
           <div>
-            <h2 className="text-xl font-black">{editingId ? `Edit ${details.label}` : `Add ${details.label} Item`}</h2>
+            <div className="text-xs font-bold uppercase tracking-[0.18em] text-brand-primary">Website CMS</div>
+            <h2 id="cms-editor-title" className="mt-1 text-xl font-black">{editingId ? `Edit ${details.label}` : `Add ${details.label} Item`}</h2>
             <p className="mt-1 text-sm text-slate-500">{details.description}</p>
           </div>
-          {editingId && <Button type="button" variant="ghost" onClick={resetForm}><X className="h-4 w-4" /> Cancel Edit</Button>}
+          <button type="button" onClick={closeEditor} className="grid h-10 w-10 place-items-center rounded-full bg-slate-100 text-slate-700 transition hover:bg-slate-200" aria-label="Close CMS editor"><X className="h-5 w-5" /></button>
         </div>
 
         <form className="grid gap-4 md:grid-cols-2" onSubmit={submit}>
@@ -230,10 +257,12 @@ export function CmsPage() {
               {editingId ? <Save className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
               {editingId ? "Save Changes" : "Add Item"}
             </Button>
-            {editingId && <Button type="button" variant="secondary" onClick={resetForm}>Cancel</Button>}
+            <Button type="button" variant="secondary" onClick={closeEditor}>Cancel</Button>
           </div>
         </form>
-      </Card>
+          </Card>
+        </div>
+      )}
 
       <div>
         <div className="mb-3 flex items-end justify-between gap-3">
@@ -241,6 +270,7 @@ export function CmsPage() {
             <h2 className="text-xl font-black">Existing {details.label}</h2>
             <p className="text-sm text-slate-500">{data.length} item{data.length === 1 ? "" : "s"}</p>
           </div>
+          <Button type="button" onClick={openNewEditor}><Plus className="h-4 w-4" /> Add {details.label}</Button>
         </div>
 
         {data.length ? (
@@ -252,7 +282,7 @@ export function CmsPage() {
                 <Card key={record.id} className="flex gap-4 bg-white p-4">
                   {needsImage && (
                     <div className="grid h-24 w-28 shrink-0 place-items-center overflow-hidden rounded-md bg-slate-100">
-                      {image ? <img src={image} alt="" className="h-full w-full object-cover" /> : <ImageIcon className="h-7 w-7 text-slate-300" />}
+                      {image ? <img src={image} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover" /> : <ImageIcon className="h-7 w-7 text-slate-300" />}
                     </div>
                   )}
                   <div className="min-w-0 flex-1">
@@ -282,7 +312,7 @@ export function CmsPage() {
             <div>
               <EmptyIcon className="mx-auto h-8 w-8 text-brand-primary" />
               <p className="mt-3 font-bold">No {details.label.toLowerCase()} items yet</p>
-              <p className="mt-1 text-sm text-slate-500">Use the form above to add the first item.</p>
+              <p className="mt-1 text-sm text-slate-500">Use the Add {details.label} button to create the first item.</p>
             </div>
           </Card>
         )}

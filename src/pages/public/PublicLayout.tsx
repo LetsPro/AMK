@@ -123,7 +123,7 @@ export function PublicLayout() {
           </div>
         )}
       </header>
-      <Outlet />
+      <main className="public-content"><Outlet /></main>
       <footer className="bg-slate-950 px-4 pt-14 text-white">
         <div className="mx-auto grid max-w-7xl gap-10 border-b border-white/10 pb-10 lg:grid-cols-[1.4fr_0.8fr_0.8fr_1fr]">
           <div>

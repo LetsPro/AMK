@@ -99,7 +99,7 @@ function FlipInfoCard({ title, text, detail, icon: Icon }: { title: string; text
 function HoverRevealTile({ title, text, image, label }: { title: string; text: string; image: string; label?: string }) {
   return (
     <motion.div className="group relative min-h-80 overflow-hidden rounded-lg bg-slate-900 shadow-sm" whileHover={{ y: -5 }} transition={{ duration: 0.22 }}>
-      <div className="absolute inset-0 bg-cover bg-center transition duration-700 group-hover:scale-110" style={{ backgroundImage: `url(${image})` }} />
+      <img src={image} alt="" loading="lazy" decoding="async" className="absolute inset-0 h-full w-full object-cover transition duration-700 group-hover:scale-110" />
       <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/45 to-transparent transition group-hover:from-slate-950 group-hover:via-slate-950/70" />
       <div className="absolute inset-x-0 bottom-0 p-6 text-white">
         {label && <div className="mb-2 text-xs font-bold uppercase tracking-wide text-brand-accent">{label}</div>}
@@ -315,7 +315,7 @@ function ProjectModal({ project, onClose }: { project: PublicProject; onClose: (
     <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/75 p-4">
       <motion.div initial={{ opacity: 0, y: 20, scale: 0.98 }} animate={{ opacity: 1, y: 0, scale: 1 }} className="max-h-[90vh] w-full max-w-5xl overflow-y-auto rounded-lg bg-white shadow-2xl">
         <div className="relative">
-          <div className="aspect-[16/8] bg-slate-200 bg-cover bg-center" style={{ backgroundImage: `url(${project.cover_image_url ?? "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1400&q=80"})` }} />
+          <img src={project.cover_image_url ?? "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1400&q=80"} alt={project.name} loading="eager" decoding="async" className="aspect-[16/8] w-full bg-slate-200 object-cover" />
           <button className="absolute right-4 top-4 grid h-10 w-10 place-items-center rounded-full bg-white/90 text-slate-900 shadow" onClick={onClose} aria-label="Close project"><X className="h-5 w-5" /></button>
         </div>
         <div className="grid gap-6 p-6 lg:grid-cols-[1.3fr_0.7fr]">
@@ -634,7 +634,7 @@ function TestimonialCarousel({ items }: { items: PublicTestimonial[] }) {
               <p className="mt-8 text-2xl font-normal leading-10 text-slate-600">"{testimonial.quote}"</p>
               <div className="mt-8 flex items-center gap-4 border-t border-slate-200 pt-5">
                 {testimonial.avatar_url ? (
-                  <img src={testimonial.avatar_url} alt={testimonial.name} className="h-14 w-14 rounded-full object-cover ring-2 ring-orange-100" />
+                  <img src={testimonial.avatar_url} alt={testimonial.name} loading="lazy" decoding="async" className="h-14 w-14 rounded-full object-cover ring-2 ring-orange-100" />
                 ) : (
                   <div className="grid h-14 w-14 place-items-center rounded-full bg-orange-50 text-lg font-black text-brand-primary">{testimonial.name.charAt(0)}</div>
                 )}
@@ -665,16 +665,35 @@ export function HomePage() {
   const testimonialRows = testimonials.length ? testimonials : demoTestimonials;
   const bannerRows = banners.length ? banners : demoBanners;
   const slide = bannerRows[activeSlide % bannerRows.length];
+  const slideImageUrl = slide.image_url ?? demoBanners[0].image_url;
+  const nextSlide = bannerRows[(activeSlide + 1) % bannerRows.length];
+  const nextSlideImageUrl = nextSlide?.image_url ?? demoBanners[0].image_url;
   useEffect(() => {
     const timer = window.setInterval(() => setActiveSlide((current) => (current + 1) % bannerRows.length), 5500);
     return () => window.clearInterval(timer);
   }, [bannerRows.length]);
+  useEffect(() => {
+    let preload = document.head.querySelector<HTMLLinkElement>('link[data-amk-hero-preload="true"]');
+    if (!preload) {
+      preload = document.createElement("link");
+      preload.rel = "preload";
+      preload.as = "image";
+      preload.setAttribute("data-amk-hero-preload", "true");
+      document.head.appendChild(preload);
+    }
+    preload.href = slideImageUrl;
+    preload.setAttribute("fetchpriority", "high");
+    const nextImage = new Image();
+    nextImage.decoding = "async";
+    nextImage.src = nextSlideImageUrl;
+    return () => preload?.remove();
+  }, [slideImageUrl, nextSlideImageUrl]);
   const visibleProjects = [0, 1, 2].map((offset) => projectRows[(activeProjectIndex + offset) % projectRows.length]).filter(Boolean);
   return (
     <>
       <Seo
-        title="AMK Architects & Engineers Mysuru | Architecture, BIM, Parametric Design"
-        description="AMK Architects & Engineers is a Mysuru architecture and engineering studio specializing in architecture, BIM, parametric design, 3D visualization, structural engineering, interiors, and project execution."
+        title="Architects in Mysuru | AMK Architects & Engineers"
+        description="AMK Architects & Engineers is a Mysuru studio for architecture, interiors, BIM, parametric design, visualization, structural coordination, and project execution."
         keywords={["architects in Mysuru", "architecture firm Mysuru", "BIM modelling India", "parametric design architecture", "3D visualization Mysuru", "structural engineering Karnataka", "interior design Mysuru", "project execution India", "construction documentation", "master planning Mysuru"]}
         canonical="/"
         jsonLd={{
@@ -689,16 +708,17 @@ export function HomePage() {
         }}
       />
       <section className="relative min-h-[720px] overflow-hidden bg-slate-950 px-4 py-20 text-white">
-        {bannerRows.map((item, index) => (
+        <AnimatePresence initial={false} mode="sync">
           <motion.div
-            key={item.id}
+            key={slide.id}
             className="absolute inset-0"
-            initial={false}
-            animate={{ opacity: index === activeSlide % bannerRows.length ? 1 : 0, scale: index === activeSlide % bannerRows.length ? 1 : 1.04 }}
+            initial={{ opacity: 0, scale: 1.04 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0 }}
             transition={{ duration: 0.9 }}
-            style={{ backgroundImage: `linear-gradient(90deg, rgba(2,6,23,0.82), rgba(15,23,42,0.66)), linear-gradient(180deg, rgba(2,6,23,0.18), rgba(2,6,23,0.74)), url(${item.image_url ?? demoBanners[0].image_url})`, backgroundSize: "cover", backgroundPosition: "center" }}
+            style={{ backgroundImage: `linear-gradient(90deg, rgba(2,6,23,0.82), rgba(15,23,42,0.66)), linear-gradient(180deg, rgba(2,6,23,0.18), rgba(2,6,23,0.74)), url(${slideImageUrl})`, backgroundSize: "cover", backgroundPosition: "center" }}
           />
-        ))}
+        </AnimatePresence>
         <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.035)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.035)_1px,transparent_1px)] bg-[size:72px_72px]" />
 
         <div className="relative mx-auto flex min-h-[560px] max-w-7xl items-center justify-center">
@@ -786,7 +806,7 @@ export function HomePage() {
           {visibleProjects.map((project) => (
             <button key={project.id} className="text-left" onClick={() => setSelectedProject(project as PublicProject)}>
               <Card className="group overflow-hidden p-0">
-                <div className="aspect-[4/3] bg-slate-200 bg-cover transition duration-500 group-hover:scale-[1.03]" style={{ backgroundImage: `url(${project.cover_image_url ?? "https://images.unsplash.com/photo-1494526585095-c41746248156?auto=format&fit=crop&w=900&q=80"})` }} />
+                <div className="aspect-[4/3] overflow-hidden bg-slate-200"><img src={project.cover_image_url ?? "https://images.unsplash.com/photo-1494526585095-c41746248156?auto=format&fit=crop&w=900&q=80"} alt={project.name} loading="lazy" decoding="async" className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.03]" /></div>
                 <div className="p-5">
                   <div className="mb-2 text-xs font-bold uppercase tracking-wide text-brand-primary">{project.category}</div>
                   <h3 className="font-bold">{project.name}</h3>
@@ -844,8 +864,8 @@ export function ListingPage({ type }: { type: "projects" | "services" | "gallery
   if (type === "about") return (
     <>
       <Seo
-        title="About AMK Architects & Engineers Mysuru | Technology-Driven Architecture Studio"
-        description="AMK Architects & Engineers is a Mysuru-based technology-driven architecture and engineering studio integrating BIM, parametric design, 3D visualization, digital fabrication, and project delivery."
+        title="About AMK | Architecture & BIM Studio in Mysuru"
+        description="Meet AMK Architects & Engineers, a Mysuru architecture studio integrating BIM, parametric design, visualization, digital fabrication, engineering, and project delivery."
         keywords={["about AMK Architects", "Mysuru architecture studio", "technology-driven architecture India", "BIM architecture Mysuru", "parametric design studio", "digital fabrication architecture", "computational design India"]}
         canonical="/about"
         jsonLd={{
@@ -950,8 +970,8 @@ export function ListingPage({ type }: { type: "projects" | "services" | "gallery
   if (type === "services") return (
     <>
       <Seo
-        title="Architecture Services Mysuru | BIM, Parametric Design & Engineering"
-        description="AMK Architects & Engineers offers architecture, master planning, interiors, BIM, parametric design, engineering, visualization, 3D printing, digital fabrication, and execution support in Mysuru."
+        title="Architecture & BIM Services Mysuru | AMK"
+        description="Explore AMK services in Mysuru: architecture, master planning, interiors, BIM, parametric design, engineering, visualization, fabrication, and execution support."
         keywords={["architecture services Mysuru", "BIM services India", "parametric design services", "master planning Karnataka", "interior design services Mysuru", "3D visualization architecture", "structural engineering Mysuru", "construction documentation", "project management Mysuru", "digital fabrication India"]}
         canonical="/services"
         jsonLd={{
@@ -986,7 +1006,7 @@ export function ListingPage({ type }: { type: "projects" | "services" | "gallery
               <motion.div key={service.id} className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm" initial={{ opacity: 0, y: 18 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, amount: 0.2 }} whileHover={{ y: -4 }}>
                 <div className="grid lg:grid-cols-[0.9fr_1.1fr]">
                   <div className="group relative min-h-72 overflow-hidden bg-slate-200">
-                    <div className="absolute inset-0 bg-cover bg-center transition duration-700 group-hover:scale-110" style={{ backgroundImage: `url(${service.image_url ?? "https://images.unsplash.com/photo-1503387762-592deb58ef4e?auto=format&fit=crop&w=1200&q=80"})` }} />
+                    <img src={service.image_url ?? "https://images.unsplash.com/photo-1503387762-592deb58ef4e?auto=format&fit=crop&w=1200&q=80"} alt={service.name ?? "AMK architecture service"} loading="lazy" decoding="async" className="absolute inset-0 h-full w-full object-cover transition duration-700 group-hover:scale-110" />
                     <div className="absolute inset-0 bg-gradient-to-t from-slate-950/70 to-transparent opacity-70" />
                     <div className="absolute bottom-5 left-5 right-5 text-white">
                       <div className="text-xs font-bold uppercase tracking-wide text-brand-accent">Service</div>
@@ -1018,8 +1038,8 @@ export function ListingPage({ type }: { type: "projects" | "services" | "gallery
   if (type === "gallery") return (
     <>
       <Seo
-        title="Architecture Gallery Mysuru | AMK Architects Project Albums"
-        description="Explore AMK Architects & Engineers gallery albums featuring residential elevations, interiors, workspaces, material palettes, and approval drawing documentation from Mysuru projects."
+        title="Architecture & Interior Gallery Mysuru | AMK"
+        description="Explore AMK project galleries featuring Mysuru residences, elevations, interiors, workspaces, material palettes, construction details, and approval drawings."
         keywords={["architecture gallery Mysuru", "project gallery India", "residential elevation photos", "interior design gallery Karnataka", "architecture photos Mysuru", "building design images"]}
         canonical="/gallery"
       />
@@ -1039,7 +1059,7 @@ export function ListingPage({ type }: { type: "projects" | "services" | "gallery
   return (
     <Section title={type}>
       <Input className="mb-6 max-w-md" aria-label={`${type} filter`} value={filter} onChange={(event) => setFilter(event.target.value)} />
-      <div className="grid gap-5 md:grid-cols-3">{rows.length ? rows.map((item: { id: string; name?: string; title?: string; description?: string; image_url?: string; cover_image_url?: string; slug?: string }) => <Card key={item.id} className="p-0"><div className="aspect-[4/3] rounded-t-lg bg-slate-200 bg-cover" style={{ backgroundImage: `url(${item.image_url ?? item.cover_image_url ?? "https://images.unsplash.com/photo-1503387762-592deb58ef4e?auto=format&fit=crop&w=900&q=80"})` }} /><div className="p-5"><h3 className="font-bold">{item.name ?? item.title}</h3><p className="mt-2 text-sm text-slate-500">{item.description}</p>{item.slug && <Link className="mt-4 inline-flex items-center gap-2 text-sm font-semibold text-brand-primary" to={`/${type}/${item.slug}`}>Details <ArrowRight className="h-4 w-4" /></Link>}</div></Card>) : <EmptyState title={`No ${type} records`} description="Publish records from the CRM to populate this page." />}</div>
+      <div className="grid gap-5 md:grid-cols-3">{rows.length ? rows.map((item: { id: string; name?: string; title?: string; description?: string; image_url?: string; cover_image_url?: string; slug?: string }) => <Card key={item.id} className="overflow-hidden p-0"><div className="aspect-[4/3] bg-slate-200"><img src={item.image_url ?? item.cover_image_url ?? "https://images.unsplash.com/photo-1503387762-592deb58ef4e?auto=format&fit=crop&w=900&q=80"} alt={item.name ?? item.title ?? "AMK project"} loading="lazy" decoding="async" className="h-full w-full object-cover" /></div><div className="p-5"><h3 className="font-bold">{item.name ?? item.title}</h3><p className="mt-2 text-sm text-slate-500">{item.description}</p>{item.slug && <Link className="mt-4 inline-flex items-center gap-2 text-sm font-semibold text-brand-primary" to={`/${type}/${item.slug}`}>Details <ArrowRight className="h-4 w-4" /></Link>}</div></Card>) : <EmptyState title={`No ${type} records`} description="Publish records from the CRM to populate this page." />}</div>
     </Section>
   );
 }
@@ -1049,8 +1069,8 @@ export function ProjectDetailPage() {
   const { data: projects = [] } = useTable("portfolio_projects", { eq: { slug: slug ?? "", status: "published" } });
   const rawProject = projects[0] as { id: string; title?: string; name?: string; short_description?: string | null; description?: string | null; location?: string | null; cover_image_url?: string | null } | undefined;
   const project: PublicProject | undefined = rawProject ? { id: rawProject.id, name: rawProject.title ?? rawProject.name ?? "", description: rawProject.short_description ?? rawProject.description, location: rawProject.location, cover_image_url: rawProject.cover_image_url } : demoProjects.find((item) => item.slug === slug);
-  if (!project) return <Section title="Project not found"><EmptyState title="No project found" description="The requested project is not published or does not exist." /></Section>;
-  return <><Seo title={`${project.name} | AMK Architects Mysuru Project`} description={`${project.name} by AMK Architects & Engineers in ${project.location ?? "Mysuru"}. View architecture project details, scope, and design approach.`} keywords={[`${project.name} Mysuru`, "architecture project", project.location ?? "Mysuru", "AMK Architects project", "architecture design Mysuru"]} canonical={`/gallery`} ogImage={project.cover_image_url ?? undefined} ogType="article" jsonLd={{ "@context": "https://schema.org", "@type": "CreativeWork", name: project.name, description: project.description ?? `${project.name} by AMK Architects & Engineers`, creator: { "@type": "ArchitecturalOrganization", name: "AMK Architects & Engineers" }, contentLocation: { "@type": "Place", name: project.location ?? "Mysuru" } }} /><Section title={project.name}><Card><div className="aspect-video rounded-lg bg-slate-200 bg-cover" style={{ backgroundImage: `url(${project.cover_image_url ?? ""})` }} /><p className="mt-6 leading-7 text-slate-600">{project.description}</p><p className="mt-3 flex items-center gap-2 text-sm text-slate-500"><MapPin className="h-4 w-4" />{project.location}</p></Card></Section></>;
+  if (!project) return <><Seo title="Project Not Found | AMK Architects & Engineers" description="The requested AMK Architects & Engineers project is not published or does not exist." noIndex /><Section title="Project not found"><EmptyState title="No project found" description="The requested project is not published or does not exist." /></Section></>;
+  return <><Seo title={`${project.name} | AMK Architects Mysuru Project`} description={`${project.name} by AMK Architects & Engineers in ${project.location ?? "Mysuru"}. View architecture project details, scope, and design approach.`} keywords={[`${project.name} Mysuru`, "architecture project", project.location ?? "Mysuru", "AMK Architects project", "architecture design Mysuru"]} canonical={`/projects/${slug ?? ""}`} ogImage={project.cover_image_url ?? undefined} ogType="article" jsonLd={{ "@context": "https://schema.org", "@type": "CreativeWork", name: project.name, description: project.description ?? `${project.name} by AMK Architects & Engineers`, creator: { "@type": "ArchitecturalOrganization", name: "AMK Architects & Engineers" }, contentLocation: { "@type": "Place", name: project.location ?? "Mysuru" } }} /><Section title={project.name}><Card><div className="aspect-video rounded-lg bg-slate-200 bg-cover" style={{ backgroundImage: `url(${project.cover_image_url ?? ""})` }} /><p className="mt-6 leading-7 text-slate-600">{project.description}</p><p className="mt-3 flex items-center gap-2 text-sm text-slate-500"><MapPin className="h-4 w-4" />{project.location}</p></Card></Section></>;
 }
 
 export function ContactPage({ compact = false }: { compact?: boolean }) {
@@ -1077,8 +1097,8 @@ export function ContactPage({ compact = false }: { compact?: boolean }) {
   return (
     <>
       <Seo
-        title="Contact AMK Architects Mysuru | Architecture & Engineering Enquiry"
-        description="Contact AMK Architects & Engineers in Mysuru, Karnataka for residential design, approval drawings, structural coordination, interiors, and project execution support."
+        title="Contact Architects in Mysuru | AMK Architects"
+        description="Contact AMK Architects & Engineers in Mysuru for residential and commercial design, interiors, BIM, approval drawings, engineering, and execution support."
         keywords={["contact architects Mysuru", "architecture enquiry Karnataka", "residential design Mysuru", "approval drawings Mysuru", "structural coordination India", "architecture consultation Mysuru"]}
         canonical="/contact"
         jsonLd={{

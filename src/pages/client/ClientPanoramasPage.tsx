@@ -63,7 +63,7 @@ export function ClientPanoramasPage() {
                   exit={{ opacity: 0, scale: 0.97 }}
                 >
                   <div className="relative aspect-[2/1] overflow-hidden bg-slate-200">
-                    <img src={panorama.image_url} alt={panorama.title} className="h-full w-full object-cover transition duration-700 group-hover:scale-105" />
+                    <img src={panorama.image_url} alt={panorama.title} loading="lazy" decoding="async" className="h-full w-full object-cover transition duration-700 group-hover:scale-105" />
                     <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-slate-950/10 to-transparent" />
                     <div className="absolute inset-0 grid place-items-center"><span className="grid h-14 w-14 place-items-center rounded-full border border-white/30 bg-slate-950/45 text-white backdrop-blur transition group-hover:scale-110 group-hover:bg-brand-primary"><Eye className="h-6 w-6" /></span></div>
                     <span className="absolute bottom-3 left-3 inline-flex items-center gap-1.5 rounded-full bg-white/90 px-3 py-1.5 text-xs font-bold text-slate-900"><Maximize2 className="h-3.5 w-3.5" /> Open 360 View</span>

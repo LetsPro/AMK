@@ -55,7 +55,10 @@ export async function deleteRow<T extends TableName>(table: T, id: string) {
 }
 
 export async function uploadFile(bucket: string, path: string, file: File) {
-  const { data, error } = await supabase.storage.from(bucket).upload(path, file, { upsert: true });
+  const { data, error } = await supabase.storage.from(bucket).upload(path, file, {
+    upsert: true,
+    cacheControl: "31536000",
+  });
   if (error) throw error;
   return supabase.storage.from(bucket).getPublicUrl(data.path).data.publicUrl;
 }

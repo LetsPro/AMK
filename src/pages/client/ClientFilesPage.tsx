@@ -100,7 +100,7 @@ export function ClientFilesPage() {
             <div key={f.id} className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white p-4 hover:border-brand-primary/30 hover:shadow-sm transition-all">
               <div className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-slate-100 text-slate-400">
                 {isImage(f.file?.mime_type ?? null)
-                  ? <img src={fileUrl(f.file)} alt="" className="h-10 w-10 rounded-lg object-cover" />
+                  ? <img src={fileUrl(f.file)} alt="" loading="lazy" decoding="async" className="h-10 w-10 rounded-lg object-cover" />
                   : <FileText className="h-5 w-5" />}
               </div>
               <div className="flex-1 min-w-0">
@@ -141,9 +141,9 @@ export function ClientFilesPage() {
           </div>
           <div className="flex-1 overflow-auto p-4 flex items-center justify-center" onClick={(e) => e.stopPropagation()}>
             {isImage(preview.file.mime_type) ? (
-              <img src={fileUrl(preview.file)} alt={preview.client_title} className="max-w-full max-h-full rounded-lg object-contain" />
+              <img src={fileUrl(preview.file)} alt={preview.client_title} loading="eager" decoding="async" className="max-w-full max-h-full rounded-lg object-contain" />
             ) : isPdf(preview.file.mime_type) ? (
-              <iframe src={fileUrl(preview.file)} className="w-full h-full rounded-lg" title={preview.client_title} />
+              <iframe src={fileUrl(preview.file)} loading="lazy" className="w-full h-full rounded-lg" title={preview.client_title} />
             ) : (
               <div className="text-center text-white">
                 <FileText className="mx-auto h-16 w-16 text-slate-400 mb-4" />

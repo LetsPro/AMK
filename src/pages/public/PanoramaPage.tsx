@@ -9,6 +9,10 @@ import type { TableRow } from "@/types/database";
 type PanoramaCategory = TableRow<"panorama_categories">;
 export type Panorama = TableRow<"panoramas">;
 type PannellumViewerInstance = { destroy: () => void; resize: () => void };
+const PANNELLUM_VERSION = "2.5.7";
+const PANNELLUM_CSS_ID = "pannellum-styles";
+const PANNELLUM_SCRIPT_ID = "pannellum-script";
+let pannellumLoadPromise: Promise<void> | null = null;
 
 declare global {
   interface Window {
@@ -18,32 +22,68 @@ declare global {
   }
 }
 
+function loadPannellum() {
+  if (window.pannellum) return Promise.resolve();
+  if (pannellumLoadPromise) return pannellumLoadPromise;
+
+  pannellumLoadPromise = new Promise<void>((resolve, reject) => {
+    if (!document.getElementById(PANNELLUM_CSS_ID)) {
+      const stylesheet = document.createElement("link");
+      stylesheet.id = PANNELLUM_CSS_ID;
+      stylesheet.rel = "stylesheet";
+      stylesheet.href = `https://cdn.jsdelivr.net/npm/pannellum@${PANNELLUM_VERSION}/build/pannellum.css`;
+      document.head.appendChild(stylesheet);
+    }
+
+    const existingScript = document.getElementById(PANNELLUM_SCRIPT_ID) as HTMLScriptElement | null;
+    const script = existingScript ?? document.createElement("script");
+    script.id = PANNELLUM_SCRIPT_ID;
+    script.src = `https://cdn.jsdelivr.net/npm/pannellum@${PANNELLUM_VERSION}/build/pannellum.js`;
+    script.async = true;
+    script.addEventListener("load", () => resolve(), { once: true });
+    script.addEventListener("error", () => {
+      pannellumLoadPromise = null;
+      reject(new Error("Pannellum failed to load"));
+    }, { once: true });
+    if (!existingScript) document.head.appendChild(script);
+  });
+
+  return pannellumLoadPromise;
+}
+
 function PanoramaViewer({ panorama }: { panorama: Panorama }) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [error, setError] = useState("");
 
   useEffect(() => {
     if (!containerRef.current) return;
-    if (!window.pannellum) {
-      setError("The 360 viewer could not load. Please refresh and try again.");
-      return;
-    }
+    let viewer: PannellumViewerInstance | null = null;
+    let cancelled = false;
+    setError("");
 
-    const viewer = window.pannellum.viewer(containerRef.current, {
-      type: "equirectangular",
-      panorama: panorama.image_url,
-      title: panorama.title,
-      autoLoad: true,
-      compass: true,
-      showControls: true,
-      showFullscreenCtrl: true,
-      hfov: 100,
-      minHfov: 45,
-      maxHfov: 120
-    });
+    loadPannellum()
+      .then(() => {
+        if (cancelled || !containerRef.current || !window.pannellum) return;
+        viewer = window.pannellum.viewer(containerRef.current, {
+          type: "equirectangular",
+          panorama: panorama.image_url,
+          title: panorama.title,
+          autoLoad: true,
+          compass: true,
+          showControls: true,
+          showFullscreenCtrl: true,
+          hfov: 100,
+          minHfov: 45,
+          maxHfov: 120
+        });
+      })
+      .catch(() => {
+        if (!cancelled) setError("The 360 viewer could not load. Please refresh and try again.");
+      });
 
     return () => {
-      viewer.destroy();
+      cancelled = true;
+      viewer?.destroy();
     };
   }, [panorama]);
 
@@ -119,7 +159,7 @@ export function PanoramaPage() {
   return (
     <>
       <Seo
-        title="360 Interior Design Tours | AMK Architects & Engineers"
+        title="360 Interior Design Tours Mysuru | AMK Architects"
         description="Explore interactive 360-degree interior design views from AMK Architects & Engineers. Browse categories and step inside selected spaces."
         keywords={["360 interior design", "virtual interior tour", "panoramic interiors", "AMK Architects interiors", "Mysuru interior design"]}
         canonical="/360-interiors"
@@ -185,7 +225,7 @@ export function PanoramaPage() {
                   exit={{ opacity: 0, scale: 0.97 }}
                 >
                   <div className="relative aspect-[2/1] overflow-hidden bg-slate-200">
-                    <img src={panorama.image_url} alt={panorama.title} loading="lazy" className="h-full w-full object-cover transition duration-700 group-hover:scale-105" />
+                    <img src={panorama.image_url} alt={panorama.title} loading="lazy" decoding="async" fetchPriority="low" className="h-full w-full object-cover transition duration-700 group-hover:scale-105" />
                     <div className="absolute inset-0 bg-gradient-to-t from-slate-950/75 via-slate-950/10 to-transparent" />
                     <div className="absolute inset-0 grid place-items-center">
                       <span className="grid h-16 w-16 place-items-center rounded-full border border-white/30 bg-slate-950/45 text-white backdrop-blur transition group-hover:scale-110 group-hover:bg-brand-primary"><Eye className="h-7 w-7" /></span>

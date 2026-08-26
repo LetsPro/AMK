@@ -38,6 +38,7 @@ export function PanoramaAdminPage() {
   const [categoryModalOpen, setCategoryModalOpen] = useState(false);
   const [panoramaForm, setPanoramaForm] = useState(emptyPanorama);
   const [panoramaEditingId, setPanoramaEditingId] = useState<string | null>(null);
+  const [panoramaModalOpen, setPanoramaModalOpen] = useState(false);
   const [assignmentPanorama, setAssignmentPanorama] = useState<Panorama | null>(null);
   const [selectedClientIds, setSelectedClientIds] = useState<string[]>([]);
   const [savingAssignments, setSavingAssignments] = useState(false);
@@ -68,6 +69,18 @@ export function PanoramaAdminPage() {
     };
   }, [assignmentPanorama]);
 
+  useEffect(() => {
+    if (!panoramaModalOpen) return;
+    const previousOverflow = document.body.style.overflow;
+    const closeOnEscape = (event: KeyboardEvent) => event.key === "Escape" && closePanoramaModal();
+    document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [panoramaModalOpen]);
+
   function resetCategory() {
     setCategoryForm(emptyCategory);
     setCategoryEditingId(null);
@@ -86,6 +99,16 @@ export function PanoramaAdminPage() {
   function resetPanorama() {
     setPanoramaForm(emptyPanorama);
     setPanoramaEditingId(null);
+  }
+
+  function openPanoramaModal() {
+    resetPanorama();
+    setPanoramaModalOpen(true);
+  }
+
+  function closePanoramaModal() {
+    resetPanorama();
+    setPanoramaModalOpen(false);
   }
 
   async function saveCategory(event: React.FormEvent) {
@@ -118,7 +141,7 @@ export function PanoramaAdminPage() {
     };
     if (panoramaEditingId) await panoramaMutations.update.mutateAsync({ id: panoramaEditingId, payload });
     else await panoramaMutations.create.mutateAsync(payload);
-    resetPanorama();
+    closePanoramaModal();
   }
 
   function editCategory(category: PanoramaCategory) {
@@ -134,6 +157,7 @@ export function PanoramaAdminPage() {
   }
 
   function editPanorama(panorama: Panorama) {
+    setPanoramaModalOpen(true);
     setPanoramaEditingId(panorama.id);
     setPanoramaForm({
       category_id: panorama.category_id,
@@ -143,7 +167,6 @@ export function PanoramaAdminPage() {
       status: panorama.status,
       display_order: String(panorama.display_order)
     });
-    window.scrollTo({ top: 380, behavior: "smooth" });
   }
 
   function deleteCategory(category: PanoramaCategory) {
@@ -195,58 +218,11 @@ export function PanoramaAdminPage() {
           <h1 className="mt-2 text-3xl font-black">360 Interiors</h1>
           <p className="mt-1 text-sm text-slate-500">Create categories and publish equirectangular panoramic interiors to the public 360 viewer.</p>
         </div>
-        <Button type="button" variant="secondary" onClick={openCategoryModal}><FolderPlus className="h-4 w-4" /> Manage Categories ({categories.length})</Button>
-      </div>
-
-      <Card>
-        <div className="mb-5 flex items-start justify-between gap-3 border-b border-slate-200 pb-4">
-          <div>
-            <h2 className="text-xl font-black">{panoramaEditingId ? "Edit 360 Interior" : "Add 360 Interior"}</h2>
-            <p className="text-sm text-slate-500">Upload a 2:1 equirectangular image for the best full-sphere viewing result.</p>
-          </div>
-          {panoramaEditingId && <Button type="button" variant="ghost" onClick={resetPanorama}><X className="h-4 w-4" /> Cancel</Button>}
+        <div className="flex flex-wrap gap-2">
+          <Button type="button" variant="secondary" onClick={openCategoryModal}><FolderPlus className="h-4 w-4" /> Manage Categories ({categories.length})</Button>
+          <Button type="button" onClick={openPanoramaModal} disabled={!categories.length}><Plus className="h-4 w-4" /> Add 360 Interior</Button>
         </div>
-        <form className="grid gap-4 md:grid-cols-2" onSubmit={savePanorama}>
-          <label>
-            <span className="mb-1 block text-sm font-medium">Title</span>
-            <Input required value={panoramaForm.title} onChange={(event) => setPanoramaForm({ ...panoramaForm, title: event.target.value })} placeholder="Modern Villa Living Room" />
-          </label>
-          <label>
-            <span className="mb-1 block text-sm font-medium">Category</span>
-            <Select required value={panoramaForm.category_id} onChange={(event) => setPanoramaForm({ ...panoramaForm, category_id: event.target.value })}>
-              <option value="">Select category</option>
-              {categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}
-            </Select>
-          </label>
-          <label className="md:col-span-2">
-            <span className="mb-1 block text-sm font-medium">Small description</span>
-            <Textarea value={panoramaForm.description} onChange={(event) => setPanoramaForm({ ...panoramaForm, description: event.target.value })} placeholder="Describe the space, materials, or design idea." />
-          </label>
-          <label className="md:col-span-2">
-            <span className="mb-1 block text-sm font-medium">Panoramic image</span>
-            <MediaPicker label="Panoramic image" value={panoramaForm.image_url} onChange={(image_url) => setPanoramaForm({ ...panoramaForm, image_url })} />
-            <span className="mt-2 block text-xs text-slate-500">JPEG or WebP recommended. Maximum upload size is 50 MB after the included database migration is applied.</span>
-          </label>
-          <label>
-            <span className="mb-1 block text-sm font-medium">Display order</span>
-            <Input type="number" min="0" value={panoramaForm.display_order} onChange={(event) => setPanoramaForm({ ...panoramaForm, display_order: event.target.value })} placeholder={String(panoramas.length + 1)} />
-          </label>
-          <label>
-            <span className="mb-1 block text-sm font-medium">Publishing status</span>
-            <Select value={panoramaForm.status} onChange={(event) => setPanoramaForm({ ...panoramaForm, status: event.target.value })}>
-              <option value="draft">Draft / hidden</option>
-              <option value="published">Published</option>
-            </Select>
-          </label>
-          <div className="md:col-span-2">
-            <Button disabled={!categories.length || panoramaMutations.create.isPending || panoramaMutations.update.isPending}>
-              {panoramaEditingId ? <Save className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
-              {panoramaEditingId ? "Save Changes" : "Add 360 Interior"}
-            </Button>
-            {!categories.length && <span className="ml-3 text-sm text-amber-700">Create a category first.</span>}
-          </div>
-        </form>
-      </Card>
+      </div>
 
       <div>
         <h2 className="text-xl font-black">Published and Draft Interiors</h2>
@@ -256,7 +232,7 @@ export function PanoramaAdminPage() {
             {panoramas.map((panorama) => (
               <Card key={panorama.id} className="flex gap-4 bg-white p-4">
                 <div className="relative h-28 w-36 shrink-0 overflow-hidden rounded-md bg-slate-100">
-                  <img src={panorama.image_url} alt="" className="h-full w-full object-cover" />
+                  <img src={panorama.image_url} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover" />
                   <div className="absolute inset-0 grid place-items-center bg-slate-950/20"><Eye className="h-7 w-7 text-white" /></div>
                 </div>
                 <div className="min-w-0 flex-1">
@@ -286,6 +262,65 @@ export function PanoramaAdminPage() {
           </Card>
         )}
       </div>
+
+      {panoramaModalOpen && (
+        <div
+          className="fixed inset-0 z-[1001] flex items-center justify-center bg-slate-950/75 p-3 backdrop-blur-sm md:p-6"
+          onMouseDown={(event) => event.target === event.currentTarget && closePanoramaModal()}
+        >
+          <div role="dialog" aria-modal="true" aria-labelledby="panorama-editor-title" className="flex max-h-[92vh] w-full max-w-4xl flex-col overflow-hidden rounded-xl bg-white shadow-2xl">
+            <div className="flex items-start justify-between gap-4 border-b border-slate-200 px-5 py-4 md:px-6">
+              <div>
+                <div className="text-xs font-bold uppercase tracking-[0.18em] text-brand-primary">360 Interiors</div>
+                <h2 id="panorama-editor-title" className="mt-1 text-2xl font-black text-slate-950">{panoramaEditingId ? "Edit 360 Interior" : "Add 360 Interior"}</h2>
+                <p className="mt-1 text-sm text-slate-500">Upload a 2:1 equirectangular image for the best full-sphere viewing result.</p>
+              </div>
+              <button type="button" onClick={closePanoramaModal} className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-slate-100 text-slate-700 transition hover:bg-slate-200" aria-label="Close 360 interior editor"><X className="h-5 w-5" /></button>
+            </div>
+
+            <form className="grid min-h-0 flex-1 gap-4 overflow-y-auto p-5 md:grid-cols-2 md:p-6" onSubmit={savePanorama}>
+              <label>
+                <span className="mb-1 block text-sm font-medium">Title</span>
+                <Input autoFocus required value={panoramaForm.title} onChange={(event) => setPanoramaForm({ ...panoramaForm, title: event.target.value })} placeholder="Modern Villa Living Room" />
+              </label>
+              <label>
+                <span className="mb-1 block text-sm font-medium">Category</span>
+                <Select required value={panoramaForm.category_id} onChange={(event) => setPanoramaForm({ ...panoramaForm, category_id: event.target.value })}>
+                  <option value="">Select category</option>
+                  {categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}
+                </Select>
+              </label>
+              <label className="md:col-span-2">
+                <span className="mb-1 block text-sm font-medium">Small description</span>
+                <Textarea value={panoramaForm.description} onChange={(event) => setPanoramaForm({ ...panoramaForm, description: event.target.value })} placeholder="Describe the space, materials, or design idea." />
+              </label>
+              <div className="md:col-span-2">
+                <span className="mb-1 block text-sm font-medium">Panoramic image</span>
+                <MediaPicker label="Panoramic image" value={panoramaForm.image_url} onChange={(image_url) => setPanoramaForm({ ...panoramaForm, image_url })} />
+                <span className="mt-2 block text-xs text-slate-500">JPEG or WebP recommended. Maximum upload size is 50 MB after the included database migration is applied.</span>
+              </div>
+              <label>
+                <span className="mb-1 block text-sm font-medium">Display order</span>
+                <Input type="number" min="0" value={panoramaForm.display_order} onChange={(event) => setPanoramaForm({ ...panoramaForm, display_order: event.target.value })} placeholder={String(panoramas.length + 1)} />
+              </label>
+              <label>
+                <span className="mb-1 block text-sm font-medium">Publishing status</span>
+                <Select value={panoramaForm.status} onChange={(event) => setPanoramaForm({ ...panoramaForm, status: event.target.value })}>
+                  <option value="draft">Draft / hidden</option>
+                  <option value="published">Published</option>
+                </Select>
+              </label>
+              <div className="flex justify-end gap-3 border-t border-slate-200 pt-4 md:col-span-2">
+                <Button type="button" variant="secondary" onClick={closePanoramaModal}>Cancel</Button>
+                <Button disabled={!categories.length || panoramaMutations.create.isPending || panoramaMutations.update.isPending}>
+                  {panoramaEditingId ? <Save className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
+                  {panoramaEditingId ? "Save Changes" : "Add 360 Interior"}
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {assignmentPanorama && (
         <div

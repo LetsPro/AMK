@@ -24,6 +24,10 @@ function upsertMeta(attr: "name" | "property", key: string, content: string) {
   el.setAttribute("content", content);
 }
 
+function removeMeta(attr: "name" | "property", key: string) {
+  document.head.querySelector<HTMLMetaElement>(`meta[${attr}="${key}"]`)?.remove();
+}
+
 function upsertLink(rel: string, href: string) {
   let el = document.head.querySelector<HTMLLinkElement>(`link[rel="${rel}"]`);
   if (!el) {
@@ -55,12 +59,16 @@ export function Seo({
   jsonLd,
 }: SeoProps) {
   useEffect(() => {
-    const fullCanonical = canonical ? `${SITE_URL}${canonical}` : SITE_URL;
+    const canonicalPath = canonical ?? window.location.pathname;
+    const fullCanonical = canonicalPath.startsWith("http") ? canonicalPath : new URL(canonicalPath, SITE_URL).toString();
     const keywordString = keywords.join(", ");
 
     document.title = title;
+    upsertMeta("name", "title", title);
     upsertMeta("name", "description", description);
     if (keywordString) upsertMeta("name", "keywords", keywordString);
+    else removeMeta("name", "keywords");
+    upsertMeta("name", "author", "AMK Architects & Engineers");
     upsertMeta("name", "robots", noIndex ? "noindex, nofollow" : "index, follow");
     upsertLink("canonical", fullCanonical);
 
@@ -69,12 +77,15 @@ export function Seo({
     upsertMeta("property", "og:type", ogType);
     upsertMeta("property", "og:url", fullCanonical);
     upsertMeta("property", "og:image", ogImage);
+    upsertMeta("property", "og:image:alt", `${title} — AMK Architects & Engineers`);
     upsertMeta("property", "og:site_name", "AMK Architects & Engineers");
+    upsertMeta("property", "og:locale", "en_IN");
 
     upsertMeta("name", "twitter:card", "summary_large_image");
     upsertMeta("name", "twitter:title", title);
     upsertMeta("name", "twitter:description", description);
     upsertMeta("name", "twitter:image", ogImage);
+    upsertMeta("name", "twitter:url", fullCanonical);
 
     if (jsonLd) upsertJsonLd("page-jsonld", jsonLd);
     else {

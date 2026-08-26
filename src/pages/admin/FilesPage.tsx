@@ -292,7 +292,7 @@ export function FilesPage() {
                       </label>
                       <div className="flex h-28 items-center justify-center bg-slate-50">
                         {file.mime_type?.startsWith("image/") ? (
-                          <img src={previewUrl(file)} alt={file.display_name} className="h-full w-full object-cover" />
+                          <img src={previewUrl(file)} alt={file.display_name} loading="lazy" decoding="async" className="h-full w-full object-cover" />
                         ) : (
                           fileIcon(file.mime_type)
                         )}
@@ -392,13 +392,13 @@ export function FilesPage() {
               </div>
               <div className="flex max-h-[70vh] items-center justify-center overflow-hidden bg-slate-950 p-4">
                 {previewFile.mime_type?.startsWith("image/") ? (
-                  <img src={previewUrl(previewFile)} alt={previewFile.display_name} className="max-h-full max-w-full object-contain" />
+                  <img src={previewUrl(previewFile)} alt={previewFile.display_name} loading="eager" decoding="async" className="max-h-full max-w-full object-contain" />
                 ) : previewFile.mime_type === "application/pdf" ? (
-                  <iframe src={previewUrl(previewFile)} className="h-[65vh] w-full" title={previewFile.display_name} />
+                  <iframe src={previewUrl(previewFile)} loading="lazy" className="h-[65vh] w-full" title={previewFile.display_name} />
                 ) : previewFile.mime_type?.startsWith("video/") ? (
-                  <video src={previewUrl(previewFile)} controls className="max-h-full max-w-full" />
+                  <video src={previewUrl(previewFile)} controls preload="metadata" className="max-h-full max-w-full" />
                 ) : previewFile.mime_type?.startsWith("audio/") ? (
-                  <audio src={previewUrl(previewFile)} controls />
+                  <audio src={previewUrl(previewFile)} controls preload="metadata" />
                 ) : (
                   <div className="text-center text-white">
                     <div className="mb-4 text-6xl">{fileIcon(previewFile.mime_type)}</div>

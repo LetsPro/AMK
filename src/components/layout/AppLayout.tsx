@@ -64,7 +64,7 @@ export function AppLayout() {
     )}>
       <div className={cn("flex items-center border-b border-white/10 px-4 shrink-0", collapsed ? "h-20 justify-center" : "h-24 justify-start")}>
         <div className={cn("flex shrink-0 items-center justify-center overflow-hidden rounded-xl bg-white p-2 shadow-lg shadow-black/20", collapsed ? "h-12 w-12" : "h-[4.5rem] w-40 max-w-full")}>
-          {branding.logoUrl ? <img src={branding.logoUrl} alt={branding.companyName} className="block h-full w-full object-contain object-center" /> : <span className="text-lg font-black text-brand-primary">A</span>}
+          {branding.logoUrl ? <img src={branding.logoUrl} alt={branding.companyName} loading="eager" decoding="async" className="block h-full w-full object-contain object-center" /> : <span className="text-lg font-black text-brand-primary">A</span>}
         </div>
       </div>
 

@@ -46,7 +46,7 @@ export function LoginPage() {
               <div className="flex items-center gap-3">
                 <div className="flex h-14 w-20 items-center justify-center overflow-hidden rounded-2xl bg-white p-2 shadow-xl">
                   {branding.logoUrl ? (
-                    <img src={branding.logoUrl} alt={branding.companyName} className="block h-full w-full object-contain" />
+                    <img src={branding.logoUrl} alt={branding.companyName} loading="eager" decoding="async" className="block h-full w-full object-contain" />
                   ) : (
                     <Building2 className="h-6 w-6 text-brand-primary" />
                   )}
@@ -98,7 +98,7 @@ export function LoginPage() {
                 <div className="flex items-center gap-3">
                   <div className="flex h-12 w-16 items-center justify-center overflow-hidden rounded-xl bg-white p-2 shadow-sm ring-1 ring-slate-200">
                     {branding.logoUrl ? (
-                      <img src={branding.logoUrl} alt={branding.companyName} className="block h-full w-full object-contain" />
+                      <img src={branding.logoUrl} alt={branding.companyName} loading="eager" decoding="async" className="block h-full w-full object-contain" />
                     ) : (
                       <Building2 className="h-5 w-5 text-brand-primary" />
                     )}

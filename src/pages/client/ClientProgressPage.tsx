@@ -141,7 +141,7 @@ export function ClientProgressPage() {
                           <div key={item.id} className="flex items-center gap-3 rounded-xl border border-slate-100 bg-white p-2 shadow-sm">
                             <div className="grid h-11 w-11 shrink-0 place-items-center overflow-hidden rounded-lg bg-slate-100 text-slate-400">
                               {item.file?.mime_type?.startsWith("image/") ? (
-                                <img src={fileUrl(item.file)} alt="" className="h-full w-full object-cover" />
+                                <img src={fileUrl(item.file)} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover" />
                               ) : (
                                 <FileText className="h-5 w-5" />
                               )}
@@ -210,9 +210,9 @@ export function ClientProgressPage() {
           </div>
           <div className="flex flex-1 items-center justify-center overflow-auto p-4" onClick={(e) => e.stopPropagation()}>
             {preview.file.mime_type?.startsWith("image/") ? (
-              <img src={fileUrl(preview.file)} alt={preview.client_title} className="max-h-full max-w-full rounded-lg object-contain" />
+              <img src={fileUrl(preview.file)} alt={preview.client_title} loading="eager" decoding="async" className="max-h-full max-w-full rounded-lg object-contain" />
             ) : preview.file.mime_type === "application/pdf" ? (
-              <iframe src={fileUrl(preview.file)} className="h-full w-full rounded-lg bg-white" title={preview.client_title} />
+              <iframe src={fileUrl(preview.file)} loading="lazy" className="h-full w-full rounded-lg bg-white" title={preview.client_title} />
             ) : (
               <div className="text-center text-white">
                 <FileText className="mx-auto mb-4 h-16 w-16 text-slate-400" />
