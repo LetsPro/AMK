@@ -38,7 +38,7 @@ export function PublicLayout() {
   const [sending, setSending] = useState(false);
   const [enquiry, setEnquiry] = useState(enquiryDefaults);
   const { branding } = useAppSettings();
-  const navItems = ["home", "about", "projects", "services", "gallery", "contact"];
+  const navItems = ["home", "about", "projects", "services", "gallery", "360-interiors", "contact"];
   const hrefFor = (item: string) => item === "home" ? "/" : `/${item}`;
 
   useEffect(() => {
@@ -93,7 +93,7 @@ export function PublicLayout() {
 
   return (
     <div className="min-h-screen bg-white text-slate-900">
-      <header className="sticky top-0 z-20 border-b border-slate-200 bg-white/90 backdrop-blur">
+      <header className="sticky top-0 z-[100] border-b border-slate-200 bg-white/95 backdrop-blur">
         <div className="mx-auto flex h-24 max-w-7xl items-center justify-between gap-3 overflow-hidden px-4">
           <Link to="/" className="flex items-center" aria-label={`${branding.companyName} ${branding.companySuffix}`}>
             <span className="grid h-20 w-32 place-items-center bg-transparent text-brand-primary md:w-40">
@@ -101,7 +101,7 @@ export function PublicLayout() {
             </span>
           </Link>
           <nav className="hidden gap-5 text-sm font-medium xl:flex">
-            {navItems.map((item) => <Link key={item} className="capitalize hover:text-brand-primary" to={hrefFor(item)}>{item.replace("-", " ")}</Link>)}
+              {navItems.map((item) => <Link key={item} className="capitalize hover:text-brand-primary" to={hrefFor(item)}>{item === "360-interiors" ? "360 Interiors" : item.replace("-", " ")}</Link>)}
           </nav>
           <div className="hidden items-center gap-2 xl:flex">
             <Button variant="secondary" onClick={() => location.href = "/login"}><LogIn className="h-4 w-4" /> Login</Button>
@@ -114,7 +114,7 @@ export function PublicLayout() {
         {open && (
           <div className="border-t border-slate-200 bg-white px-4 py-4 shadow-lg xl:hidden">
             <nav className="grid gap-2 text-sm font-semibold">
-              {navItems.map((item) => <Link key={item} className="rounded-md px-3 py-2 capitalize hover:bg-orange-50 hover:text-brand-primary" to={hrefFor(item)} onClick={() => setOpen(false)}>{item.replace("-", " ")}</Link>)}
+              {navItems.map((item) => <Link key={item} className="rounded-md px-3 py-2 capitalize hover:bg-orange-50 hover:text-brand-primary" to={hrefFor(item)} onClick={() => setOpen(false)}>{item === "360-interiors" ? "360 Interiors" : item.replace("-", " ")}</Link>)}
             </nav>
             <div className="mt-4 grid grid-cols-2 gap-2">
               <Button variant="secondary" onClick={() => { setOpen(false); location.href = "/login"; }}><LogIn className="h-4 w-4" /> Login</Button>
@@ -136,7 +136,7 @@ export function PublicLayout() {
           <div>
             <h4 className="font-semibold">Company</h4>
             <div className="mt-4 grid gap-3 text-sm text-slate-400">
-              {["Home", "About", "Projects", "Services", "Gallery", "Contact"].map((item) => <Link key={item} to={hrefFor(item.toLowerCase())} className="hover:text-white">{item}</Link>)}
+              {["Home", "About", "Projects", "Services", "Gallery", "360 Interiors", "Contact"].map((item) => <Link key={item} to={item === "360 Interiors" ? "/360-interiors" : hrefFor(item.toLowerCase())} className="hover:text-white">{item}</Link>)}
             </div>
           </div>
           <div>

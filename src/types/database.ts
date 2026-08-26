@@ -33,7 +33,7 @@ export type Database = {
       roles: T<Base & { name: RoleName; description: string | null }>;
       permissions: T<Base & { role_id: string; module: string; can_create: boolean; can_read: boolean; can_update: boolean; can_delete: boolean }>;
       website_pages: T<Base & { slug: string; title: string; content: string; meta_title: string | null; meta_description: string | null; status: "draft" | "published" }>;
-      banners: T<Base & { title: string; subtitle: string | null; image_url: string | null; cta_label: string | null; cta_url: string | null; is_active: boolean }>;
+      banners: T<Base & { title: string; subtitle: string | null; image_url: string | null; cta_label: string | null; cta_url: string | null; is_active: boolean; display_order: number }>;
       services: T<Base & { name: string; slug: string; description: string; image_url: string | null; price_from: number | null; status: "draft" | "published" }>;
       customers: T<Base & { name: string; company: string | null; email: string | null; mobile: string | null; address: string | null; notes: string | null }>;
       clients: T<Base & { customer_id: string | null; name: string; contact_person: string | null; email: string | null; mobile: string | null; address: string | null; contract_value: number | null; payment_received: number | null; notes: string | null; auth_user_id: string | null; status: ClientStatus; avatar_url: string | null; admin_notes: string | null; created_by: string | null; updated_by: string | null }>;
@@ -53,8 +53,11 @@ export type Database = {
       activity_logs: T<Base & { user_id: string | null; module: string; action: string; entity_id: string | null; metadata: Json }>;
       media_assets: T<Base & { bucket: string; path: string; url: string; file_name: string; mime_type: string | null; size: number | null; alt_text: string | null; created_by: string | null }>;
       app_settings: T<Base & { key: string; value: Json }>;
-      gallery: T<Base & { title: string; image_url: string; category: string | null; project_id: string | null; is_featured: boolean }>;
-      testimonials: T<Base & { name: string; company: string | null; quote: string; rating: number; avatar_url: string | null; is_published: boolean }>;
+      gallery: T<Base & { title: string; image_url: string; category: string | null; project_id: string | null; is_featured: boolean; display_order: number }>;
+      testimonials: T<Base & { name: string; company: string | null; quote: string; rating: number; avatar_url: string | null; is_published: boolean; display_order: number }>;
+      panorama_categories: T<Base & { name: string; slug: string; description: string | null; display_order: number; is_active: boolean }>;
+      panoramas: T<Base & { category_id: string; title: string; description: string | null; image_url: string; status: "draft" | "published"; display_order: number }>;
+      client_panorama_assignments: T<Base & { client_id: string; panorama_id: string; assigned_by: string | null }>;
     };
     Views: Record<string, never>;
     Functions: Record<string, never>;

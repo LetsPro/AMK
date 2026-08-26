@@ -112,7 +112,7 @@ function HoverRevealTile({ title, text, image, label }: { title: string; text: s
 
 type PublicProject = { id: string; name: string; slug?: string; description?: string | null; category?: string | null; location?: string | null; cover_image_url?: string | null; progress?: number | null; status?: string | null; budget?: number | null };
 type PublicGallery = { id: string; title: string; category?: string | null; image_url: string; description?: string | null };
-type PublicTestimonial = { id: string; name: string; company?: string | null; quote: string; rating?: number | null };
+type PublicTestimonial = { id: string; name: string; company?: string | null; quote: string; rating?: number | null; avatar_url?: string | null };
 
 function openEnquiryModal() {
   window.dispatchEvent(new CustomEvent("open-enquiry-modal"));
@@ -147,9 +147,9 @@ const demoGallery = [
 ];
 
 const demoTestimonials = [
-  { id: "demo-testimonial-1", name: "Homeowner, Mysuru", company: "Residential Client", quote: "From the initial concept to the final design, the AMK team demonstrated exceptional creativity, professionalism, and technical expertise.", rating: 5 },
-  { id: "demo-testimonial-2", name: "Commercial Property Owner", company: "Commercial Client", quote: "AMK Architects & Engineers delivered a well-planned commercial project that balanced design, efficiency, and investment value.", rating: 5 },
-  { id: "demo-testimonial-3", name: "Real Estate Developer", company: "Development Client", quote: "Their expertise in planning, engineering coordination, and project execution gave us complete confidence throughout the project.", rating: 5 }
+  { id: "demo-testimonial-1", name: "Homeowner, Mysuru", company: "Residential Client", quote: "From the initial concept to the final design, the AMK team demonstrated exceptional creativity, professionalism, and technical expertise.", rating: 5, avatar_url: null },
+  { id: "demo-testimonial-2", name: "Commercial Property Owner", company: "Commercial Client", quote: "AMK Architects & Engineers delivered a well-planned commercial project that balanced design, efficiency, and investment value.", rating: 5, avatar_url: null },
+  { id: "demo-testimonial-3", name: "Real Estate Developer", company: "Development Client", quote: "Their expertise in planning, engineering coordination, and project execution gave us complete confidence throughout the project.", rating: 5, avatar_url: null }
 ];
 
 const demoBanners = [
@@ -373,7 +373,7 @@ function DesignProcessSection({ title = "Our Design Process", subtitle = "From f
   };
 
   return (
-    <section className="relative overflow-hidden bg-gradient-to-b from-white via-slate-50 to-white px-4 py-20 text-slate-950">
+    <section className="relative isolate overflow-hidden bg-gradient-to-b from-white via-slate-50 to-white px-4 py-20 text-slate-950">
       <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(rgba(15,23,42,0.035)_1px,transparent_1px),linear-gradient(90deg,rgba(15,23,42,0.035)_1px,transparent_1px)] bg-[size:56px_56px]" />
       <div className="relative mx-auto max-w-7xl">
         <div className="mx-auto mb-12 max-w-4xl text-center">
@@ -632,9 +632,16 @@ function TestimonialCarousel({ items }: { items: PublicTestimonial[] }) {
                 ))}
               </div>
               <p className="mt-8 text-2xl font-normal leading-10 text-slate-600">"{testimonial.quote}"</p>
-              <div className="mt-8 border-t border-slate-200 pt-5">
-                <div className="text-xl font-semibold text-slate-950">{testimonial.name}</div>
-                <div className="mt-1 text-sm font-normal text-slate-500">{testimonial.company}</div>
+              <div className="mt-8 flex items-center gap-4 border-t border-slate-200 pt-5">
+                {testimonial.avatar_url ? (
+                  <img src={testimonial.avatar_url} alt={testimonial.name} className="h-14 w-14 rounded-full object-cover ring-2 ring-orange-100" />
+                ) : (
+                  <div className="grid h-14 w-14 place-items-center rounded-full bg-orange-50 text-lg font-black text-brand-primary">{testimonial.name.charAt(0)}</div>
+                )}
+                <div>
+                  <div className="text-xl font-semibold text-slate-950">{testimonial.name}</div>
+                  <div className="mt-1 text-sm font-normal text-slate-500">{testimonial.company}</div>
+                </div>
               </div>
             </motion.div>
           </AnimatePresence>
@@ -648,8 +655,8 @@ export function HomePage() {
   const { data: services = [] } = useTable("services", { limit: 6, orderBy: "created_at", eq: { status: "published" } });
   const { data: rawProjects = [] } = useTable("portfolio_projects", { limit: 6, orderBy: "display_order", eq: { status: "published" } });
   const projects: PublicProject[] = (rawProjects as Array<{ id: string; title: string; short_description?: string | null; category_id?: string | null; location?: string | null; cover_image_url?: string | null; slug: string }>).map((p) => ({ id: p.id, name: p.title, slug: p.slug, description: p.short_description, category: p.category_id ?? undefined, location: p.location, cover_image_url: p.cover_image_url }));
-  const { data: testimonials = [] } = useTable("testimonials", { limit: 3, orderBy: "created_at", eq: { is_published: true } });
-  const { data: banners = [] } = useTable("banners", { orderBy: "created_at", ascending: true, eq: { is_active: true } });
+  const { data: testimonials = [] } = useTable("testimonials", { limit: 6, orderBy: "display_order", ascending: true, eq: { is_published: true } });
+  const { data: banners = [] } = useTable("banners", { orderBy: "display_order", ascending: true, eq: { is_active: true } });
   const [activeSlide, setActiveSlide] = useState(0);
   const [activeProjectIndex, setActiveProjectIndex] = useState(0);
   const [selectedProject, setSelectedProject] = useState<PublicProject | null>(null);
@@ -687,7 +694,7 @@ export function HomePage() {
             key={item.id}
             className="absolute inset-0"
             initial={false}
-            animate={{ opacity: index === activeSlide ? 1 : 0, scale: index === activeSlide ? 1 : 1.04 }}
+            animate={{ opacity: index === activeSlide % bannerRows.length ? 1 : 0, scale: index === activeSlide % bannerRows.length ? 1 : 1.04 }}
             transition={{ duration: 0.9 }}
             style={{ backgroundImage: `linear-gradient(90deg, rgba(2,6,23,0.82), rgba(15,23,42,0.66)), linear-gradient(180deg, rgba(2,6,23,0.18), rgba(2,6,23,0.74)), url(${item.image_url ?? demoBanners[0].image_url})`, backgroundSize: "cover", backgroundPosition: "center" }}
           />
@@ -722,7 +729,7 @@ export function HomePage() {
         </div>
         <div className="absolute bottom-8 left-1/2 flex -translate-x-1/2 items-center gap-3 rounded-full border border-white/10 bg-slate-950/45 px-4 py-3 backdrop-blur">
           {bannerRows.map((item, index) => (
-            <button key={item.id} aria-label={`Go to slide ${index + 1}`} onClick={() => setActiveSlide(index)} className={`h-2.5 rounded-full transition-all ${index === activeSlide ? "w-12 bg-brand-primary" : "w-2.5 bg-white/45 hover:bg-white"}`} />
+            <button key={item.id} aria-label={`Go to slide ${index + 1}`} onClick={() => setActiveSlide(index)} className={`h-2.5 rounded-full transition-all ${index === activeSlide % bannerRows.length ? "w-12 bg-brand-primary" : "w-2.5 bg-white/45 hover:bg-white"}`} />
           ))}
         </div>
       </section>
@@ -827,7 +834,7 @@ export function HomePage() {
 
 export function ListingPage({ type }: { type: "projects" | "services" | "gallery" | "about" }) {
   const table = type === "services" ? "services" : type === "gallery" ? "gallery" : "portfolio_projects";
-  const { data = [] } = useTable(table as never, { orderBy: "created_at" });
+  const { data = [] } = useTable(table as never, { orderBy: type === "gallery" ? "display_order" : "created_at", ascending: type === "gallery" });
   const [filter, setFilter] = useState("");
   const [selectedProject, setSelectedProject] = useState<PublicProject | null>(null);
   const [preview, setPreview] = useState<PublicGallery | null>(null);

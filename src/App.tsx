@@ -1,4 +1,4 @@
-import { useEffect, lazy, Suspense, useState } from "react";
+import { useEffect, lazy, Suspense, useRef, useState } from "react";
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { Building2 } from "lucide-react";
 import { AppLayout } from "@/components/layout/AppLayout";
@@ -10,6 +10,7 @@ import { ResetPasswordPage } from "@/pages/auth/ResetPasswordPage";
 import { PublicLayout } from "@/pages/public/PublicLayout";
 import { ContactPage, HomePage, ListingPage, ProjectDetailPage } from "@/pages/public/PublicPages";
 import { PortfolioListingPage, PortfolioDetailPage } from "@/pages/public/PortfolioPages";
+import { PanoramaPage } from "@/pages/public/PanoramaPage";
 import { useAppSettings } from "@/hooks/useAppSettings";
 
 // Admin pages
@@ -23,6 +24,7 @@ const AssignmentsPage = lazy(() => import("@/pages/admin/AssignmentsPage").then(
 const BlueprintsAdminPage = lazy(() => import("@/pages/admin/BlueprintsAdminPage").then((m) => ({ default: m.BlueprintsAdminPage })));
 const ActivityPage = lazy(() => import("@/pages/admin/ActivityPage").then((m) => ({ default: m.ActivityPage })));
 const CmsPage = lazy(() => import("@/pages/admin/CmsPage").then((m) => ({ default: m.CmsPage })));
+const PanoramaAdminPage = lazy(() => import("@/pages/admin/PanoramaAdminPage").then((m) => ({ default: m.PanoramaAdminPage })));
 const SettingsPage = lazy(() => import("@/pages/admin/SettingsPage").then((m) => ({ default: m.SettingsPage })));
 
 // Client pages
@@ -31,32 +33,53 @@ const ClientProgressPage = lazy(() => import("@/pages/client/ClientProgressPage"
 const ClientFilesPage = lazy(() => import("@/pages/client/ClientFilesPage").then((m) => ({ default: m.ClientFilesPage })));
 const ClientBlueprintsPage = lazy(() => import("@/pages/client/ClientBlueprintsPage").then((m) => ({ default: m.ClientBlueprintsPage })));
 const ClientProfilePage = lazy(() => import("@/pages/client/ClientProfilePage").then((m) => ({ default: m.ClientProfilePage })));
+const ClientPanoramasPage = lazy(() => import("@/pages/client/ClientPanoramasPage").then((m) => ({ default: m.ClientPanoramasPage })));
 
 function PageLoader({ fixed = false }: { fixed?: boolean }) {
   const { branding } = useAppSettings();
 
   return (
-    <div className={`${fixed ? "fixed inset-0 z-[999] min-h-screen bg-white/90 backdrop-blur-sm" : "min-h-[60vh]"} flex items-center justify-center`}>
-      <div className="relative grid h-28 w-28 place-items-center rounded-full bg-white shadow-[0_24px_70px_rgba(15,23,42,0.14)] ring-1 ring-orange-100">
-        <div className="absolute inset-0 rounded-full border border-orange-100" />
-        <div className="absolute inset-2 rounded-full border-2 border-brand-primary/20 border-t-brand-primary animate-spin [animation-duration:3s]" />
-        <div className="grid h-20 w-20 place-items-center rounded-full bg-white">
-          {branding.logoUrl ? (
-            <img src={branding.logoUrl} alt={branding.companyName} className="max-h-14 max-w-16 object-contain animate-spin [animation-duration:6s]" />
-          ) : (
-            <Building2 className="h-10 w-10 animate-spin text-brand-primary [animation-duration:6s]" />
-          )}
+    <div className={`${fixed ? "fixed inset-0 z-[999] min-h-screen bg-white/95 backdrop-blur-sm" : "min-h-[60vh]"} flex items-center justify-center p-6`}>
+      {branding.logoUrl ? (
+        <img src={branding.logoUrl} alt={branding.companyName} className={fixed ? "max-h-[75vh] max-w-[86vw] object-contain" : "max-h-28 max-w-xs object-contain"} />
+      ) : (
+        <Building2 className={fixed ? "h-24 w-24 text-brand-primary" : "h-14 w-14 text-brand-primary"} />
+      )}
+    </div>
+  );
+}
+
+function InitialSplash({ onComplete }: { onComplete: () => void }) {
+  const { branding } = useAppSettings();
+
+  useEffect(() => {
+    const timer = window.setTimeout(onComplete, 3000);
+    return () => window.clearTimeout(timer);
+  }, [onComplete]);
+
+  return (
+    <div className="fixed inset-0 z-[1000] grid min-h-screen place-items-center overflow-hidden bg-white p-6 md:p-10">
+      {branding.logoUrl ? (
+        <img src={branding.logoUrl} alt={branding.companyName} className="max-h-[86vh] max-w-[90vw] object-contain" />
+      ) : (
+        <div className="flex flex-col items-center text-center">
+          <Building2 className="h-24 w-24 text-brand-primary" />
+          <h1 className="mt-5 text-3xl font-black text-slate-950">{branding.companyName}</h1>
+          <p className="mt-1 text-sm font-semibold uppercase tracking-[0.22em] text-brand-primary">{branding.companySuffix}</p>
         </div>
-      </div>
+      )}
     </div>
   );
 }
 
 function RouteChangeLoader() {
   const { pathname } = useLocation();
-  const [loading, setLoading] = useState(true);
+  const previousPath = useRef(pathname);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
+    if (previousPath.current === pathname) return;
+    previousPath.current = pathname;
     setLoading(true);
     const timer = window.setTimeout(() => setLoading(false), 650);
     return () => window.clearTimeout(timer);
@@ -72,6 +95,10 @@ function ScrollToTop() {
 }
 
 export function App() {
+  const [splashComplete, setSplashComplete] = useState(false);
+
+  if (!splashComplete) return <InitialSplash onComplete={() => setSplashComplete(true)} />;
+
   return (
     <>
       <ScrollToTop />
@@ -85,6 +112,7 @@ export function App() {
           <Route path="projects/:slug" element={<PortfolioDetailPage />} />
           <Route path="services" element={<ListingPage type="services" />} />
           <Route path="gallery" element={<ListingPage type="gallery" />} />
+          <Route path="360-interiors" element={<PanoramaPage />} />
           <Route path="contact" element={<ContactPage />} />
         </Route>
 
@@ -106,6 +134,7 @@ export function App() {
             <Route path="blueprints" element={<Suspense fallback={<PageLoader />}><BlueprintsAdminPage /></Suspense>} />
             <Route path="activity" element={<Suspense fallback={<PageLoader />}><ActivityPage /></Suspense>} />
             <Route path="cms" element={<Suspense fallback={<PageLoader />}><CmsPage /></Suspense>} />
+            <Route path="360-interiors" element={<Suspense fallback={<PageLoader />}><PanoramaAdminPage /></Suspense>} />
             <Route path="settings" element={<Suspense fallback={<PageLoader />}><SettingsPage /></Suspense>} />
           </Route>
         </Route>
@@ -117,6 +146,7 @@ export function App() {
             <Route path="progress" element={<Suspense fallback={<PageLoader />}><ClientProgressPage /></Suspense>} />
             <Route path="files" element={<Suspense fallback={<PageLoader />}><ClientFilesPage /></Suspense>} />
             <Route path="blueprints" element={<Suspense fallback={<PageLoader />}><ClientBlueprintsPage /></Suspense>} />
+            <Route path="360-interiors" element={<Suspense fallback={<PageLoader />}><ClientPanoramasPage /></Suspense>} />
             <Route path="profile" element={<Suspense fallback={<PageLoader />}><ClientProfilePage /></Suspense>} />
           </Route>
         </Route>

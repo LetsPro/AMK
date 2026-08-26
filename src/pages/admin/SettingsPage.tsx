@@ -3,9 +3,11 @@ import { Save } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
+import { Select } from "@/components/ui/Input";
 import { MediaPicker } from "@/components/media/MediaPicker";
 import { useAppSettings } from "@/hooks/useAppSettings";
 import { useTableMutations } from "@/hooks/useSupabaseTable";
+import { GOOGLE_FONTS, googleFontsUrl } from "@/lib/googleFonts";
 
 export function SettingsPage() {
   const { branding, settingRow } = useAppSettings();
@@ -13,6 +15,19 @@ export function SettingsPage() {
   const [form, setForm] = useState(branding);
 
   useEffect(() => setForm(branding), [branding]);
+
+  useEffect(() => {
+    const previewId = "amk-google-font-preview";
+    let link = document.getElementById(previewId) as HTMLLinkElement | null;
+    if (!link) {
+      link = document.createElement("link");
+      link.id = previewId;
+      link.rel = "stylesheet";
+      document.head.appendChild(link);
+    }
+    link.href = googleFontsUrl([form.bodyFont, form.headingFont]);
+    return () => link?.remove();
+  }, [form.bodyFont, form.headingFont]);
 
   async function save(event: React.FormEvent) {
     event.preventDefault();
@@ -24,7 +39,7 @@ export function SettingsPage() {
     <div className="space-y-5">
       <div>
         <h1 className="text-3xl font-black">Settings</h1>
-        <p className="text-sm text-slate-500">Manage logo, brand identity, contact details, and theme colors used across the website and admin UI.</p>
+        <p className="text-sm text-slate-500">Manage the logo, typography, contact details, and theme used across the public website, admin area, and client portal.</p>
       </div>
       <Card>
         <form className="grid gap-5 md:grid-cols-2" onSubmit={save}>
@@ -52,6 +67,26 @@ export function SettingsPage() {
             <span className="mb-1 block text-sm font-medium">Location</span>
             <Input value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} />
           </label>
+          <div className="md:col-span-2 grid gap-5 rounded-lg border border-slate-200 bg-slate-50 p-5 md:grid-cols-2">
+            <label>
+              <span className="mb-1 block text-sm font-medium">Body Font</span>
+              <Select value={form.bodyFont} style={{ fontFamily: form.bodyFont }} onChange={(e) => setForm({ ...form, bodyFont: e.target.value })}>
+                {GOOGLE_FONTS.map((font) => <option key={font} value={font}>{font}</option>)}
+              </Select>
+              <span className="mt-2 block text-xs text-slate-500">Used for paragraphs, navigation, forms, tables, and buttons.</span>
+            </label>
+            <label>
+              <span className="mb-1 block text-sm font-medium">Heading Font</span>
+              <Select value={form.headingFont} style={{ fontFamily: form.headingFont }} onChange={(e) => setForm({ ...form, headingFont: e.target.value })}>
+                {GOOGLE_FONTS.map((font) => <option key={font} value={font}>{font}</option>)}
+              </Select>
+              <span className="mt-2 block text-xs text-slate-500">Used for page titles and all section headings.</span>
+            </label>
+            <div className="md:col-span-2 rounded-md bg-white p-5 shadow-sm ring-1 ring-slate-200">
+              <h3 style={{ fontFamily: form.headingFont }} className="text-2xl font-bold">Architecture shaped around people.</h3>
+              <p style={{ fontFamily: form.bodyFont }} className="mt-2 text-sm leading-6 text-slate-600">Preview how your selected heading and body fonts work together across the application.</p>
+            </div>
+          </div>
           {(["primary", "accent", "secondary", "background"] as const).map((key) => (
             <label key={key}>
               <span className="mb-1 block text-sm font-medium capitalize">{key} Color</span>
