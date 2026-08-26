@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import { ArrowRight, BarChart3, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, ClipboardCheck, Eye, Layers3, MapPin, Ruler, Send, ShieldCheck, Sparkles, Star, X } from "lucide-react";
+import { ArrowRight, BarChart3, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, ClipboardCheck, Eye, Layers3, LogIn, MapPin, Ruler, Send, ShieldCheck, Sparkles, Star, X } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Input, Textarea } from "@/components/ui/Input";
@@ -312,7 +312,7 @@ function mergeServiceRows<T extends { id: string; name?: string; slug?: string }
 
 function ProjectModal({ project, onClose }: { project: PublicProject; onClose: () => void }) {
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/75 p-4">
+    <div className="fixed inset-0 z-[1001] grid place-items-center bg-slate-950/75 p-4">
       <motion.div initial={{ opacity: 0, y: 20, scale: 0.98 }} animate={{ opacity: 1, y: 0, scale: 1 }} className="max-h-[90vh] w-full max-w-5xl overflow-y-auto rounded-lg bg-white shadow-2xl">
         <div className="relative">
           <img src={project.cover_image_url ?? "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1400&q=80"} alt={project.name} loading="eager" decoding="async" className="aspect-[16/8] w-full bg-slate-200 object-cover" />
@@ -345,7 +345,7 @@ function ProjectModal({ project, onClose }: { project: PublicProject; onClose: (
 
 function GalleryPreview({ item, onClose }: { item: PublicGallery; onClose: () => void }) {
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/80 p-4">
+    <div className="fixed inset-0 z-[1001] grid place-items-center bg-slate-950/80 p-4">
       <motion.div initial={{ opacity: 0, scale: 0.97 }} animate={{ opacity: 1, scale: 1 }} className="w-full max-w-5xl overflow-hidden rounded-lg bg-white shadow-2xl">
         <div className="flex items-center justify-between border-b border-slate-200 p-4">
           <div><h2 className="text-xl font-black">{item.title}</h2><p className="text-sm text-slate-500">{item.category}</p></div>
@@ -730,6 +730,13 @@ export function HomePage() {
             <motion.h1 key={slide.title} initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} className="mx-auto mt-7 max-w-5xl text-5xl font-bold leading-tight tracking-normal md:text-6xl xl:text-7xl">{slide.title}</motion.h1>
             <p className="mx-auto mt-6 max-w-3xl text-lg leading-8 text-slate-200 md:text-xl">{slide.subtitle}</p>
             <div className="mt-9 flex flex-wrap items-center justify-center gap-4">
+              <button
+                type="button"
+                onClick={() => location.href = "/login"}
+                className="group rounded-full bg-brand-primary px-7 py-4 text-sm font-black text-white shadow-2xl shadow-orange-950/40 ring-2 ring-white/30 transition hover:-translate-y-1 hover:bg-brand-accent hover:ring-white/60"
+              >
+                <span className="inline-flex items-center gap-2"><LogIn className="h-5 w-5" /> Login to Your Portal</span>
+              </button>
               <button
                 type="button"
                 onClick={() => (slide.cta_url === "#enquiry" || slide.cta_url === legacyEnquiryRoute || slide.cta_label?.toLowerCase() === "get started") ? openEnquiryModal() : location.href = slide.cta_url ?? "/contact"}

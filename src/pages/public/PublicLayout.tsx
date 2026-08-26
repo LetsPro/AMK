@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import { Link, Outlet } from "react-router-dom";
-import { Building2, CalendarDays, Facebook, Instagram, Linkedin, LogIn, Mail, MapPin, Menu, Phone, Send, UserPlus, X } from "lucide-react";
+import { Building2, CalendarDays, Facebook, Instagram, Linkedin, Mail, MapPin, Menu, Phone, Send, UserPlus, X } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Input, Select, Textarea } from "@/components/ui/Input";
 import { useAppSettings } from "@/hooks/useAppSettings";
@@ -46,6 +46,18 @@ export function PublicLayout() {
     window.addEventListener("open-enquiry-modal", listener);
     return () => window.removeEventListener("open-enquiry-modal", listener);
   }, []);
+
+  useEffect(() => {
+    if (!enquiryOpen) return;
+    const previousOverflow = document.body.style.overflow;
+    const closeOnEscape = (event: KeyboardEvent) => event.key === "Escape" && setEnquiryOpen(false);
+    document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [enquiryOpen]);
 
   async function submitEnquiry(event: FormEvent) {
     event.preventDefault();
@@ -104,7 +116,6 @@ export function PublicLayout() {
               {navItems.map((item) => <Link key={item} className="capitalize hover:text-brand-primary" to={hrefFor(item)}>{item === "360-interiors" ? "360 Interiors" : item.replace("-", " ")}</Link>)}
           </nav>
           <div className="hidden items-center gap-2 xl:flex">
-            <Button variant="secondary" onClick={() => location.href = "/login"}><LogIn className="h-4 w-4" /> Login</Button>
             <Button onClick={() => setEnquiryOpen(true)}><UserPlus className="h-4 w-4" /> Get Started</Button>
           </div>
           <button className="grid h-10 w-10 place-items-center rounded-md border border-slate-200 bg-white text-slate-800 xl:hidden" onClick={() => setOpen((value) => !value)} aria-label="Toggle menu">
@@ -116,8 +127,7 @@ export function PublicLayout() {
             <nav className="grid gap-2 text-sm font-semibold">
               {navItems.map((item) => <Link key={item} className="rounded-md px-3 py-2 capitalize hover:bg-orange-50 hover:text-brand-primary" to={hrefFor(item)} onClick={() => setOpen(false)}>{item === "360-interiors" ? "360 Interiors" : item.replace("-", " ")}</Link>)}
             </nav>
-            <div className="mt-4 grid grid-cols-2 gap-2">
-              <Button variant="secondary" onClick={() => { setOpen(false); location.href = "/login"; }}><LogIn className="h-4 w-4" /> Login</Button>
+            <div className="mt-4 grid gap-2">
               <Button onClick={() => { setOpen(false); setEnquiryOpen(true); }}><UserPlus className="h-4 w-4" /> Get Started</Button>
             </div>
           </div>
@@ -161,7 +171,7 @@ export function PublicLayout() {
         </div>
       </footer>
       {enquiryOpen && (
-        <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/75 p-3 backdrop-blur-sm sm:p-4">
+        <div className="fixed inset-0 z-[1001] grid place-items-center bg-slate-950/75 p-3 backdrop-blur-sm sm:p-4">
           <div className="max-h-[92vh] w-full max-w-4xl overflow-hidden rounded-2xl bg-white shadow-2xl">
             <div className="flex items-center justify-between border-b border-slate-200 bg-slate-950 px-5 py-4 text-white sm:px-6">
               <div>

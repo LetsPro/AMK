@@ -54,7 +54,7 @@ function InitialSplash({ onComplete }: { onComplete: () => void }) {
   const { branding } = useAppSettings();
 
   useEffect(() => {
-    const timer = window.setTimeout(onComplete, 4000);
+    const timer = window.setTimeout(onComplete, 2000);
     return () => window.clearTimeout(timer);
   }, [onComplete]);
 
