@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Edit3, Eye, FolderPlus, ImageIcon, Plus, Save, Trash2, Users, X } from "lucide-react";
+import { Edit3, Eye, EyeOff, FolderPlus, ImageIcon, Loader2, Plus, Save, Trash2, Users, X } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Input, Select, Textarea } from "@/components/ui/Input";
@@ -14,7 +14,15 @@ type Client = TableRow<"clients">;
 type PanoramaAssignment = TableRow<"client_panorama_assignments">;
 
 const emptyCategory = { name: "", slug: "", description: "", display_order: "", is_active: "true" };
-const emptyPanorama = { category_id: "", title: "", description: "", image_url: "", status: "draft", display_order: "" };
+type PanoramaDraft = { localId: string; title: string; description: string; image_url: string; display_order: string };
+
+const emptyPanorama = { category_id: "", title: "", description: "", image_url: "", status: "published", is_public: true, display_order: "" };
+let panoramaDraftId = 0;
+
+function createPanoramaDraft(displayOrder = ""): PanoramaDraft {
+  panoramaDraftId += 1;
+  return { localId: `panorama-${panoramaDraftId}`, title: "", description: "", image_url: "", display_order: displayOrder };
+}
 
 function slugify(value: string) {
   return value.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
@@ -27,6 +35,8 @@ export function PanoramaAdminPage() {
   const { data: assignmentRows = [] } = useTable("client_panorama_assignments", { orderBy: "created_at", ascending: true });
   const categoryMutations = useTableMutations("panorama_categories");
   const panoramaMutations = useTableMutations("panoramas");
+  const batchPanoramaMutations = useTableMutations("panoramas", { toast: false });
+  const visibilityMutations = useTableMutations("panoramas", { toast: false });
   const assignmentMutations = useTableMutations("client_panorama_assignments", { toast: false });
   const toast = useToast();
   const categories = categoryRows as PanoramaCategory[];
@@ -37,6 +47,10 @@ export function PanoramaAdminPage() {
   const [categoryEditingId, setCategoryEditingId] = useState<string | null>(null);
   const [categoryModalOpen, setCategoryModalOpen] = useState(false);
   const [panoramaForm, setPanoramaForm] = useState(emptyPanorama);
+  const [panoramaDrafts, setPanoramaDrafts] = useState<PanoramaDraft[]>(() => [createPanoramaDraft("1")]);
+  const [batchClientIds, setBatchClientIds] = useState<string[]>([]);
+  const [showBatchClients, setShowBatchClients] = useState(false);
+  const [savingBatch, setSavingBatch] = useState(false);
   const [panoramaEditingId, setPanoramaEditingId] = useState<string | null>(null);
   const [panoramaModalOpen, setPanoramaModalOpen] = useState(false);
   const [assignmentPanorama, setAssignmentPanorama] = useState<Panorama | null>(null);
@@ -98,6 +112,9 @@ export function PanoramaAdminPage() {
 
   function resetPanorama() {
     setPanoramaForm(emptyPanorama);
+    setPanoramaDrafts([createPanoramaDraft(String(panoramas.length + 1))]);
+    setBatchClientIds([]);
+    setShowBatchClients(false);
     setPanoramaEditingId(null);
   }
 
@@ -109,6 +126,22 @@ export function PanoramaAdminPage() {
   function closePanoramaModal() {
     resetPanorama();
     setPanoramaModalOpen(false);
+  }
+
+  function updatePanoramaDraft(localId: string, changes: Partial<PanoramaDraft>) {
+    setPanoramaDrafts((current) => current.map((draft) => draft.localId === localId ? { ...draft, ...changes } : draft));
+  }
+
+  function addPanoramaDraft() {
+    setPanoramaDrafts((current) => [...current, createPanoramaDraft(String(panoramas.length + current.length + 1))]);
+  }
+
+  function removePanoramaDraft(localId: string) {
+    setPanoramaDrafts((current) => current.length === 1 ? current : current.filter((draft) => draft.localId !== localId));
+  }
+
+  function toggleBatchClient(clientId: string) {
+    setBatchClientIds((current) => current.includes(clientId) ? current.filter((id) => id !== clientId) : [...current, clientId]);
   }
 
   async function saveCategory(event: React.FormEvent) {
@@ -127,21 +160,60 @@ export function PanoramaAdminPage() {
 
   async function savePanorama(event: React.FormEvent) {
     event.preventDefault();
-    if (!panoramaForm.image_url) {
-      window.alert("Please upload or select a panoramic image before saving.");
+    if (panoramaEditingId) {
+      if (!panoramaForm.image_url) {
+        window.alert("Please upload or select a panoramic image before saving.");
+        return;
+      }
+      await panoramaMutations.update.mutateAsync({
+        id: panoramaEditingId,
+        payload: {
+          category_id: panoramaForm.category_id,
+          title: panoramaForm.title.trim(),
+          description: panoramaForm.description.trim() || null,
+          image_url: panoramaForm.image_url,
+          status: panoramaForm.status as "draft" | "published",
+          is_public: panoramaForm.is_public,
+          display_order: Number(panoramaForm.display_order || panoramas.length + 1)
+        }
+      });
+      closePanoramaModal();
       return;
     }
-    const payload = {
-      category_id: panoramaForm.category_id,
-      title: panoramaForm.title.trim(),
-      description: panoramaForm.description.trim() || null,
-      image_url: panoramaForm.image_url,
-      status: panoramaForm.status as "draft" | "published",
-      display_order: Number(panoramaForm.display_order || panoramas.length + 1)
-    };
-    if (panoramaEditingId) await panoramaMutations.update.mutateAsync({ id: panoramaEditingId, payload });
-    else await panoramaMutations.create.mutateAsync(payload);
-    closePanoramaModal();
+
+    if (!panoramaForm.category_id) {
+      window.alert("Please select a category.");
+      return;
+    }
+    const incomplete = panoramaDrafts.find((draft) => !draft.title.trim() || !draft.image_url);
+    if (incomplete) {
+      window.alert("Please add a title and panoramic image for every view.");
+      return;
+    }
+
+    setSavingBatch(true);
+    try {
+      const createdPanoramas: Panorama[] = [];
+      for (const [index, draft] of panoramaDrafts.entries()) {
+        const created = await batchPanoramaMutations.create.mutateAsync({
+          category_id: panoramaForm.category_id,
+          title: draft.title.trim(),
+          description: draft.description.trim() || null,
+          image_url: draft.image_url,
+          status: panoramaForm.status as "draft" | "published",
+          is_public: panoramaForm.is_public,
+          display_order: Number(draft.display_order || panoramas.length + index + 1)
+        });
+        createdPanoramas.push(created as Panorama);
+      }
+      await Promise.all(createdPanoramas.flatMap((panorama) => batchClientIds.map((clientId) => assignmentMutations.create.mutateAsync({ client_id: clientId, panorama_id: panorama.id }))));
+      toast.success("360 interiors added", `${createdPanoramas.length} panorama${createdPanoramas.length === 1 ? "" : "s"} created${batchClientIds.length ? ` and assigned to ${batchClientIds.length} client${batchClientIds.length === 1 ? "" : "s"}` : ""}.`);
+      closePanoramaModal();
+    } catch (error) {
+      toast.error("Could not add panoramas", error instanceof Error ? error.message : "Please try again.");
+    } finally {
+      setSavingBatch(false);
+    }
   }
 
   function editCategory(category: PanoramaCategory) {
@@ -165,8 +237,23 @@ export function PanoramaAdminPage() {
       description: panorama.description ?? "",
       image_url: panorama.image_url,
       status: panorama.status,
+      is_public: panorama.is_public !== false,
       display_order: String(panorama.display_order)
     });
+  }
+
+  async function toggleWebsiteVisibility(panorama: Panorama) {
+    const currentlyVisible = panorama.status === "published" && panorama.is_public !== false;
+    const enable = !currentlyVisible;
+    try {
+      await visibilityMutations.update.mutateAsync({
+        id: panorama.id,
+        payload: { is_public: enable, ...(enable ? { status: "published" as const } : {}) }
+      });
+      toast.success(enable ? "Website display enabled" : "Website display disabled", `${panorama.title} ${enable ? "will appear" : "will no longer appear"} on the public website.`);
+    } catch (error) {
+      toast.error("Visibility update failed", error instanceof Error ? error.message : "Please try again.");
+    }
   }
 
   function deleteCategory(category: PanoramaCategory) {
@@ -220,7 +307,7 @@ export function PanoramaAdminPage() {
         </div>
         <div className="flex flex-wrap gap-2">
           <Button type="button" variant="secondary" onClick={openCategoryModal}><FolderPlus className="h-4 w-4" /> Manage Categories ({categories.length})</Button>
-          <Button type="button" onClick={openPanoramaModal} disabled={!categories.length}><Plus className="h-4 w-4" /> Add 360 Interior</Button>
+          <Button type="button" onClick={openPanoramaModal} disabled={!categories.length}><Plus className="h-4 w-4" /> Add Panoramas</Button>
         </div>
       </div>
 
@@ -241,12 +328,13 @@ export function PanoramaAdminPage() {
                       <h3 className="font-bold text-slate-950">{panorama.title}</h3>
                       <p className="mt-1 text-xs font-semibold uppercase tracking-wide text-brand-primary">{categoryById.get(panorama.category_id)?.name ?? "Unknown category"}</p>
                     </div>
-                    <span className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${panorama.status === "published" ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-500"}`}>{panorama.status === "published" ? "Live" : "Draft"}</span>
+                    <span className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${panorama.status === "published" && panorama.is_public !== false ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-500"}`}>{panorama.status === "published" && panorama.is_public !== false ? "Website enabled" : "Website disabled"}</span>
                   </div>
                   <p className="mt-2 line-clamp-2 text-sm text-slate-500">{panorama.description || "No description"}</p>
                   <div className="mt-3 flex items-center justify-between gap-3">
                     <span className="text-xs text-slate-400">Order {panorama.display_order}</span>
                     <div className="flex flex-wrap justify-end gap-1">
+                      <Button type="button" className="h-8 px-3" variant="ghost" onClick={() => toggleWebsiteVisibility(panorama)}>{panorama.status === "published" && panorama.is_public !== false ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />} {panorama.status === "published" && panorama.is_public !== false ? "Disable website" : "Enable website"}</Button>
                       <Button type="button" className="h-8 px-3" variant="ghost" onClick={() => openAssignments(panorama)}><Users className="h-4 w-4" /> Assign ({assignments.filter((assignment) => assignment.panorama_id === panorama.id).length})</Button>
                       <Button type="button" className="h-8 px-3" variant="ghost" onClick={() => editPanorama(panorama)}><Edit3 className="h-4 w-4" /> Edit</Button>
                       <Button type="button" className="h-8 px-3" variant="ghost" onClick={() => deletePanorama(panorama)}><Trash2 className="h-4 w-4" /> Delete</Button>
@@ -268,53 +356,124 @@ export function PanoramaAdminPage() {
           className="fixed inset-0 z-[1001] flex items-center justify-center bg-slate-950/75 p-3 backdrop-blur-sm md:p-6"
           onMouseDown={(event) => event.target === event.currentTarget && closePanoramaModal()}
         >
-          <div role="dialog" aria-modal="true" aria-labelledby="panorama-editor-title" className="flex max-h-[92vh] w-full max-w-4xl flex-col overflow-hidden rounded-xl bg-white shadow-2xl">
+          <div role="dialog" aria-modal="true" aria-labelledby="panorama-editor-title" className="flex max-h-[92vh] w-full max-w-6xl flex-col overflow-hidden rounded-xl bg-white shadow-2xl">
             <div className="flex items-start justify-between gap-4 border-b border-slate-200 px-5 py-4 md:px-6">
               <div>
                 <div className="text-xs font-bold uppercase tracking-[0.18em] text-brand-primary">360 Interiors</div>
-                <h2 id="panorama-editor-title" className="mt-1 text-2xl font-black text-slate-950">{panoramaEditingId ? "Edit 360 Interior" : "Add 360 Interior"}</h2>
-                <p className="mt-1 text-sm text-slate-500">Upload one 2:1 panorama. Every view added to the same category automatically joins its thumbnail gallery.</p>
+                <h2 id="panorama-editor-title" className="mt-1 text-2xl font-black text-slate-950">{panoramaEditingId ? "Edit 360 Interior" : "Add Multiple 360 Interiors"}</h2>
+                <p className="mt-1 text-sm text-slate-500">{panoramaEditingId ? "Update this panoramic view and its website visibility." : "Choose a category once, add multiple panoramic views, and optionally assign the complete batch to clients."}</p>
               </div>
               <button type="button" onClick={closePanoramaModal} className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-slate-100 text-slate-700 transition hover:bg-slate-200" aria-label="Close 360 interior editor"><X className="h-5 w-5" /></button>
             </div>
 
-            <form className="grid min-h-0 flex-1 gap-4 overflow-y-auto p-5 md:grid-cols-2 md:p-6" onSubmit={savePanorama}>
-              <label>
-                <span className="mb-1 block text-sm font-medium">Title</span>
-                <Input autoFocus required value={panoramaForm.title} onChange={(event) => setPanoramaForm({ ...panoramaForm, title: event.target.value })} placeholder="Modern Villa Living Room" />
-              </label>
-              <label>
-                <span className="mb-1 block text-sm font-medium">Category</span>
-                <Select required value={panoramaForm.category_id} onChange={(event) => setPanoramaForm({ ...panoramaForm, category_id: event.target.value })}>
-                  <option value="">Select category</option>
-                  {categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}
-                </Select>
-              </label>
-              <label className="md:col-span-2">
-                <span className="mb-1 block text-sm font-medium">Small description</span>
-                <Textarea value={panoramaForm.description} onChange={(event) => setPanoramaForm({ ...panoramaForm, description: event.target.value })} placeholder="Describe the space, materials, or design idea." />
-              </label>
-              <div className="md:col-span-2">
-                <span className="mb-1 block text-sm font-medium">Panoramic image</span>
-                <MediaPicker label="Panoramic image" value={panoramaForm.image_url} onChange={(image_url) => setPanoramaForm({ ...panoramaForm, image_url })} />
-                <span className="mt-2 block text-xs text-slate-500">JPEG or WebP recommended. Maximum upload size is 50 MB after the included database migration is applied.</span>
+            <form className="min-h-0 flex-1 space-y-5 overflow-y-auto p-5 md:p-6" onSubmit={savePanorama}>
+              <div className="grid gap-4 md:grid-cols-2">
+                <label>
+                  <span className="mb-1 block text-sm font-medium">Category</span>
+                  <Select required value={panoramaForm.category_id} onChange={(event) => setPanoramaForm({ ...panoramaForm, category_id: event.target.value })}>
+                    <option value="">Select category</option>
+                    {categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}
+                  </Select>
+                </label>
+                <label>
+                  <span className="mb-1 block text-sm font-medium">Content availability</span>
+                  <Select value={panoramaForm.status} onChange={(event) => setPanoramaForm({ ...panoramaForm, status: event.target.value })}>
+                    <option value="published">Ready for viewing</option>
+                    <option value="draft">Draft / hidden everywhere</option>
+                  </Select>
+                </label>
               </div>
-              <label>
-                <span className="mb-1 block text-sm font-medium">Display order</span>
-                <Input type="number" min="0" value={panoramaForm.display_order} onChange={(event) => setPanoramaForm({ ...panoramaForm, display_order: event.target.value })} placeholder={String(panoramas.length + 1)} />
-              </label>
-              <label>
-                <span className="mb-1 block text-sm font-medium">Publishing status</span>
-                <Select value={panoramaForm.status} onChange={(event) => setPanoramaForm({ ...panoramaForm, status: event.target.value })}>
-                  <option value="draft">Draft / hidden</option>
-                  <option value="published">Published</option>
-                </Select>
-              </label>
-              <div className="flex justify-end gap-3 border-t border-slate-200 pt-4 md:col-span-2">
+
+              <button
+                type="button"
+                role="switch"
+                aria-checked={panoramaForm.is_public}
+                onClick={() => setPanoramaForm({ ...panoramaForm, is_public: !panoramaForm.is_public })}
+                className={`flex w-full items-center justify-between gap-4 rounded-lg border p-4 text-left transition ${panoramaForm.is_public ? "border-emerald-200 bg-emerald-50" : "border-slate-200 bg-slate-50"}`}
+              >
+                <span>
+                  <span className="block font-bold text-slate-950">Display on public website</span>
+                  <span className="mt-1 block text-xs text-slate-500">Client assignments are separate and remain available when website display is disabled.</span>
+                </span>
+                <span className={`relative h-7 w-12 shrink-0 rounded-full transition ${panoramaForm.is_public ? "bg-emerald-500" : "bg-slate-300"}`}><span className={`absolute top-1 h-5 w-5 rounded-full bg-white shadow transition ${panoramaForm.is_public ? "left-6" : "left-1"}`} /></span>
+              </button>
+
+              {panoramaEditingId ? (
+                <div className="grid gap-4 md:grid-cols-2">
+                  <label>
+                    <span className="mb-1 block text-sm font-medium">Title</span>
+                    <Input autoFocus required value={panoramaForm.title} onChange={(event) => setPanoramaForm({ ...panoramaForm, title: event.target.value })} placeholder="Modern Villa Living Room" />
+                  </label>
+                  <label>
+                    <span className="mb-1 block text-sm font-medium">Display order</span>
+                    <Input type="number" min="0" value={panoramaForm.display_order} onChange={(event) => setPanoramaForm({ ...panoramaForm, display_order: event.target.value })} placeholder={String(panoramas.length + 1)} />
+                  </label>
+                  <label className="md:col-span-2">
+                    <span className="mb-1 block text-sm font-medium">Small description</span>
+                    <Textarea value={panoramaForm.description} onChange={(event) => setPanoramaForm({ ...panoramaForm, description: event.target.value })} placeholder="Describe the space, materials, or design idea." />
+                  </label>
+                  <div className="md:col-span-2">
+                    <span className="mb-1 block text-sm font-medium">Panoramic image</span>
+                    <MediaPicker label="Panoramic image" value={panoramaForm.image_url} onChange={(image_url) => setPanoramaForm({ ...panoramaForm, image_url })} />
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div><h3 className="text-lg font-black text-slate-950">Panorama views</h3><p className="text-xs text-slate-500">Each view needs its own title and 2:1 panoramic image.</p></div>
+                    <Button type="button" variant="secondary" onClick={addPanoramaDraft}><Plus className="h-4 w-4" /> Add more</Button>
+                  </div>
+                  {panoramaDrafts.map((draft, index) => (
+                    <div key={draft.localId} className="rounded-xl border border-slate-200 bg-slate-50 p-4 md:p-5">
+                      <div className="mb-4 flex items-center justify-between gap-3">
+                        <span className="text-sm font-black text-slate-950">Panorama {String(index + 1).padStart(2, "0")}</span>
+                        {panoramaDrafts.length > 1 && <Button type="button" className="h-8 px-3 text-red-600" variant="ghost" onClick={() => removePanoramaDraft(draft.localId)}><Trash2 className="h-4 w-4" /> Remove</Button>}
+                      </div>
+                      <div className="grid gap-4 md:grid-cols-[1fr_180px]">
+                        <label>
+                          <span className="mb-1 block text-sm font-medium">Title</span>
+                          <Input autoFocus={index === 0} required value={draft.title} onChange={(event) => updatePanoramaDraft(draft.localId, { title: event.target.value })} placeholder="Modern Villa Living Room" />
+                        </label>
+                        <label>
+                          <span className="mb-1 block text-sm font-medium">Display order</span>
+                          <Input type="number" min="0" value={draft.display_order} onChange={(event) => updatePanoramaDraft(draft.localId, { display_order: event.target.value })} />
+                        </label>
+                        <label className="md:col-span-2">
+                          <span className="mb-1 block text-sm font-medium">Small description</span>
+                          <Textarea value={draft.description} onChange={(event) => updatePanoramaDraft(draft.localId, { description: event.target.value })} placeholder="Describe this view, materials, or design idea." />
+                        </label>
+                        <div className="md:col-span-2">
+                          <span className="mb-1 block text-sm font-medium">Panoramic image</span>
+                          <MediaPicker label={`Panoramic image ${index + 1}`} value={draft.image_url} onChange={(image_url) => updatePanoramaDraft(draft.localId, { image_url })} />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+
+                  <div className="rounded-xl border border-slate-200 bg-white">
+                    <button type="button" onClick={() => setShowBatchClients((value) => !value)} className="flex w-full items-center justify-between gap-3 p-4 text-left">
+                      <span><span className="flex items-center gap-2 font-bold text-slate-950"><Users className="h-4 w-4 text-brand-primary" /> Assign clients</span><span className="mt-1 block text-xs text-slate-500">Selected clients receive every panorama in this batch.</span></span>
+                      <span className="rounded-full bg-orange-50 px-3 py-1 text-xs font-bold text-brand-primary">{batchClientIds.length} selected</span>
+                    </button>
+                    {showBatchClients && (
+                      <div className="border-t border-slate-200 p-4">
+                        <div className="mb-3 flex justify-end gap-2 text-xs font-bold"><button type="button" onClick={() => setBatchClientIds(clients.map((client) => client.id))} className="text-brand-primary">Select all</button><span className="text-slate-300">·</span><button type="button" onClick={() => setBatchClientIds([])} className="text-slate-500">Clear</button></div>
+                        {clients.length ? <div className="grid max-h-48 gap-2 overflow-y-auto sm:grid-cols-2 lg:grid-cols-3">{clients.map((client) => {
+                          const selected = batchClientIds.includes(client.id);
+                          return <label key={client.id} className={`flex cursor-pointer items-center gap-3 rounded-lg border p-3 ${selected ? "border-brand-primary bg-orange-50" : "border-slate-200"}`}><input type="checkbox" checked={selected} onChange={() => toggleBatchClient(client.id)} className="h-4 w-4 accent-orange-600" /><span className="min-w-0 truncate text-sm font-bold text-slate-800">{client.name}</span></label>;
+                        })}</div> : <p className="text-sm text-slate-500">No clients are available yet.</p>}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              <p className="text-xs text-slate-500">JPEG or WebP recommended. Maximum upload size is 50 MB per panorama.</p>
+              <div className="flex justify-end gap-3 border-t border-slate-200 pt-4">
                 <Button type="button" variant="secondary" onClick={closePanoramaModal}>Cancel</Button>
-                <Button disabled={!categories.length || panoramaMutations.create.isPending || panoramaMutations.update.isPending}>
-                  {panoramaEditingId ? <Save className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
-                  {panoramaEditingId ? "Save Changes" : "Add 360 Interior"}
+                <Button disabled={!categories.length || savingBatch || panoramaMutations.update.isPending}>
+                  {savingBatch ? <Loader2 className="h-4 w-4 animate-spin" /> : panoramaEditingId ? <Save className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
+                  {panoramaEditingId ? "Save Changes" : `Add ${panoramaDrafts.length} Panorama${panoramaDrafts.length === 1 ? "" : "s"}`}
                 </Button>
               </div>
             </form>

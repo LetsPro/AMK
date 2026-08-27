@@ -188,7 +188,7 @@ export function PanoramaModal({
 
 export function PanoramaPage() {
   const { data: categoryRows = [] } = useTable("panorama_categories", { orderBy: "display_order", ascending: true, eq: { is_active: true } });
-  const { data: panoramaRows = [] } = useTable("panoramas", { orderBy: "display_order", ascending: true, eq: { status: "published" } });
+  const { data: panoramaRows = [] } = useTable("panoramas", { orderBy: "display_order", ascending: true, eq: { status: "published", is_public: true } });
   const categories = categoryRows as PanoramaCategory[];
   const panoramas = panoramaRows as Panorama[];
   const [activeCategory, setActiveCategory] = useState("all");
@@ -199,6 +199,7 @@ export function PanoramaPage() {
     panoramas.forEach((panorama) => counts.set(panorama.category_id, (counts.get(panorama.category_id) ?? 0) + 1));
     return counts;
   }, [panoramas]);
+  const categoryById = useMemo(() => new Map(categories.map((category) => [category.id, category])), [categories]);
 
   const visiblePanoramas = activeCategory === "all" ? panoramas : panoramas.filter((panorama) => panorama.category_id === activeCategory);
   const activeDetails = categories.find((category) => category.id === activeCategory);
@@ -280,6 +281,10 @@ export function PanoramaPage() {
                     <span className="absolute bottom-3 left-3 inline-flex items-center gap-1.5 rounded-full bg-white/90 px-3 py-1.5 text-xs font-bold text-slate-900"><Maximize2 className="h-3.5 w-3.5" /> Open 360 View</span>
                   </div>
                   <div className="p-5">
+                    <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                      <span className="text-xs font-bold uppercase tracking-[0.14em] text-brand-primary">{categoryById.get(panorama.category_id)?.name ?? "Interior"}</span>
+                      <span className="rounded-full bg-orange-50 px-2.5 py-1 text-[11px] font-bold text-brand-primary">{categoryCounts.get(panorama.category_id) ?? 1} view{(categoryCounts.get(panorama.category_id) ?? 1) === 1 ? "" : "s"}</span>
+                    </div>
                     <h3 className="text-xl font-black text-slate-950">{panorama.title}</h3>
                     <p className="mt-2 line-clamp-2 text-sm leading-6 text-slate-500">{panorama.description || "Open this immersive panorama to explore the complete interior."}</p>
                   </div>

@@ -56,7 +56,7 @@ export type Database = {
       gallery: T<Base & { title: string; image_url: string; category: string | null; project_id: string | null; is_featured: boolean; display_order: number }>;
       testimonials: T<Base & { name: string; company: string | null; quote: string; rating: number; avatar_url: string | null; is_published: boolean; display_order: number }>;
       panorama_categories: T<Base & { name: string; slug: string; description: string | null; display_order: number; is_active: boolean }>;
-      panoramas: T<Base & { category_id: string; title: string; description: string | null; image_url: string; status: "draft" | "published"; display_order: number }>;
+      panoramas: T<Base & { category_id: string; title: string; description: string | null; image_url: string; status: "draft" | "published"; is_public: boolean; display_order: number }>;
       client_panorama_assignments: T<Base & { client_id: string; panorama_id: string; assigned_by: string | null }>;
     };
     Views: Record<string, never>;
