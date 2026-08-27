@@ -88,10 +88,28 @@ function PanoramaViewer({ panorama }: { panorama: Panorama }) {
   }, [panorama]);
 
   if (error) return <div className="grid h-full place-items-center bg-slate-900 p-8 text-center text-sm font-semibold text-white">{error}</div>;
-  return <div ref={containerRef} className="h-full min-h-[420px] w-full" aria-label={`360 degree view of ${panorama.title}`} />;
+  return <div ref={containerRef} className="h-full min-h-[260px] w-full md:min-h-[420px]" aria-label={`360 degree view of ${panorama.title}`} />;
 }
 
-export function PanoramaModal({ panorama, onClose }: { panorama: Panorama; onClose: () => void }) {
+export function PanoramaModal({
+  panorama,
+  panoramas = [panorama],
+  categoryName,
+  onClose,
+}: {
+  panorama: Panorama;
+  panoramas?: Panorama[];
+  categoryName?: string;
+  onClose: () => void;
+}) {
+  const [activePanorama, setActivePanorama] = useState(panorama);
+  const categoryPanoramas = useMemo(
+    () => panoramas.filter((item) => item.category_id === panorama.category_id),
+    [panoramas, panorama.category_id],
+  );
+
+  useEffect(() => setActivePanorama(panorama), [panorama]);
+
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => event.key === "Escape" && onClose();
     const previousOverflow = document.body.style.overflow;
@@ -115,25 +133,54 @@ export function PanoramaModal({ panorama, onClose }: { panorama: Panorama; onClo
         role="dialog"
         aria-modal="true"
         aria-labelledby="panorama-modal-title"
-        className="flex max-h-[94vh] w-full max-w-7xl flex-col overflow-hidden rounded-xl bg-white shadow-2xl"
+        className="flex h-[94vh] max-h-[94vh] w-full max-w-7xl flex-col overflow-hidden rounded-xl bg-white shadow-2xl"
         initial={{ opacity: 0, y: 24, scale: 0.98 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
         exit={{ opacity: 0, y: 20, scale: 0.98 }}
       >
         <div className="flex items-start justify-between gap-4 border-b border-slate-200 px-5 py-4">
           <div>
-            <div className="text-xs font-bold uppercase tracking-[0.18em] text-brand-primary">Interactive 360 Interior</div>
-            <h2 id="panorama-modal-title" className="mt-1 text-xl font-black text-slate-950 md:text-2xl">{panorama.title}</h2>
-            {panorama.description && <p className="mt-1 max-w-3xl text-sm text-slate-500">{panorama.description}</p>}
+            <div className="text-xs font-bold uppercase tracking-[0.18em] text-brand-primary">{categoryName || "Interactive 360 Interior"}</div>
+            <h2 id="panorama-modal-title" className="mt-1 text-xl font-black text-slate-950 md:text-2xl">{activePanorama.title}</h2>
+            {activePanorama.description && <p className="mt-1 max-w-3xl text-sm text-slate-500">{activePanorama.description}</p>}
           </div>
           <button type="button" onClick={onClose} className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-slate-100 text-slate-700 transition hover:bg-slate-200" aria-label="Close 360 viewer"><X className="h-5 w-5" /></button>
         </div>
-        <div className="relative h-[72vh] min-h-[420px] bg-slate-950">
-          <PanoramaViewer panorama={panorama} />
+        <div className="relative min-h-0 flex-1 bg-slate-950">
+          <PanoramaViewer panorama={activePanorama} />
           <div className="pointer-events-none absolute bottom-4 left-1/2 flex -translate-x-1/2 items-center gap-2 rounded-full bg-slate-950/70 px-4 py-2 text-xs font-semibold text-white backdrop-blur">
             <Move className="h-4 w-4" /> Drag to look around · Scroll to zoom
           </div>
         </div>
+        {categoryPanoramas.length > 0 && (
+          <div className="shrink-0 border-t border-slate-200 bg-white px-4 py-3 md:px-5">
+            <div className="mb-2 flex items-center justify-between gap-3">
+              <span className="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">Views in this category</span>
+              <span className="text-xs font-semibold text-slate-400">{categoryPanoramas.length} views</span>
+            </div>
+            <div className="flex gap-3 overflow-x-auto pb-1">
+              {categoryPanoramas.map((item) => {
+                const isActive = item.id === activePanorama.id;
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => setActivePanorama(item)}
+                    aria-label={`Open ${item.title}`}
+                    aria-current={isActive ? "true" : undefined}
+                    className={`group w-28 shrink-0 overflow-hidden rounded-lg border bg-white text-left transition md:w-36 ${isActive ? "border-brand-primary ring-2 ring-orange-100" : "border-slate-200 hover:border-orange-300"}`}
+                  >
+                    <div className="relative aspect-[2/1] overflow-hidden bg-slate-100">
+                      <img src={item.image_url} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover transition duration-300 group-hover:scale-105" />
+                      {isActive && <span className="absolute inset-0 grid place-items-center bg-slate-950/20"><Eye className="h-5 w-5 text-white" /></span>}
+                    </div>
+                    <span className={`block truncate px-2 py-2 text-xs font-bold ${isActive ? "text-brand-primary" : "text-slate-700"}`}>{item.title}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
       </motion.div>
     </motion.div>
   );
@@ -245,7 +292,7 @@ export function PanoramaPage() {
         )}
       </section>
 
-      <AnimatePresence>{selectedPanorama && <PanoramaModal panorama={selectedPanorama} onClose={() => setSelectedPanorama(null)} />}</AnimatePresence>
+      <AnimatePresence>{selectedPanorama && <PanoramaModal panorama={selectedPanorama} panoramas={panoramas} categoryName={categories.find((category) => category.id === selectedPanorama.category_id)?.name} onClose={() => setSelectedPanorama(null)} />}</AnimatePresence>
     </>
   );
 }

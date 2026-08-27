@@ -273,7 +273,7 @@ export function PanoramaAdminPage() {
               <div>
                 <div className="text-xs font-bold uppercase tracking-[0.18em] text-brand-primary">360 Interiors</div>
                 <h2 id="panorama-editor-title" className="mt-1 text-2xl font-black text-slate-950">{panoramaEditingId ? "Edit 360 Interior" : "Add 360 Interior"}</h2>
-                <p className="mt-1 text-sm text-slate-500">Upload a 2:1 equirectangular image for the best full-sphere viewing result.</p>
+                <p className="mt-1 text-sm text-slate-500">Upload one 2:1 panorama. Every view added to the same category automatically joins its thumbnail gallery.</p>
               </div>
               <button type="button" onClick={closePanoramaModal} className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-slate-100 text-slate-700 transition hover:bg-slate-200" aria-label="Close 360 interior editor"><X className="h-5 w-5" /></button>
             </div>

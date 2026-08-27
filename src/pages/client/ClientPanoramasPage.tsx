@@ -82,7 +82,7 @@ export function ClientPanoramasPage() {
         <EmptyState title="No 360 interiors assigned" description="Your assigned interactive interior views will appear here when the studio shares them with you." />
       )}
 
-      <AnimatePresence>{selectedPanorama && <PanoramaModal panorama={selectedPanorama} onClose={() => setSelectedPanorama(null)} />}</AnimatePresence>
+      <AnimatePresence>{selectedPanorama && <PanoramaModal panorama={selectedPanorama} panoramas={panoramas} categoryName={categoryById.get(selectedPanorama.category_id)?.name} onClose={() => setSelectedPanorama(null)} />}</AnimatePresence>
     </div>
   );
 }
