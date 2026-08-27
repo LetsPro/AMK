@@ -14,14 +14,15 @@ type Client = TableRow<"clients">;
 type PanoramaAssignment = TableRow<"client_panorama_assignments">;
 
 const emptyCategory = { name: "", slug: "", description: "", display_order: "", is_active: "true" };
-type PanoramaDraft = { localId: string; title: string; description: string; image_url: string; display_order: string };
+type PanoramaDraft = { localId: string; category_id: string; title: string; description: string; image_url: string; display_order: string };
+type QuickCategoryTarget = { kind: "edit" } | { kind: "draft"; localId: string };
 
-const emptyPanorama = { category_id: "", title: "", description: "", image_url: "", status: "published", is_public: true, display_order: "" };
+const emptyPanorama = { design_id: "", design_title: "", category_id: "", title: "", description: "", image_url: "", status: "published", is_public: true, display_order: "" };
 let panoramaDraftId = 0;
 
 function createPanoramaDraft(displayOrder = ""): PanoramaDraft {
   panoramaDraftId += 1;
-  return { localId: `panorama-${panoramaDraftId}`, title: "", description: "", image_url: "", display_order: displayOrder };
+  return { localId: `panorama-${panoramaDraftId}`, category_id: "", title: "", description: "", image_url: "", display_order: displayOrder };
 }
 
 function slugify(value: string) {
@@ -53,6 +54,10 @@ export function PanoramaAdminPage() {
   const [savingBatch, setSavingBatch] = useState(false);
   const [panoramaEditingId, setPanoramaEditingId] = useState<string | null>(null);
   const [panoramaModalOpen, setPanoramaModalOpen] = useState(false);
+  const [quickCategoryTarget, setQuickCategoryTarget] = useState<QuickCategoryTarget | null>(null);
+  const [quickCategoryName, setQuickCategoryName] = useState("");
+  const [quickCategoryDescription, setQuickCategoryDescription] = useState("");
+  const [savingQuickCategory, setSavingQuickCategory] = useState(false);
   const [assignmentPanorama, setAssignmentPanorama] = useState<Panorama | null>(null);
   const [selectedClientIds, setSelectedClientIds] = useState<string[]>([]);
   const [savingAssignments, setSavingAssignments] = useState(false);
@@ -86,14 +91,18 @@ export function PanoramaAdminPage() {
   useEffect(() => {
     if (!panoramaModalOpen) return;
     const previousOverflow = document.body.style.overflow;
-    const closeOnEscape = (event: KeyboardEvent) => event.key === "Escape" && closePanoramaModal();
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      if (quickCategoryTarget) closeQuickCategory();
+      else closePanoramaModal();
+    };
     document.body.style.overflow = "hidden";
     window.addEventListener("keydown", closeOnEscape);
     return () => {
       document.body.style.overflow = previousOverflow;
       window.removeEventListener("keydown", closeOnEscape);
     };
-  }, [panoramaModalOpen]);
+  }, [panoramaModalOpen, quickCategoryTarget]);
 
   function resetCategory() {
     setCategoryForm(emptyCategory);
@@ -116,6 +125,7 @@ export function PanoramaAdminPage() {
     setBatchClientIds([]);
     setShowBatchClients(false);
     setPanoramaEditingId(null);
+    closeQuickCategory();
   }
 
   function openPanoramaModal() {
@@ -144,6 +154,42 @@ export function PanoramaAdminPage() {
     setBatchClientIds((current) => current.includes(clientId) ? current.filter((id) => id !== clientId) : [...current, clientId]);
   }
 
+  function openQuickCategory(target: QuickCategoryTarget) {
+    setQuickCategoryTarget(target);
+    setQuickCategoryName("");
+    setQuickCategoryDescription("");
+  }
+
+  function closeQuickCategory() {
+    setQuickCategoryTarget(null);
+    setQuickCategoryName("");
+    setQuickCategoryDescription("");
+  }
+
+  async function saveQuickCategory(event: React.FormEvent) {
+    event.preventDefault();
+    const name = quickCategoryName.trim();
+    if (!name || !quickCategoryTarget) return;
+    setSavingQuickCategory(true);
+    try {
+      const created = await categoryMutations.create.mutateAsync({
+        name,
+        slug: slugify(name),
+        description: quickCategoryDescription.trim() || null,
+        display_order: categories.length + 1,
+        is_active: true
+      });
+      if (quickCategoryTarget.kind === "edit") {
+        setPanoramaForm((current) => ({ ...current, category_id: created.id }));
+      } else {
+        updatePanoramaDraft(quickCategoryTarget.localId, { category_id: created.id });
+      }
+      closeQuickCategory();
+    } finally {
+      setSavingQuickCategory(false);
+    }
+  }
+
   async function saveCategory(event: React.FormEvent) {
     event.preventDefault();
     const payload = {
@@ -168,6 +214,7 @@ export function PanoramaAdminPage() {
       await panoramaMutations.update.mutateAsync({
         id: panoramaEditingId,
         payload: {
+          design_title: panoramaForm.design_title.trim(),
           category_id: panoramaForm.category_id,
           title: panoramaForm.title.trim(),
           description: panoramaForm.description.trim() || null,
@@ -177,26 +224,31 @@ export function PanoramaAdminPage() {
           display_order: Number(panoramaForm.display_order || panoramas.length + 1)
         }
       });
+      const editedPanorama = panoramas.find((panorama) => panorama.id === panoramaEditingId);
+      if (editedPanorama) {
+        await Promise.all(panoramas
+          .filter((panorama) => panorama.design_id === editedPanorama.design_id && panorama.id !== panoramaEditingId)
+          .map((panorama) => batchPanoramaMutations.update.mutateAsync({ id: panorama.id, payload: { design_title: panoramaForm.design_title.trim() } })));
+      }
       closePanoramaModal();
       return;
     }
 
-    if (!panoramaForm.category_id) {
-      window.alert("Please select a category.");
-      return;
-    }
-    const incomplete = panoramaDrafts.find((draft) => !draft.title.trim() || !draft.image_url);
-    if (incomplete) {
-      window.alert("Please add a title and panoramic image for every view.");
+    const incomplete = panoramaDrafts.find((draft) => !draft.category_id || !draft.title.trim() || !draft.image_url);
+    if (!panoramaForm.design_title.trim() || incomplete) {
+      window.alert("Please add the design title, select a space, add a view label, and choose an image for every panorama.");
       return;
     }
 
     setSavingBatch(true);
     try {
+      const designId = crypto.randomUUID();
       const createdPanoramas: Panorama[] = [];
       for (const [index, draft] of panoramaDrafts.entries()) {
         const created = await batchPanoramaMutations.create.mutateAsync({
-          category_id: panoramaForm.category_id,
+          design_id: designId,
+          design_title: panoramaForm.design_title.trim(),
+          category_id: draft.category_id,
           title: draft.title.trim(),
           description: draft.description.trim() || null,
           image_url: draft.image_url,
@@ -232,6 +284,8 @@ export function PanoramaAdminPage() {
     setPanoramaModalOpen(true);
     setPanoramaEditingId(panorama.id);
     setPanoramaForm({
+      design_id: panorama.design_id,
+      design_title: panorama.design_title,
       category_id: panorama.category_id,
       title: panorama.title,
       description: panorama.description ?? "",
@@ -258,8 +312,8 @@ export function PanoramaAdminPage() {
 
   function deleteCategory(category: PanoramaCategory) {
     const count = panoramas.filter((panorama) => panorama.category_id === category.id).length;
-    const detail = count ? ` This will also delete ${count} panorama${count === 1 ? "" : "s"} in this category.` : "";
-    if (window.confirm(`Delete category “${category.name}”?${detail}`)) categoryMutations.remove.mutate(category.id);
+    const detail = count ? ` This will also delete ${count} panorama${count === 1 ? "" : "s"} using this space.` : "";
+    if (window.confirm(`Delete space “${category.name}”?${detail}`)) categoryMutations.remove.mutate(category.id);
   }
 
   function deletePanorama(panorama: Panorama) {
@@ -303,11 +357,11 @@ export function PanoramaAdminPage() {
         <div>
           <div className="flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-brand-primary"><Eye className="h-4 w-4" /> Immersive Content</div>
           <h1 className="mt-2 text-3xl font-black">360 Interiors</h1>
-          <p className="mt-1 text-sm text-slate-500">Create categories and publish equirectangular panoramic interiors to the public 360 viewer.</p>
+          <p className="mt-1 text-sm text-slate-500">Create a design and add multiple panoramic spaces to its interactive 360 viewer.</p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button type="button" variant="secondary" onClick={openCategoryModal}><FolderPlus className="h-4 w-4" /> Manage Categories ({categories.length})</Button>
-          <Button type="button" onClick={openPanoramaModal} disabled={!categories.length}><Plus className="h-4 w-4" /> Add Panoramas</Button>
+          <Button type="button" variant="secondary" onClick={openCategoryModal}><FolderPlus className="h-4 w-4" /> Manage Spaces ({categories.length})</Button>
+          <Button type="button" onClick={openPanoramaModal}><Plus className="h-4 w-4" /> Add 360 Design</Button>
         </div>
       </div>
 
@@ -325,8 +379,8 @@ export function PanoramaAdminPage() {
                 <div className="min-w-0 flex-1">
                   <div className="flex items-start justify-between gap-2">
                     <div>
-                      <h3 className="font-bold text-slate-950">{panorama.title}</h3>
-                      <p className="mt-1 text-xs font-semibold uppercase tracking-wide text-brand-primary">{categoryById.get(panorama.category_id)?.name ?? "Unknown category"}</p>
+                      <h3 className="font-bold text-slate-950">{panorama.design_title}</h3>
+                      <p className="mt-1 text-xs font-semibold uppercase tracking-wide text-brand-primary">{categoryById.get(panorama.category_id)?.name ?? "Unknown space"} · {panorama.title}</p>
                     </div>
                     <span className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${panorama.status === "published" && panorama.is_public !== false ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-500"}`}>{panorama.status === "published" && panorama.is_public !== false ? "Website enabled" : "Website disabled"}</span>
                   </div>
@@ -346,7 +400,7 @@ export function PanoramaAdminPage() {
           </div>
         ) : (
           <Card className="mt-4 grid min-h-48 place-items-center border border-dashed border-slate-300 bg-white text-center">
-            <div><ImageIcon className="mx-auto h-8 w-8 text-brand-primary" /><p className="mt-3 font-bold">No 360 interiors yet</p><p className="mt-1 text-sm text-slate-500">Create a category, then upload the first panoramic image.</p></div>
+            <div><ImageIcon className="mx-auto h-8 w-8 text-brand-primary" /><p className="mt-3 font-bold">No 360 designs yet</p><p className="mt-1 text-sm text-slate-500">Create spaces, then add the first 360 design.</p></div>
           </Card>
         )}
       </div>
@@ -360,21 +414,31 @@ export function PanoramaAdminPage() {
             <div className="flex items-start justify-between gap-4 border-b border-slate-200 px-5 py-4 md:px-6">
               <div>
                 <div className="text-xs font-bold uppercase tracking-[0.18em] text-brand-primary">360 Interiors</div>
-                <h2 id="panorama-editor-title" className="mt-1 text-2xl font-black text-slate-950">{panoramaEditingId ? "Edit 360 Interior" : "Add Multiple 360 Interiors"}</h2>
-                <p className="mt-1 text-sm text-slate-500">{panoramaEditingId ? "Update this panoramic view and its website visibility." : "Choose a category once, add multiple panoramic views, and optionally assign the complete batch to clients."}</p>
+                <h2 id="panorama-editor-title" className="mt-1 text-2xl font-black text-slate-950">{panoramaEditingId ? "Edit 360 Space" : "Add 360 Interior Design"}</h2>
+                <p className="mt-1 text-sm text-slate-500">{panoramaEditingId ? "Update this space inside the 360 design." : "Enter one design title, then add all of its panoramic spaces below."}</p>
               </div>
               <button type="button" onClick={closePanoramaModal} className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-slate-100 text-slate-700 transition hover:bg-slate-200" aria-label="Close 360 interior editor"><X className="h-5 w-5" /></button>
             </div>
 
             <form className="min-h-0 flex-1 space-y-5 overflow-y-auto p-5 md:p-6" onSubmit={savePanorama}>
-              <div className="grid gap-4 md:grid-cols-2">
-                <label>
-                  <span className="mb-1 block text-sm font-medium">Category</span>
-                  <Select required value={panoramaForm.category_id} onChange={(event) => setPanoramaForm({ ...panoramaForm, category_id: event.target.value })}>
-                    <option value="">Select category</option>
-                    {categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}
-                  </Select>
-                </label>
+              <label className="block">
+                <span className="mb-1 block text-sm font-medium">Design title</span>
+                <Input autoFocus required value={panoramaForm.design_title} onChange={(event) => setPanoramaForm({ ...panoramaForm, design_title: event.target.value })} placeholder="Modern Villa Interior" />
+                <span className="mt-1 block text-xs text-slate-500">This title represents the complete 360 design containing all spaces below.</span>
+              </label>
+              <div className={`grid gap-4 ${panoramaEditingId ? "md:grid-cols-2" : ""}`}>
+                {panoramaEditingId && (
+                  <div>
+                    <span className="mb-1 block text-sm font-medium">Space</span>
+                    <div className="flex gap-2">
+                      <Select className="min-w-0 flex-1" required value={panoramaForm.category_id} onChange={(event) => setPanoramaForm({ ...panoramaForm, category_id: event.target.value })}>
+                        <option value="">Select space</option>
+                        {categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}
+                      </Select>
+                      <Button type="button" variant="secondary" className="shrink-0 px-3" onClick={() => openQuickCategory({ kind: "edit" })}><FolderPlus className="h-4 w-4" /> New</Button>
+                    </div>
+                  </div>
+                )}
                 <label>
                   <span className="mb-1 block text-sm font-medium">Content availability</span>
                   <Select value={panoramaForm.status} onChange={(event) => setPanoramaForm({ ...panoramaForm, status: event.target.value })}>
@@ -401,8 +465,8 @@ export function PanoramaAdminPage() {
               {panoramaEditingId ? (
                 <div className="grid gap-4 md:grid-cols-2">
                   <label>
-                    <span className="mb-1 block text-sm font-medium">Title</span>
-                    <Input autoFocus required value={panoramaForm.title} onChange={(event) => setPanoramaForm({ ...panoramaForm, title: event.target.value })} placeholder="Modern Villa Living Room" />
+                    <span className="mb-1 block text-sm font-medium">View label</span>
+                    <Input required value={panoramaForm.title} onChange={(event) => setPanoramaForm({ ...panoramaForm, title: event.target.value })} placeholder="Main view" />
                   </label>
                   <label>
                     <span className="mb-1 block text-sm font-medium">Display order</span>
@@ -420,29 +484,39 @@ export function PanoramaAdminPage() {
               ) : (
                 <div className="space-y-4">
                   <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div><h3 className="text-lg font-black text-slate-950">Panorama views</h3><p className="text-xs text-slate-500">Each view needs its own title and 2:1 panoramic image.</p></div>
-                    <Button type="button" variant="secondary" onClick={addPanoramaDraft}><Plus className="h-4 w-4" /> Add more</Button>
+                    <div><h3 className="text-lg font-black text-slate-950">Spaces</h3><p className="text-xs text-slate-500">Add every panoramic space that belongs to this design.</p></div>
+                    <Button type="button" variant="secondary" onClick={addPanoramaDraft}><Plus className="h-4 w-4" /> Add Space</Button>
                   </div>
                   {panoramaDrafts.map((draft, index) => (
                     <div key={draft.localId} className="rounded-xl border border-slate-200 bg-slate-50 p-4 md:p-5">
                       <div className="mb-4 flex items-center justify-between gap-3">
-                        <span className="text-sm font-black text-slate-950">Panorama {String(index + 1).padStart(2, "0")}</span>
+                        <span className="text-sm font-black text-slate-950">Space {String(index + 1).padStart(2, "0")}</span>
                         {panoramaDrafts.length > 1 && <Button type="button" className="h-8 px-3 text-red-600" variant="ghost" onClick={() => removePanoramaDraft(draft.localId)}><Trash2 className="h-4 w-4" /> Remove</Button>}
                       </div>
-                      <div className="grid gap-4 md:grid-cols-[1fr_180px]">
+                      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-[1fr_360px_160px]">
                         <label>
-                          <span className="mb-1 block text-sm font-medium">Title</span>
-                          <Input autoFocus={index === 0} required value={draft.title} onChange={(event) => updatePanoramaDraft(draft.localId, { title: event.target.value })} placeholder="Modern Villa Living Room" />
+                          <span className="mb-1 block text-sm font-medium">View label</span>
+                          <Input required value={draft.title} onChange={(event) => updatePanoramaDraft(draft.localId, { title: event.target.value })} placeholder="Main view" />
                         </label>
+                        <div>
+                          <span className="mb-1 block text-sm font-medium">Space</span>
+                          <div className="flex gap-2">
+                            <Select className="min-w-0 flex-1" required value={draft.category_id} onChange={(event) => updatePanoramaDraft(draft.localId, { category_id: event.target.value })}>
+                              <option value="">Select space</option>
+                              {categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}
+                            </Select>
+                            <Button type="button" variant="secondary" className="shrink-0 px-3" onClick={() => openQuickCategory({ kind: "draft", localId: draft.localId })}><FolderPlus className="h-4 w-4" /> New</Button>
+                          </div>
+                        </div>
                         <label>
                           <span className="mb-1 block text-sm font-medium">Display order</span>
                           <Input type="number" min="0" value={draft.display_order} onChange={(event) => updatePanoramaDraft(draft.localId, { display_order: event.target.value })} />
                         </label>
-                        <label className="md:col-span-2">
+                        <label className="md:col-span-2 lg:col-span-3">
                           <span className="mb-1 block text-sm font-medium">Small description</span>
                           <Textarea value={draft.description} onChange={(event) => updatePanoramaDraft(draft.localId, { description: event.target.value })} placeholder="Describe this view, materials, or design idea." />
                         </label>
-                        <div className="md:col-span-2">
+                        <div className="md:col-span-2 lg:col-span-3">
                           <span className="mb-1 block text-sm font-medium">Panoramic image</span>
                           <MediaPicker label={`Panoramic image ${index + 1}`} value={draft.image_url} onChange={(image_url) => updatePanoramaDraft(draft.localId, { image_url })} />
                         </div>
@@ -471,13 +545,48 @@ export function PanoramaAdminPage() {
               <p className="text-xs text-slate-500">JPEG or WebP recommended. Maximum upload size is 50 MB per panorama.</p>
               <div className="flex justify-end gap-3 border-t border-slate-200 pt-4">
                 <Button type="button" variant="secondary" onClick={closePanoramaModal}>Cancel</Button>
-                <Button disabled={!categories.length || savingBatch || panoramaMutations.update.isPending}>
+                <Button disabled={savingBatch || panoramaMutations.update.isPending}>
                   {savingBatch ? <Loader2 className="h-4 w-4 animate-spin" /> : panoramaEditingId ? <Save className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
-                  {panoramaEditingId ? "Save Changes" : `Add ${panoramaDrafts.length} Panorama${panoramaDrafts.length === 1 ? "" : "s"}`}
+                  {panoramaEditingId ? "Save Changes" : `Create Design with ${panoramaDrafts.length} Space${panoramaDrafts.length === 1 ? "" : "s"}`}
                 </Button>
               </div>
             </form>
           </div>
+        </div>
+      )}
+
+      {quickCategoryTarget && (
+        <div
+          className="fixed inset-0 z-[1003] flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-sm"
+          onMouseDown={(event) => event.target === event.currentTarget && closeQuickCategory()}
+        >
+          <form role="dialog" aria-modal="true" aria-labelledby="quick-category-title" className="w-full max-w-lg overflow-hidden rounded-xl bg-white shadow-2xl" onSubmit={saveQuickCategory}>
+            <div className="flex items-start justify-between gap-4 border-b border-slate-200 px-5 py-4">
+              <div>
+                <div className="text-xs font-bold uppercase tracking-[0.18em] text-brand-primary">360 Interiors</div>
+                <h2 id="quick-category-title" className="mt-1 text-xl font-black text-slate-950">Add Space</h2>
+                <p className="mt-1 text-sm text-slate-500">Create a space and select it for this panoramic view.</p>
+              </div>
+              <button type="button" onClick={closeQuickCategory} className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-slate-100 text-slate-700 transition hover:bg-slate-200" aria-label="Close quick category form"><X className="h-4 w-4" /></button>
+            </div>
+            <div className="space-y-4 p-5">
+              <label className="block">
+                <span className="mb-1 block text-sm font-medium">Space name</span>
+                <Input autoFocus required value={quickCategoryName} onChange={(event) => setQuickCategoryName(event.target.value)} placeholder="Dining Room" />
+              </label>
+              <label className="block">
+                <span className="mb-1 block text-sm font-medium">Small description</span>
+                <Textarea value={quickCategoryDescription} onChange={(event) => setQuickCategoryDescription(event.target.value)} placeholder="A short introduction to this collection" />
+              </label>
+            </div>
+            <div className="flex justify-end gap-3 border-t border-slate-200 bg-slate-50 px-5 py-4">
+              <Button type="button" variant="secondary" onClick={closeQuickCategory} disabled={savingQuickCategory}>Cancel</Button>
+              <Button disabled={savingQuickCategory || !quickCategoryName.trim()}>
+                {savingQuickCategory ? <Loader2 className="h-4 w-4 animate-spin" /> : <FolderPlus className="h-4 w-4" />}
+                Create &amp; Select
+              </Button>
+            </div>
+          </form>
         </div>
       )}
 
@@ -546,8 +655,8 @@ export function PanoramaAdminPage() {
             <div className="flex items-start justify-between gap-4 border-b border-slate-200 bg-white px-5 py-4 md:px-6">
               <div>
                 <div className="text-xs font-bold uppercase tracking-[0.18em] text-brand-primary">360 Interiors</div>
-                <h2 id="category-modal-title" className="mt-1 text-2xl font-black text-slate-950">Manage Categories</h2>
-                <p className="mt-1 text-sm text-slate-500">Add, edit, order, hide, or delete the categories shown on the public page.</p>
+                <h2 id="category-modal-title" className="mt-1 text-2xl font-black text-slate-950">Manage Spaces</h2>
+                <p className="mt-1 text-sm text-slate-500">Add, edit, order, hide, or delete spaces such as Living Room, Dining Room, and Bedroom.</p>
               </div>
               <button type="button" onClick={closeCategoryModal} className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-slate-100 text-slate-700 transition hover:bg-slate-200" aria-label="Close category manager"><X className="h-5 w-5" /></button>
             </div>
@@ -556,15 +665,15 @@ export function PanoramaAdminPage() {
               <div className="border-b border-slate-200 bg-white p-5 lg:border-b-0 lg:border-r md:p-6">
                 <div className="mb-4 flex items-center justify-between gap-3">
                   <div>
-                    <h3 className="text-lg font-black text-slate-950">{categoryEditingId ? "Edit Category" : "Add Category"}</h3>
-                    <p className="text-xs text-slate-500">Category names and descriptions appear as public filters.</p>
+                    <h3 className="text-lg font-black text-slate-950">{categoryEditingId ? "Edit Space" : "Add Space"}</h3>
+                    <p className="text-xs text-slate-500">Space names appear as filters and labels inside each 360 design.</p>
                   </div>
                   {categoryEditingId && <Button type="button" className="h-8 px-3" variant="ghost" onClick={resetCategory}><Plus className="h-4 w-4" /> New</Button>}
                 </div>
 
                 <form className="space-y-4" onSubmit={saveCategory}>
                   <label className="block">
-                    <span className="mb-1 block text-sm font-medium">Category name</span>
+                    <span className="mb-1 block text-sm font-medium">Space name</span>
                     <Input autoFocus required value={categoryForm.name} onChange={(event) => setCategoryForm({ ...categoryForm, name: event.target.value })} placeholder="Living Rooms" />
                   </label>
                   <label className="block">
@@ -591,7 +700,7 @@ export function PanoramaAdminPage() {
                   <div className="flex flex-wrap gap-2 pt-1">
                     <Button disabled={categoryMutations.create.isPending || categoryMutations.update.isPending}>
                       {categoryEditingId ? <Save className="h-4 w-4" /> : <FolderPlus className="h-4 w-4" />}
-                      {categoryEditingId ? "Save Changes" : "Add Category"}
+                      {categoryEditingId ? "Save Changes" : "Add Space"}
                     </Button>
                     {categoryEditingId && <Button type="button" variant="secondary" onClick={resetCategory}>Cancel Edit</Button>}
                   </div>
@@ -601,8 +710,8 @@ export function PanoramaAdminPage() {
               <div className="p-5 md:p-6">
                 <div className="mb-4 flex items-end justify-between gap-3">
                   <div>
-                    <h3 className="text-lg font-black text-slate-950">Existing Categories</h3>
-                    <p className="text-xs text-slate-500">{categories.length} categor{categories.length === 1 ? "y" : "ies"}</p>
+                    <h3 className="text-lg font-black text-slate-950">Existing Spaces</h3>
+                    <p className="text-xs text-slate-500">{categories.length} space{categories.length === 1 ? "" : "s"}</p>
                   </div>
                   <Button type="button" className="h-9 px-3" variant="secondary" onClick={resetCategory}><Plus className="h-4 w-4" /> Add New</Button>
                 </div>
@@ -631,7 +740,7 @@ export function PanoramaAdminPage() {
                   </div>
                 ) : (
                   <div className="grid min-h-64 place-items-center rounded-lg border border-dashed border-slate-300 bg-white p-8 text-center">
-                    <div><FolderPlus className="mx-auto h-8 w-8 text-brand-primary" /><p className="mt-3 font-bold">No categories yet</p><p className="mt-1 text-sm text-slate-500">Use the form to create the first category.</p></div>
+                    <div><FolderPlus className="mx-auto h-8 w-8 text-brand-primary" /><p className="mt-3 font-bold">No spaces yet</p><p className="mt-1 text-sm text-slate-500">Use the form to create the first space.</p></div>
                   </div>
                 )}
               </div>

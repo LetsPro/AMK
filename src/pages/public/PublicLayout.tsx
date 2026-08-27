@@ -38,7 +38,7 @@ export function PublicLayout() {
   const [sending, setSending] = useState(false);
   const [enquiry, setEnquiry] = useState(enquiryDefaults);
   const { branding } = useAppSettings();
-  const navItems = ["home", "about", "projects", "services", "gallery", "360-interiors", "contact"];
+  const navItems = ["home", "about", "projects", "services", "gallery", "contact"];
   const hrefFor = (item: string) => item === "home" ? "/" : `/${item}`;
 
   useEffect(() => {
@@ -112,10 +112,11 @@ export function PublicLayout() {
               {branding.logoUrl ? <img src={branding.logoUrl} alt={branding.companyName} loading="eager" decoding="async" className="max-h-16 max-w-full object-contain md:max-h-20" /> : <Building2 className="h-12 w-12" />}
             </span>
           </Link>
-          <nav className="hidden gap-5 text-sm font-medium xl:flex">
-              {navItems.map((item) => <Link key={item} className="capitalize hover:text-brand-primary" to={hrefFor(item)}>{item === "360-interiors" ? "360 Interiors" : item.replace("-", " ")}</Link>)}
+          <nav className="hidden items-center gap-5 text-sm font-medium xl:flex">
+            {navItems.map((item) => <Link key={item} className="capitalize hover:text-brand-primary" to={hrefFor(item)}>{item.replace("-", " ")}</Link>)}
           </nav>
           <div className="hidden items-center gap-2 xl:flex">
+            <Link className="inline-flex h-10 items-center justify-center rounded-md bg-brand-accent px-4 text-sm font-bold text-slate-950 shadow-sm transition hover:brightness-95" to="/360-interiors">360 Interiors</Link>
             <Button onClick={() => setEnquiryOpen(true)}><UserPlus className="h-4 w-4" /> Get Started</Button>
           </div>
           <button className="grid h-10 w-10 place-items-center rounded-md border border-slate-200 bg-white text-slate-800 xl:hidden" onClick={() => setOpen((value) => !value)} aria-label="Toggle menu">
@@ -125,9 +126,10 @@ export function PublicLayout() {
         {open && (
           <div className="border-t border-slate-200 bg-white px-4 py-4 shadow-lg xl:hidden">
             <nav className="grid gap-2 text-sm font-semibold">
-              {navItems.map((item) => <Link key={item} className="rounded-md px-3 py-2 capitalize hover:bg-orange-50 hover:text-brand-primary" to={hrefFor(item)} onClick={() => setOpen(false)}>{item === "360-interiors" ? "360 Interiors" : item.replace("-", " ")}</Link>)}
+              {navItems.map((item) => <Link key={item} className="rounded-md px-3 py-2 capitalize hover:bg-orange-50 hover:text-brand-primary" to={hrefFor(item)} onClick={() => setOpen(false)}>{item.replace("-", " ")}</Link>)}
             </nav>
             <div className="mt-4 grid gap-2">
+              <Link className="inline-flex h-10 items-center justify-center rounded-md bg-brand-accent px-4 text-sm font-bold text-slate-950" to="/360-interiors" onClick={() => setOpen(false)}>360 Interiors</Link>
               <Button onClick={() => { setOpen(false); setEnquiryOpen(true); }}><UserPlus className="h-4 w-4" /> Get Started</Button>
             </div>
           </div>
