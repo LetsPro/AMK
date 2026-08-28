@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import { ArrowRight, BarChart3, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, ClipboardCheck, Eye, Layers3, LogIn, MapPin, Ruler, Send, ShieldCheck, Sparkles, Star, X } from "lucide-react";
+import { ArrowRight, BarChart3, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, ClipboardCheck, Eye, Layers3, LogIn, MapPin, MessageCircle, Ruler, Send, ShieldCheck, Sparkles, Star, X } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Input, Textarea } from "@/components/ui/Input";
@@ -14,7 +14,7 @@ function Section({ title, eyebrow = "AMK Studio", description, children }: { tit
   return (
     <motion.section
       className="mx-auto max-w-7xl px-4 py-14"
-      initial={{ opacity: 0, y: 24 }}
+      initial={false}
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true, amount: 0.18 }}
       transition={{ duration: 0.45 }}
@@ -112,7 +112,7 @@ function HoverRevealTile({ title, text, image, label }: { title: string; text: s
 
 type PublicProject = { id: string; name: string; slug?: string; description?: string | null; category?: string | null; location?: string | null; cover_image_url?: string | null; progress?: number | null; status?: string | null; budget?: number | null };
 type PublicGallery = { id: string; title: string; category?: string | null; image_url: string; description?: string | null };
-type PublicTestimonial = { id: string; name: string; company?: string | null; quote: string; rating?: number | null; avatar_url?: string | null };
+type PublicTestimonial = { id: string; name: string; company?: string | null; quote: string; rating?: number | null; avatar_url?: string | null; video_url?: string | null };
 
 function openEnquiryModal() {
   window.dispatchEvent(new CustomEvent("open-enquiry-modal"));
@@ -147,9 +147,9 @@ const demoGallery = [
 ];
 
 const demoTestimonials = [
-  { id: "demo-testimonial-1", name: "Homeowner, Mysuru", company: "Residential Client", quote: "From the initial concept to the final design, the AMK team demonstrated exceptional creativity, professionalism, and technical expertise.", rating: 5, avatar_url: null },
-  { id: "demo-testimonial-2", name: "Commercial Property Owner", company: "Commercial Client", quote: "AMK Architects & Engineers delivered a well-planned commercial project that balanced design, efficiency, and investment value.", rating: 5, avatar_url: null },
-  { id: "demo-testimonial-3", name: "Real Estate Developer", company: "Development Client", quote: "Their expertise in planning, engineering coordination, and project execution gave us complete confidence throughout the project.", rating: 5, avatar_url: null }
+  { id: "demo-testimonial-1", name: "Homeowner, Mysuru", company: "Residential Client", quote: "From the initial concept to the final design, the AMK team demonstrated exceptional creativity, professionalism, and technical expertise.", rating: 5, avatar_url: null, video_url: null },
+  { id: "demo-testimonial-2", name: "Commercial Property Owner", company: "Commercial Client", quote: "AMK Architects & Engineers delivered a well-planned commercial project that balanced design, efficiency, and investment value.", rating: 5, avatar_url: null, video_url: null },
+  { id: "demo-testimonial-3", name: "Real Estate Developer", company: "Development Client", quote: "Their expertise in planning, engineering coordination, and project execution gave us complete confidence throughout the project.", rating: 5, avatar_url: null, video_url: null }
 ];
 
 const demoBanners = [
@@ -626,6 +626,9 @@ function TestimonialCarousel({ items }: { items: PublicTestimonial[] }) {
               transition={{ duration: 1, ease: [0.22, 1, 0.36, 1] }}
               className="min-h-80 rounded-lg border border-slate-200 bg-white p-6 shadow-sm md:p-8"
             >
+              {testimonial.video_url && (
+                <video src={testimonial.video_url} controls playsInline preload="metadata" className="mb-6 aspect-video w-full rounded-lg bg-slate-950 object-cover" aria-label={`${testimonial.name} testimonial video`} />
+              )}
               <div className="flex gap-1 text-yellow-400">
                 {Array.from({ length: 5 }).map((_, index) => (
                   <Star key={index} className={`h-5 w-5 ${index < rating ? "fill-yellow-400" : "text-slate-200"}`} />
@@ -733,7 +736,7 @@ export function HomePage() {
               <button
                 type="button"
                 onClick={() => location.href = "/login"}
-                className="group rounded-full bg-brand-primary px-7 py-4 text-sm font-black text-white shadow-2xl shadow-orange-950/40 ring-2 ring-white/30 transition hover:-translate-y-1 hover:bg-brand-accent hover:ring-white/60"
+                className="group rounded-full border-2 border-white bg-brand-accent px-7 py-4 text-sm font-black text-slate-950 shadow-2xl shadow-orange-950/40 ring-4 ring-brand-accent/30 transition hover:-translate-y-1 hover:brightness-110"
               >
                 <span className="inline-flex items-center gap-2"><LogIn className="h-5 w-5" /> Login to Your Portal</span>
               </button>
@@ -862,12 +865,14 @@ export function HomePage() {
 export function ListingPage({ type }: { type: "projects" | "services" | "gallery" | "about" }) {
   const table = type === "services" ? "services" : type === "gallery" ? "gallery" : "portfolio_projects";
   const { data = [] } = useTable(table as never, { orderBy: type === "gallery" ? "display_order" : "created_at", ascending: type === "gallery" });
+  const { data: aboutPages = [] } = useTable("website_pages", { eq: { slug: "about", status: "published" }, limit: 1 });
   const [filter, setFilter] = useState("");
   const [selectedProject, setSelectedProject] = useState<PublicProject | null>(null);
   const [preview, setPreview] = useState<PublicGallery | null>(null);
   const fallbackRows = type === "services" ? demoServices : type === "gallery" ? demoGallery : demoProjects;
   const sourceRows = type === "services" ? mergeServiceRows(data as typeof demoServices) : data.length ? data : fallbackRows;
   const rows = useMemo(() => sourceRows.filter((item: { name?: string; title?: string; category?: string }) => `${item.name ?? item.title ?? ""} ${item.category ?? ""}`.toLowerCase().includes(filter.toLowerCase())), [sourceRows, filter]);
+  const aboutPage = aboutPages[0];
   if (type === "about") return (
     <>
       <Seo
@@ -891,6 +896,11 @@ export function ListingPage({ type }: { type: "projects" | "services" | "gallery
         </div>
       </section>
       <Section title="About Us" description="A technology-led studio model where design intent, engineering coordination, visualization, and site delivery move together.">
+        {aboutPage?.image_url && (
+          <figure className="mb-8 overflow-hidden rounded-xl bg-slate-100 shadow-sm">
+            <img src={aboutPage.image_url} alt="AMK Architects & Engineers studio" loading="eager" decoding="async" className="aspect-[16/7] w-full object-cover" />
+          </figure>
+        )}
         <div className="grid gap-8 rounded-xl bg-slate-50 p-6 lg:grid-cols-[1.05fr_0.95fr] lg:p-8">
           <div className="space-y-5 text-sm leading-7 text-slate-600">
             <p>Founded by Ar. Andra Manoj Kumar, AMK is a technology-driven architecture and engineering studio based in Mysuru. Our expertise extends beyond conventional architectural practice into Building Information Modelling (BIM), parametric design, computational workflows, 3D visualization, 3D printed buildings, and digital fabrication technologies.</p>
@@ -1010,7 +1020,7 @@ export function ListingPage({ type }: { type: "projects" | "services" | "gallery
               signature: "From Concept to Completion."
             };
             return (
-              <motion.div key={service.id} className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm" initial={{ opacity: 0, y: 18 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, amount: 0.2 }} whileHover={{ y: -4 }}>
+              <motion.div key={service.id} className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm" initial={false} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, amount: 0.05 }} whileHover={{ y: -4 }}>
                 <div className="grid lg:grid-cols-[0.9fr_1.1fr]">
                   <div className="group relative min-h-72 overflow-hidden bg-slate-200">
                     <img src={service.image_url ?? "https://images.unsplash.com/photo-1503387762-592deb58ef4e?auto=format&fit=crop&w=1200&q=80"} alt={service.name ?? "AMK architecture service"} loading="lazy" decoding="async" className="absolute inset-0 h-full w-full object-cover transition duration-700 group-hover:scale-110" />
@@ -1132,9 +1142,16 @@ export function ContactPage({ compact = false }: { compact?: boolean }) {
             ].map(([label, value]) => (
               <div key={label} className="rounded-lg border border-white/10 bg-white/[0.04] p-5">
                 <div className="text-xs font-bold uppercase tracking-wide text-brand-accent">{label}</div>
-                <div className="mt-2 text-sm leading-6 text-slate-200">{value}</div>
+                <div className="mt-3 text-lg font-semibold leading-7 text-white">{value}</div>
               </div>
             ))}
+            <a href={`https://wa.me/${branding.phone.replace(/\D/g, "")}`} target="_blank" rel="noopener noreferrer" className="flex items-center justify-between gap-3 rounded-lg border border-emerald-400/30 bg-emerald-500/10 p-5 text-emerald-100 transition hover:bg-emerald-500/20 sm:col-span-2">
+              <span>
+                <span className="text-xs font-bold uppercase tracking-wide text-emerald-400">WhatsApp</span>
+                <span className="mt-2 block text-lg font-semibold">Chat with AMK about your project</span>
+              </span>
+              <MessageCircle className="h-8 w-8 shrink-0 text-emerald-400" />
+            </a>
           </motion.div>
         </div>
       </section>

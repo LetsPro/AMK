@@ -6,15 +6,16 @@ import { Input, Select, Textarea } from "@/components/ui/Input";
 import { MediaPicker } from "@/components/media/MediaPicker";
 import { useTable, useTableMutations } from "@/hooks/useSupabaseTable";
 
-const cmsTables = ["banners", "testimonials", "gallery", "services"] as const;
+const cmsTables = ["banners", "testimonials", "gallery", "services", "website_pages"] as const;
 type CmsTable = (typeof cmsTables)[number];
 type CmsRecord = Record<string, unknown> & { id: string };
 
 const tableDetails: Record<CmsTable, { label: string; description: string; icon: React.ElementType }> = {
   banners: { label: "Hero Slider", description: "Manage hero images, messages, buttons, visibility, and slide order.", icon: LayoutTemplate },
-  testimonials: { label: "Testimonials", description: "Publish client reviews, ratings, company details, and profile images.", icon: MessageSquareQuote },
+  testimonials: { label: "Testimonials", description: "Publish client reviews, ratings, company details, profile images, and videos.", icon: MessageSquareQuote },
   gallery: { label: "Gallery", description: "Upload, categorize, feature, order, and remove gallery images.", icon: ImageIcon },
-  services: { label: "Services", description: "Maintain service copy, images, slugs, and publishing status.", icon: Edit3 }
+  services: { label: "Services", description: "Maintain service copy, images, slugs, and publishing status.", icon: Edit3 },
+  website_pages: { label: "About Us", description: "Manage the About Us photo and supporting introduction shown on the website.", icon: ImageIcon }
 };
 
 function value(record: CmsRecord, ...keys: string[]) {
@@ -31,6 +32,7 @@ function recordDescription(table: CmsTable, record: CmsRecord) {
   if (table === "testimonials") return value(record, "quote");
   if (table === "gallery") return value(record, "category") || "Uncategorized";
   if (table === "services") return value(record, "description");
+  if (table === "website_pages") return value(record, "content");
   return value(record, "content");
 }
 
@@ -42,13 +44,14 @@ function recordPublished(table: CmsTable, record: CmsRecord) {
   if (table === "banners") return Boolean(record.is_active);
   if (table === "testimonials") return Boolean(record.is_published);
   if (table === "gallery") return Boolean(record.is_featured);
+  if (table === "website_pages") return record.status === "published";
   return record.status === "published";
 }
 
 export function CmsPage() {
   const [table, setTable] = useState<CmsTable>("banners");
   const orderedTable = table === "banners" || table === "testimonials" || table === "gallery";
-  const { data = [] } = useTable(table, { orderBy: orderedTable ? "display_order" : "created_at", ascending: orderedTable });
+  const { data = [] } = useTable(table, { orderBy: orderedTable ? "display_order" : "created_at", ascending: orderedTable, ...(table === "website_pages" ? { eq: { slug: "about" } } : {}) });
   const { create, update, remove } = useTableMutations(table);
   const [form, setForm] = useState<Record<string, string>>({});
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -96,12 +99,14 @@ export function CmsPage() {
       return;
     }
     const displayOrder = Number(form.display_order || data.length + 1);
-    const payload = table === "services"
+    const payload = table === "website_pages"
+      ? { slug: "about", title: form.title || "About Us", content: form.content ?? "", image_url: form.image_url || null, status: form.status || "published" }
+      : table === "services"
         ? { name: form.title, slug: form.slug, description: form.content ?? "", image_url: form.image_url || null, status: form.status || "draft" }
         : table === "gallery"
           ? { title: form.title, image_url: form.image_url, category: form.category || null, is_featured: form.status === "published", display_order: displayOrder }
           : table === "testimonials"
-            ? { name: form.title, company: form.company || null, quote: form.content ?? "", rating: Number(form.rating || 5), avatar_url: form.image_url || null, is_published: form.status === "published", display_order: displayOrder }
+            ? { name: form.title, company: form.company || null, quote: form.content ?? "", rating: Number(form.rating || 5), avatar_url: form.image_url || null, video_url: form.video_url || null, is_published: form.status === "published", display_order: displayOrder }
             : { title: form.title, subtitle: form.content || null, image_url: form.image_url || null, cta_label: form.cta_label || null, cta_url: form.cta_url || null, is_active: form.status === "published", display_order: displayOrder };
 
     if (editingId) await update.mutateAsync({ id: editingId, payload: payload as never });
@@ -115,6 +120,7 @@ export function CmsPage() {
       title: recordTitle(table, record),
       slug: value(record, "slug"),
       image_url: recordImage(table, record),
+      video_url: value(record, "video_url"),
       status: table === "gallery"
         ? (record.is_featured ? "published" : "draft")
         : (recordPublished(table, record) ? "published" : "draft"),
@@ -133,7 +139,7 @@ export function CmsPage() {
     if (window.confirm(`Delete “${recordTitle(table, record)}”? This cannot be undone.`)) remove.mutate(record.id);
   }
 
-  const needsImage = table === "banners" || table === "testimonials" || table === "gallery" || table === "services";
+  const needsImage = table === "banners" || table === "testimonials" || table === "gallery" || table === "services" || table === "website_pages";
   const hasOrder = table === "banners" || table === "testimonials" || table === "gallery";
   const statusLabel = table === "banners" ? "Slide visibility" : table === "gallery" ? "Featured status" : "Publishing status";
 
@@ -141,10 +147,10 @@ export function CmsPage() {
     <div className="space-y-5">
       <div>
         <h1 className="text-3xl font-black">Website CMS</h1>
-        <p className="text-sm text-slate-500">Manage the live website’s slider, testimonials, gallery, and services from one place.</p>
+        <p className="text-sm text-slate-500">Manage the live website’s slider, testimonials, gallery, services, and About Us image from one place.</p>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
         {cmsTables.map((item) => {
           const itemDetails = tableDetails[item];
           const Icon = itemDetails.icon;
@@ -176,7 +182,7 @@ export function CmsPage() {
 
         <form className="grid gap-4 md:grid-cols-2" onSubmit={submit}>
           <label>
-            <span className="mb-1 block text-sm font-medium">{table === "testimonials" ? "Client name" : table === "services" ? "Service name" : "Title"}</span>
+            <span className="mb-1 block text-sm font-medium">{table === "testimonials" ? "Client name" : table === "services" ? "Service name" : table === "website_pages" ? "Section title" : "Title"}</span>
             <Input required value={form.title ?? ""} onChange={(e) => setForm({ ...form, title: e.target.value })} />
           </label>
 
@@ -203,8 +209,15 @@ export function CmsPage() {
 
           {needsImage && (
             <label className="md:col-span-2">
-              <span className="mb-1 block text-sm font-medium">{table === "testimonials" ? "Client photo (optional)" : "Image"}</span>
-              <MediaPicker label={table === "testimonials" ? "Client photo" : `${details.label} image`} value={form.image_url ?? ""} onChange={(image_url) => setForm({ ...form, image_url })} />
+              <span className="mb-1 block text-sm font-medium">{table === "testimonials" ? "Client photo (optional)" : table === "website_pages" ? "About Us photo" : "Image"}</span>
+              <MediaPicker label={table === "testimonials" ? "Client photo" : table === "website_pages" ? "About Us photo" : `${details.label} image`} value={form.image_url ?? ""} onChange={(image_url) => setForm({ ...form, image_url })} />
+            </label>
+          )}
+
+          {table === "testimonials" && (
+            <label className="md:col-span-2">
+              <span className="mb-1 block text-sm font-medium">Testimonial video (optional)</span>
+              <MediaPicker mediaType="video" label="Testimonial video" value={form.video_url ?? ""} onChange={(video_url) => setForm({ ...form, video_url })} />
             </label>
           )}
 
@@ -239,7 +252,7 @@ export function CmsPage() {
 
           <label>
             <span className="mb-1 block text-sm font-medium">{statusLabel}</span>
-            <Select value={form.status ?? "draft"} onChange={(e) => setForm({ ...form, status: e.target.value })}>
+            <Select value={form.status ?? (table === "website_pages" ? "published" : "draft")} onChange={(e) => setForm({ ...form, status: e.target.value })}>
               <option value="draft">{table === "banners" ? "Hidden" : table === "gallery" ? "Standard" : "Draft / hidden"}</option>
               <option value="published">{table === "banners" ? "Visible" : table === "gallery" ? "Featured" : "Published"}</option>
             </Select>
@@ -247,7 +260,7 @@ export function CmsPage() {
 
           {table !== "gallery" && (
             <label className="md:col-span-2">
-              <span className="mb-1 block text-sm font-medium">{table === "banners" ? "Subtitle / supporting content" : table === "testimonials" ? "Testimonial" : "Description"}</span>
+              <span className="mb-1 block text-sm font-medium">{table === "banners" ? "Subtitle / supporting content" : table === "testimonials" ? "Testimonial" : table === "website_pages" ? "About introduction" : "Description"}</span>
               <Textarea required value={form.content ?? ""} onChange={(e) => setForm({ ...form, content: e.target.value })} />
             </label>
           )}
@@ -270,7 +283,10 @@ export function CmsPage() {
             <h2 className="text-xl font-black">Existing {details.label}</h2>
             <p className="text-sm text-slate-500">{data.length} item{data.length === 1 ? "" : "s"}</p>
           </div>
-          <Button type="button" onClick={openNewEditor}><Plus className="h-4 w-4" /> Add {details.label}</Button>
+          <Button type="button" onClick={() => table === "website_pages" && data[0] ? editRecord(data[0] as CmsRecord) : openNewEditor()}>
+            {table === "website_pages" && data[0] ? <Edit3 className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
+            {table === "website_pages" && data[0] ? "Edit About Us" : `Add ${details.label}`}
+          </Button>
         </div>
 
         {data.length ? (

@@ -10,7 +10,11 @@ import { useToast } from "@/contexts/ToastContext";
 import { useAuth } from "@/contexts/AuthContext";
 import type { TableRow } from "@/types/database";
 
-type PortfolioProject = TableRow<"portfolio_projects"> & { category?: TableRow<"portfolio_categories"> | null };
+type PortfolioGalleryImage = Pick<TableRow<"portfolio_gallery">, "id" | "image_url" | "caption" | "display_order">;
+type PortfolioProject = TableRow<"portfolio_projects"> & {
+  category?: TableRow<"portfolio_categories"> | null;
+  portfolio_gallery?: PortfolioGalleryImage[];
+};
 type PortfolioCategory = TableRow<"portfolio_categories">;
 
 type FormData = {
@@ -53,22 +57,49 @@ export function PortfolioPage() {
   const [statusFilter, setStatusFilter] = useState<"all" | "draft" | "published">("all");
   const [previewProject, setPreviewProject] = useState<PortfolioProject | null>(null);
   const [uploadingImage, setUploadingImage] = useState(false);
+  const [uploadingGallery, setUploadingGallery] = useState(false);
+  const [galleryImages, setGalleryImages] = useState<PortfolioGalleryImage[]>([]);
   const imageInputRef = useRef<HTMLInputElement>(null);
+  const galleryInputRef = useRef<HTMLInputElement>(null);
 
   async function uploadCoverImage(file: globalThis.File) {
     setUploadingImage(true);
     const path = `portfolio/${Date.now()}_${file.name}`;
-    const { data: uploaded, error } = await supabase.storage.from("documents").upload(path, file, { upsert: false });
+    const { data: uploaded, error } = await supabase.storage.from("website").upload(path, file, { upsert: false });
     if (error) { toast.error("Upload failed", error.message); setUploadingImage(false); return; }
-    const { data: { publicUrl } } = supabase.storage.from("documents").getPublicUrl(uploaded.path);
+    const { data: { publicUrl } } = supabase.storage.from("website").getPublicUrl(uploaded.path);
     setForm((f) => ({ ...f, cover_image_url: publicUrl }));
     setUploadingImage(false);
+  }
+
+  async function uploadGalleryImages(files: FileList | null) {
+    const selectedFiles = Array.from(files ?? []);
+    if (!selectedFiles.length) return;
+    setUploadingGallery(true);
+    try {
+      const uploadedImages: PortfolioGalleryImage[] = [];
+      for (const [index, file] of selectedFiles.entries()) {
+        const cleanName = file.name.toLowerCase().replace(/[^a-z0-9.]+/g, "-");
+        const path = `portfolio/gallery/${Date.now()}-${index}-${cleanName}`;
+        const { data: uploaded, error } = await supabase.storage.from("website").upload(path, file, { upsert: false });
+        if (error) throw error;
+        const { data: { publicUrl } } = supabase.storage.from("website").getPublicUrl(uploaded.path);
+        uploadedImages.push({ id: `new-${crypto.randomUUID()}`, image_url: publicUrl, caption: file.name.replace(/\.[^.]+$/, ""), display_order: galleryImages.length + index });
+      }
+      setGalleryImages((current) => [...current, ...uploadedImages]);
+      toast.success(`${uploadedImages.length} project image${uploadedImages.length === 1 ? "" : "s"} uploaded`);
+    } catch (error) {
+      toast.error("Upload failed", error instanceof Error ? error.message : "Could not upload project images");
+    } finally {
+      setUploadingGallery(false);
+      if (galleryInputRef.current) galleryInputRef.current.value = "";
+    }
   }
 
   const load = useCallback(async () => {
     setLoading(true);
     const [pRes, cRes] = await Promise.all([
-      supabase.from("portfolio_projects").select("*, category:portfolio_categories(*)").order("display_order").order("created_at", { ascending: false }),
+      supabase.from("portfolio_projects").select("*, category:portfolio_categories(*), portfolio_gallery(id,image_url,caption,display_order)").order("display_order").order("created_at", { ascending: false }),
       supabase.from("portfolio_categories").select("*").order("display_order"),
     ]);
     setProjects((pRes.data as PortfolioProject[]) ?? []);
@@ -83,7 +114,7 @@ export function PortfolioPage() {
 
   const filtered = projects.filter((p) => statusFilter === "all" || p.status === statusFilter);
 
-  function openAdd() { setEditProject(null); setForm(defaultForm); setShowForm(true); }
+  function openAdd() { setEditProject(null); setForm(defaultForm); setGalleryImages([]); setShowForm(true); }
   function openEdit(p: PortfolioProject) {
     setEditProject(p);
     setForm({
@@ -94,6 +125,7 @@ export function PortfolioPage() {
       services_provided: (p.services_provided ?? []).join(", "),
       technologies_used: (p.technologies_used ?? []).join(", "),
     });
+    setGalleryImages([...(p.portfolio_gallery ?? [])].sort((a, b) => a.display_order - b.display_order));
     setShowForm(true);
   }
 
@@ -109,15 +141,34 @@ export function PortfolioPage() {
       updated_by: profile?.id,
     };
     try {
+      let projectId = editProject?.id;
       if (editProject) {
         const { error } = await supabase.from("portfolio_projects").update(payload).eq("id", editProject.id);
         if (error) throw error;
-        toast.success("Project updated");
       } else {
-        const { error } = await supabase.from("portfolio_projects").insert({ ...payload, created_by: profile?.id });
+        const { data: createdProject, error } = await supabase.from("portfolio_projects").insert({ ...payload, created_by: profile?.id }).select("id").single();
         if (error) throw error;
-        toast.success("Project created");
+        projectId = createdProject.id;
       }
+
+      if (projectId) {
+        const retainedIds = galleryImages.filter((image) => !image.id.startsWith("new-")).map((image) => image.id);
+        let deleteQuery = supabase.from("portfolio_gallery").delete().eq("portfolio_project_id", projectId);
+        if (retainedIds.length) deleteQuery = deleteQuery.not("id", "in", `(${retainedIds.join(",")})`);
+        const { error: deleteError } = await deleteQuery;
+        if (deleteError) throw deleteError;
+
+        const existingImages = galleryImages.filter((image) => !image.id.startsWith("new-"));
+        const updateResults = await Promise.all(existingImages.map((image, index) => supabase.from("portfolio_gallery").update({ caption: image.caption || null, display_order: index }).eq("id", image.id)));
+        const updateError = updateResults.find((result) => result.error)?.error;
+        if (updateError) throw updateError;
+        const newImages = galleryImages.filter((image) => image.id.startsWith("new-"));
+        if (newImages.length) {
+          const { error: galleryError } = await supabase.from("portfolio_gallery").insert(newImages.map((image, index) => ({ portfolio_project_id: projectId, image_url: image.image_url, caption: image.caption || null, display_order: existingImages.length + index })));
+          if (galleryError) throw galleryError;
+        }
+      }
+      toast.success(editProject ? "Project updated" : "Project created");
       setShowForm(false);
       load();
     } catch (err) {
@@ -219,6 +270,11 @@ export function PortfolioPage() {
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 grid place-items-center bg-slate-950/80 p-4" onClick={() => setPreviewProject(null)}>
             <motion.div initial={{ scale: 0.96 }} animate={{ scale: 1 }} exit={{ scale: 0.96 }} onClick={(e) => e.stopPropagation()} className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-2xl bg-white shadow-2xl">
               {previewProject.cover_image_url && <img src={previewProject.cover_image_url} alt={previewProject.title} loading="eager" decoding="async" className="w-full aspect-video object-cover" />}
+              {previewProject.portfolio_gallery?.length ? (
+                <div className="flex gap-2 overflow-x-auto border-b border-slate-200 bg-slate-50 p-3">
+                  {[...previewProject.portfolio_gallery].sort((a, b) => a.display_order - b.display_order).map((image) => <img key={image.id} src={image.image_url} alt={image.caption ?? "Project gallery"} loading="lazy" decoding="async" className="h-20 w-28 shrink-0 rounded-md object-cover" />)}
+                </div>
+              ) : null}
               <div className="p-6">
                 <div className="flex items-start justify-between gap-4">
                   <div>
@@ -284,6 +340,33 @@ export function PortfolioPage() {
                   ) : (
                     <button type="button" onClick={() => imageInputRef.current?.click()} disabled={uploadingImage} className="flex h-32 w-full items-center justify-center gap-2 rounded-lg border-2 border-dashed border-slate-300 text-slate-400 hover:border-brand-primary/50 hover:text-brand-primary transition-colors disabled:opacity-50">
                       {uploadingImage ? <div className="h-5 w-5 rounded-full border-2 border-brand-primary border-t-transparent animate-spin" /> : <><Upload className="h-5 w-5" /><span className="text-sm font-medium">Upload cover image</span></>}
+                    </button>
+                  )}
+                </div>
+                <div>
+                  <div className="mb-2 flex items-end justify-between gap-3">
+                    <div>
+                      <label className="block text-sm font-medium">Project Gallery</label>
+                      <p className="mt-0.5 text-xs text-slate-500">Select several images at once. They will appear as a gallery on the project page.</p>
+                    </div>
+                    <input ref={galleryInputRef} type="file" accept="image/*" multiple className="hidden" onChange={(event) => uploadGalleryImages(event.target.files)} />
+                    <Button type="button" variant="secondary" className="shrink-0" onClick={() => galleryInputRef.current?.click()} disabled={uploadingGallery}>
+                      <Upload className="h-4 w-4" /> {uploadingGallery ? "Uploading..." : "Add Photos"}
+                    </Button>
+                  </div>
+                  {galleryImages.length ? (
+                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                      {galleryImages.map((image, index) => (
+                        <div key={image.id} className="group relative overflow-hidden rounded-lg border border-slate-200 bg-slate-50">
+                          <img src={image.image_url} alt={image.caption ?? `Project image ${index + 1}`} loading="lazy" decoding="async" className="aspect-[4/3] w-full object-cover" />
+                          <button type="button" onClick={() => setGalleryImages((current) => current.filter((item) => item.id !== image.id))} className="absolute right-2 top-2 grid h-8 w-8 place-items-center rounded-full bg-red-500 text-white shadow transition hover:bg-red-600" aria-label={`Remove project image ${index + 1}`}><Trash2 className="h-4 w-4" /></button>
+                          <input value={image.caption ?? ""} onChange={(event) => setGalleryImages((current) => current.map((item) => item.id === image.id ? { ...item, caption: event.target.value } : item))} className="w-full border-t border-slate-200 bg-white px-2 py-2 text-xs outline-none focus:border-brand-primary" placeholder={`Caption ${index + 1}`} />
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <button type="button" onClick={() => galleryInputRef.current?.click()} disabled={uploadingGallery} className="flex min-h-24 w-full items-center justify-center gap-2 rounded-lg border-2 border-dashed border-slate-300 text-sm font-medium text-slate-500 transition hover:border-brand-primary/50 hover:text-brand-primary disabled:opacity-50">
+                      <Image className="h-5 w-5" /> Add multiple project photos
                     </button>
                   )}
                 </div>

@@ -128,10 +128,17 @@ select {
   to { opacity: 1; }
 }
 
-@supports (content-visibility: auto) {
-  .public-content > section:not(:first-child) {
-    content-visibility: auto;
-    contain-intrinsic-size: auto 800px;
+@media (hover: none), (pointer: coarse) {
+  .flip-card-inner {
+    transform: none !important;
+  }
+
+  .flip-card-face {
+    backface-visibility: visible;
+  }
+
+  .flip-card-back {
+    display: none;
   }
 }
 

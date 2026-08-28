@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import { Link, Outlet } from "react-router-dom";
-import { Building2, CalendarDays, Facebook, Instagram, Linkedin, Mail, MapPin, Menu, Phone, Send, UserPlus, X } from "lucide-react";
+import { Building2, CalendarDays, Facebook, Instagram, Linkedin, Mail, MapPin, Menu, MessageCircle, Phone, Send, UserPlus, X } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Input, Select, Textarea } from "@/components/ui/Input";
 import { useAppSettings } from "@/hooks/useAppSettings";
@@ -159,10 +159,10 @@ export function PublicLayout() {
           </div>
           <div>
             <h4 className="font-semibold">Contact</h4>
-            <div className="mt-4 grid gap-3 text-sm text-slate-400">
-              <span className="flex items-center gap-2"><Mail className="h-4 w-4 text-brand-accent" />{branding.email}</span>
-              <span className="flex items-center gap-2"><Phone className="h-4 w-4 text-brand-accent" />{branding.phone}</span>
-              <span className="flex items-start gap-2"><MapPin className="mt-0.5 h-4 w-4 text-brand-accent" />{branding.location}</span>
+            <div className="mt-4 grid gap-3 text-base font-medium text-slate-300">
+              <a href={`mailto:${branding.email}`} className="flex items-center gap-2 hover:text-white"><Mail className="h-5 w-5 shrink-0 text-brand-accent" />{branding.email}</a>
+              <a href={`tel:${branding.phone.replace(/\s/g, "")}`} className="flex items-center gap-2 hover:text-white"><Phone className="h-5 w-5 shrink-0 text-brand-accent" />{branding.phone}</a>
+              <span className="flex items-start gap-2"><MapPin className="mt-0.5 h-5 w-5 shrink-0 text-brand-accent" />{branding.location}</span>
             </div>
             <Button className="mt-5" onClick={() => setEnquiryOpen(true)}>Get Started</Button>
           </div>
@@ -172,6 +172,16 @@ export function PublicLayout() {
           <span>Powered by <a className="font-semibold text-brand-accent hover:text-white" href="https://dreambuzz.in" target="_blank" rel="noreferrer">Dreambuzz Solutions</a></span>
         </div>
       </footer>
+      <a
+        href={`https://wa.me/${phoneForWhatsapp(branding.phone)}?text=${encodeURIComponent("Hello AMK, I would like to discuss a project.")}`}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="fixed bottom-5 right-5 z-[90] inline-flex h-14 items-center gap-2 rounded-full bg-emerald-500 px-4 font-bold text-white shadow-2xl shadow-emerald-950/30 transition hover:-translate-y-1 hover:bg-emerald-600 focus:outline-none focus:ring-4 focus:ring-emerald-200"
+        aria-label="Chat with AMK on WhatsApp"
+      >
+        <MessageCircle className="h-6 w-6" />
+        <span className="hidden sm:inline">WhatsApp</span>
+      </a>
       {enquiryOpen && (
         <div className="fixed inset-0 z-[1001] grid place-items-center bg-slate-950/75 p-3 backdrop-blur-sm sm:p-4">
           <div className="max-h-[92vh] w-full max-w-4xl overflow-hidden rounded-2xl bg-white shadow-2xl">
