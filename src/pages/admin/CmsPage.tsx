@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Edit3, ImageIcon, LayoutTemplate, MessageSquareQuote, Plus, Save, Trash2, X } from "lucide-react";
+import { Clock3, Edit3, ImageIcon, LayoutTemplate, MessageSquareQuote, Plus, Save, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Input, Select, Textarea } from "@/components/ui/Input";
@@ -10,12 +10,18 @@ const cmsTables = ["banners", "testimonials", "gallery", "services", "website_pa
 type CmsTable = (typeof cmsTables)[number];
 type CmsRecord = Record<string, unknown> & { id: string };
 
+function testimonialSeconds(value: unknown) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return 3;
+  const seconds = Number((value as Record<string, unknown>).seconds);
+  return Number.isFinite(seconds) ? Math.min(30, Math.max(2, Math.round(seconds))) : 3;
+}
+
 const tableDetails: Record<CmsTable, { label: string; description: string; icon: React.ElementType }> = {
   banners: { label: "Hero Slider", description: "Manage hero images, messages, buttons, visibility, and slide order.", icon: LayoutTemplate },
   testimonials: { label: "Testimonials", description: "Publish client reviews, ratings, company details, profile images, and videos.", icon: MessageSquareQuote },
   gallery: { label: "Gallery", description: "Upload, categorize, feature, order, and remove gallery images.", icon: ImageIcon },
   services: { label: "Services", description: "Maintain service copy, images, slugs, and publishing status.", icon: Edit3 },
-  website_pages: { label: "About Us", description: "Manage the About Us photo and supporting introduction shown on the website.", icon: ImageIcon }
+  website_pages: { label: "About Us", description: "Manage the founder photo and supporting About introduction shown on the website.", icon: ImageIcon }
 };
 
 function value(record: CmsRecord, ...keys: string[]) {
@@ -37,7 +43,8 @@ function recordDescription(table: CmsTable, record: CmsRecord) {
 }
 
 function recordImage(table: CmsTable, record: CmsRecord) {
-  return table === "testimonials" ? value(record, "avatar_url") : value(record, "image_url");
+  if (table === "testimonials") return value(record, "avatar_url");
+  return value(record, "image_url");
 }
 
 function recordPublished(table: CmsTable, record: CmsRecord) {
@@ -53,11 +60,18 @@ export function CmsPage() {
   const orderedTable = table === "banners" || table === "testimonials" || table === "gallery";
   const { data = [] } = useTable(table, { orderBy: orderedTable ? "display_order" : "created_at", ascending: orderedTable, ...(table === "website_pages" ? { eq: { slug: "about" } } : {}) });
   const { create, update, remove } = useTableMutations(table);
+  const { data: testimonialSettings = [] } = useTable("app_settings", { eq: { key: "testimonial_carousel" }, limit: 1 });
+  const testimonialSettingMutations = useTableMutations("app_settings");
   const [form, setForm] = useState<Record<string, string>>({});
+  const [testimonialInterval, setTestimonialInterval] = useState("3");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editorOpen, setEditorOpen] = useState(false);
   const details = tableDetails[table];
   const EmptyIcon = details.icon;
+
+  useEffect(() => {
+    setTestimonialInterval(String(testimonialSeconds(testimonialSettings[0]?.value)));
+  }, [testimonialSettings]);
 
   useEffect(() => {
     if (!editorOpen) return;
@@ -139,6 +153,15 @@ export function CmsPage() {
     if (window.confirm(`Delete “${recordTitle(table, record)}”? This cannot be undone.`)) remove.mutate(record.id);
   }
 
+  async function saveTestimonialInterval(event: React.FormEvent) {
+    event.preventDefault();
+    const seconds = Math.min(30, Math.max(2, Number(testimonialInterval) || 3));
+    setTestimonialInterval(String(seconds));
+    const row = testimonialSettings[0];
+    if (row) await testimonialSettingMutations.update.mutateAsync({ id: row.id, payload: { value: { seconds } } });
+    else await testimonialSettingMutations.create.mutateAsync({ key: "testimonial_carousel", value: { seconds } });
+  }
+
   const needsImage = table === "banners" || table === "testimonials" || table === "gallery" || table === "services" || table === "website_pages";
   const hasOrder = table === "banners" || table === "testimonials" || table === "gallery";
   const statusLabel = table === "banners" ? "Slide visibility" : table === "gallery" ? "Featured status" : "Publishing status";
@@ -147,7 +170,7 @@ export function CmsPage() {
     <div className="space-y-5">
       <div>
         <h1 className="text-3xl font-black">Website CMS</h1>
-        <p className="text-sm text-slate-500">Manage the live website’s slider, testimonials, gallery, services, and About Us image from one place.</p>
+        <p className="text-sm text-slate-500">Manage the live website’s slider, testimonials, gallery, services, and About/Founder content from one place.</p>
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
@@ -209,8 +232,8 @@ export function CmsPage() {
 
           {needsImage && (
             <label className="md:col-span-2">
-              <span className="mb-1 block text-sm font-medium">{table === "testimonials" ? "Client photo (optional)" : table === "website_pages" ? "About Us photo" : "Image"}</span>
-              <MediaPicker label={table === "testimonials" ? "Client photo" : table === "website_pages" ? "About Us photo" : `${details.label} image`} value={form.image_url ?? ""} onChange={(image_url) => setForm({ ...form, image_url })} />
+              <span className="mb-1 block text-sm font-medium">{table === "testimonials" ? "Client photo (optional)" : table === "website_pages" ? "Founder photo (optional)" : "Image"}</span>
+              <MediaPicker label={table === "testimonials" ? "Client photo" : table === "website_pages" ? "Founder photo" : `${details.label} image`} value={form.image_url ?? ""} onChange={(image_url) => setForm({ ...form, image_url })} />
             </label>
           )}
 
@@ -275,6 +298,19 @@ export function CmsPage() {
         </form>
           </Card>
         </div>
+      )}
+
+      {table === "testimonials" && (
+        <Card className="bg-white">
+          <form className="flex flex-col gap-4 sm:flex-row sm:items-end" onSubmit={saveTestimonialInterval}>
+            <label className="w-full max-w-xs">
+              <span className="mb-1 flex items-center gap-2 text-sm font-medium"><Clock3 className="h-4 w-4 text-brand-primary" /> Auto-scroll time</span>
+              <Input type="number" min="2" max="30" step="1" value={testimonialInterval} onChange={(event) => setTestimonialInterval(event.target.value)} />
+              <span className="mt-1 block text-xs text-slate-500">Seconds before the next testimonial appears (2–30).</span>
+            </label>
+            <Button disabled={testimonialSettingMutations.create.isPending || testimonialSettingMutations.update.isPending}><Save className="h-4 w-4" /> Save timing</Button>
+          </form>
+        </Card>
       )}
 
       <div>

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import { ArrowRight, BarChart3, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, ClipboardCheck, Eye, Layers3, LogIn, MapPin, MessageCircle, Ruler, Send, ShieldCheck, Sparkles, Star, X } from "lucide-react";
+import { ArrowRight, BarChart3, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, ClipboardCheck, Eye, Layers3, LogIn, MapPin, MessageCircle, Play, Ruler, Send, ShieldCheck, Sparkles, Star, X } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Input, Textarea } from "@/components/ui/Input";
@@ -113,6 +113,12 @@ function HoverRevealTile({ title, text, image, label }: { title: string; text: s
 type PublicProject = { id: string; name: string; slug?: string; description?: string | null; category?: string | null; location?: string | null; cover_image_url?: string | null; progress?: number | null; status?: string | null; budget?: number | null };
 type PublicGallery = { id: string; title: string; category?: string | null; image_url: string; description?: string | null };
 type PublicTestimonial = { id: string; name: string; company?: string | null; quote: string; rating?: number | null; avatar_url?: string | null; video_url?: string | null };
+
+function testimonialAutoplaySeconds(value: unknown) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return 3;
+  const seconds = Number((value as Record<string, unknown>).seconds);
+  return Number.isFinite(seconds) ? Math.min(30, Math.max(2, Math.round(seconds))) : 3;
+}
 
 function openEnquiryModal() {
   window.dispatchEvent(new CustomEvent("open-enquiry-modal"));
@@ -587,20 +593,33 @@ function PerformanceSection() {
   );
 }
 
-function TestimonialCarousel({ items }: { items: PublicTestimonial[] }) {
+function TestimonialCarousel({ items, autoplaySeconds }: { items: PublicTestimonial[]; autoplaySeconds: number }) {
   const [active, setActive] = useState(0);
   const [paused, setPaused] = useState(false);
+  const [videoOpen, setVideoOpen] = useState(false);
   const safeItems = items.length ? items : demoTestimonials;
   const testimonial = safeItems[active % safeItems.length];
   const rating = Math.max(1, Math.min(5, testimonial.rating ?? 5));
 
   useEffect(() => {
-    if (paused || safeItems.length <= 1) return;
+    if (paused || videoOpen || safeItems.length <= 1) return;
     const timer = window.setInterval(() => {
       setActive((current) => (current + 1) % safeItems.length);
-    }, 3000);
+    }, autoplaySeconds * 1000);
     return () => window.clearInterval(timer);
-  }, [paused, safeItems.length]);
+  }, [active, autoplaySeconds, paused, safeItems.length, videoOpen]);
+
+  useEffect(() => {
+    if (!videoOpen) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const closeOnEscape = (event: KeyboardEvent) => event.key === "Escape" && setVideoOpen(false);
+    window.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [videoOpen]);
 
   return (
     <section className="mx-auto max-w-7xl px-4 py-14">
@@ -614,6 +633,11 @@ function TestimonialCarousel({ items }: { items: PublicTestimonial[] }) {
             <div className="text-sm font-semibold uppercase tracking-wide text-brand-primary">Client Testimonials</div>
             <h2 className="mt-3 max-w-xl text-3xl font-semibold tracking-tight text-slate-950 md:text-4xl">What clients say about working with AMK.</h2>
             <p className="mt-4 max-w-md text-sm font-normal leading-7 text-slate-500">Real feedback from residential, commercial, and development clients who trusted AMK for design, coordination, and project execution.</p>
+            <div className="mt-6 flex items-center gap-3">
+              <button type="button" onClick={() => setActive((current) => (current - 1 + safeItems.length) % safeItems.length)} disabled={safeItems.length <= 1} className="grid h-11 w-11 place-items-center rounded-full border border-slate-200 bg-white text-slate-700 shadow-sm transition hover:border-orange-200 hover:text-brand-primary disabled:cursor-not-allowed disabled:opacity-40" aria-label="Previous testimonial"><ChevronLeft className="h-5 w-5" /></button>
+              <button type="button" onClick={() => setActive((current) => (current + 1) % safeItems.length)} disabled={safeItems.length <= 1} className="grid h-11 w-11 place-items-center rounded-full border border-slate-200 bg-white text-slate-700 shadow-sm transition hover:border-orange-200 hover:text-brand-primary disabled:cursor-not-allowed disabled:opacity-40" aria-label="Next testimonial"><ChevronRight className="h-5 w-5" /></button>
+              <span className="text-sm font-semibold text-slate-500">{(active % safeItems.length) + 1} / {safeItems.length}</span>
+            </div>
           </div>
         </div>
         <div className="overflow-hidden rounded-lg text-slate-950">
@@ -627,7 +651,20 @@ function TestimonialCarousel({ items }: { items: PublicTestimonial[] }) {
               className="min-h-80 rounded-lg border border-slate-200 bg-white p-6 shadow-sm md:p-8"
             >
               {testimonial.video_url && (
-                <video src={testimonial.video_url} controls playsInline preload="metadata" className="mb-6 aspect-video w-full rounded-lg bg-slate-950 object-cover" aria-label={`${testimonial.name} testimonial video`} />
+                <button
+                  type="button"
+                  onClick={() => setVideoOpen(true)}
+                  className="group relative mb-6 block aspect-video w-full overflow-hidden rounded-lg bg-slate-950 text-white shadow-sm focus:outline-none focus:ring-4 focus:ring-orange-200"
+                  aria-label={`Play ${testimonial.name}'s testimonial video`}
+                >
+                  <video src={testimonial.video_url} muted playsInline preload="metadata" className="h-full w-full object-cover opacity-80 transition duration-300 group-hover:scale-[1.02] group-hover:opacity-65" />
+                  <span className="absolute inset-0 grid place-items-center bg-slate-950/20">
+                    <span className="grid h-16 w-16 place-items-center rounded-full bg-white/95 text-brand-primary shadow-xl transition group-hover:scale-110">
+                      <Play className="ml-1 h-7 w-7 fill-current" />
+                    </span>
+                  </span>
+                  <span className="absolute bottom-4 left-4 rounded-full bg-slate-950/75 px-3 py-1.5 text-xs font-bold uppercase tracking-wide">Watch video testimonial</span>
+                </button>
               )}
               <div className="flex gap-1 text-yellow-400">
                 {Array.from({ length: 5 }).map((_, index) => (
@@ -650,6 +687,38 @@ function TestimonialCarousel({ items }: { items: PublicTestimonial[] }) {
           </AnimatePresence>
         </div>
       </div>
+      <AnimatePresence>
+        {videoOpen && testimonial.video_url && (
+          <motion.div
+            className="fixed inset-0 z-[1100] grid place-items-center bg-slate-950/90 p-3 backdrop-blur-sm sm:p-6"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onMouseDown={(event) => event.target === event.currentTarget && setVideoOpen(false)}
+          >
+            <motion.div
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="testimonial-video-title"
+              initial={{ opacity: 0, scale: 0.96, y: 16 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.96, y: 16 }}
+              className="w-full max-w-5xl overflow-hidden rounded-xl bg-slate-950 shadow-2xl ring-1 ring-white/10"
+            >
+              <div className="flex items-center justify-between gap-4 border-b border-white/10 px-4 py-3 text-white sm:px-5">
+                <div className="min-w-0">
+                  <div className="text-xs font-bold uppercase tracking-wide text-brand-accent">Video testimonial</div>
+                  <h2 id="testimonial-video-title" className="truncate text-lg font-semibold">{testimonial.name}</h2>
+                </div>
+                <button type="button" onClick={() => setVideoOpen(false)} className="grid h-10 w-10 shrink-0 place-items-center rounded-full text-slate-200 hover:bg-white/10 hover:text-white" aria-label="Close testimonial video">
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+              <video src={testimonial.video_url} controls autoPlay playsInline preload="metadata" className="max-h-[78vh] w-full bg-black object-contain" aria-label={`${testimonial.name} testimonial video`} />
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </section>
   );
 }
@@ -659,6 +728,7 @@ export function HomePage() {
   const { data: rawProjects = [] } = useTable("portfolio_projects", { limit: 6, orderBy: "display_order", eq: { status: "published" } });
   const projects: PublicProject[] = (rawProjects as Array<{ id: string; title: string; short_description?: string | null; category_id?: string | null; location?: string | null; cover_image_url?: string | null; slug: string }>).map((p) => ({ id: p.id, name: p.title, slug: p.slug, description: p.short_description, category: p.category_id ?? undefined, location: p.location, cover_image_url: p.cover_image_url }));
   const { data: testimonials = [] } = useTable("testimonials", { limit: 6, orderBy: "display_order", ascending: true, eq: { is_published: true } });
+  const { data: testimonialSettings = [] } = useTable("app_settings", { eq: { key: "testimonial_carousel" }, limit: 1 });
   const { data: banners = [] } = useTable("banners", { orderBy: "display_order", ascending: true, eq: { is_active: true } });
   const [activeSlide, setActiveSlide] = useState(0);
   const [activeProjectIndex, setActiveProjectIndex] = useState(0);
@@ -666,6 +736,7 @@ export function HomePage() {
   const serviceRows = mergeServiceRows(services as typeof demoServices);
   const projectRows = projects.length ? projects : demoProjects;
   const testimonialRows = testimonials.length ? testimonials : demoTestimonials;
+  const testimonialInterval = testimonialAutoplaySeconds(testimonialSettings[0]?.value);
   const bannerRows = banners.length ? banners : demoBanners;
   const slide = bannerRows[activeSlide % bannerRows.length];
   const slideImageUrl = slide.image_url ?? demoBanners[0].image_url;
@@ -856,7 +927,7 @@ export function HomePage() {
           </div>
         </div>
       </section>
-      <TestimonialCarousel items={testimonialRows as PublicTestimonial[]} />
+      <TestimonialCarousel items={testimonialRows as PublicTestimonial[]} autoplaySeconds={testimonialInterval} />
       {selectedProject && <ProjectModal project={selectedProject} onClose={() => setSelectedProject(null)} />}
     </>
   );
@@ -896,11 +967,6 @@ export function ListingPage({ type }: { type: "projects" | "services" | "gallery
         </div>
       </section>
       <Section title="About Us" description="A technology-led studio model where design intent, engineering coordination, visualization, and site delivery move together.">
-        {aboutPage?.image_url && (
-          <figure className="mb-8 overflow-hidden rounded-xl bg-slate-100 shadow-sm">
-            <img src={aboutPage.image_url} alt="AMK Architects & Engineers studio" loading="eager" decoding="async" className="aspect-[16/7] w-full object-cover" />
-          </figure>
-        )}
         <div className="grid gap-8 rounded-xl bg-slate-50 p-6 lg:grid-cols-[1.05fr_0.95fr] lg:p-8">
           <div className="space-y-5 text-sm leading-7 text-slate-600">
             <p>Founded by Ar. Andra Manoj Kumar, AMK is a technology-driven architecture and engineering studio based in Mysuru. Our expertise extends beyond conventional architectural practice into Building Information Modelling (BIM), parametric design, computational workflows, 3D visualization, 3D printed buildings, and digital fabrication technologies.</p>
@@ -921,12 +987,22 @@ export function ListingPage({ type }: { type: "projects" | "services" | "gallery
       </Section>
       <Section title="Meet the Founder" description="AMK is led with a focus on architecture, computation, BIM, visualization, and delivery discipline.">
         <div className="grid gap-8 lg:grid-cols-[0.8fr_1.2fr]">
-          <FlipInfoCard
-            title="Ar. Andra Manoj Kumar"
-            text="Architect | Computational Designer | BIM Specialist | Architectural Visualizer"
-            detail="The studio is shaped around design clarity, BIM coordination, realistic visualization, and construction-ready decision making."
-            icon={Sparkles}
-          />
+          <Card className="overflow-hidden p-0">
+            <div className="aspect-[4/3] overflow-hidden bg-gradient-to-br from-orange-50 to-slate-100">
+              {aboutPage?.image_url ? (
+                <img src={aboutPage.image_url} alt="Ar. Andra Manoj Kumar, founder of AMK Architects & Engineers" loading="eager" decoding="async" className="h-full w-full object-cover object-top" />
+              ) : (
+                <div className="grid h-full place-items-center text-brand-primary">
+                  <Sparkles className="h-14 w-14" />
+                </div>
+              )}
+            </div>
+            <div className="p-6">
+              <h3 className="text-2xl font-black text-slate-950">Ar. Andra Manoj Kumar</h3>
+              <p className="mt-2 text-sm font-semibold text-brand-primary">Architect | Computational Designer | BIM Specialist | Architectural Visualizer</p>
+              <p className="mt-4 text-sm leading-7 text-slate-600">The studio is shaped around design clarity, BIM coordination, realistic visualization, and construction-ready decision making.</p>
+            </div>
+          </Card>
           <Card>
             <p className="text-lg leading-8 text-slate-600">Architecture today demands more than drawings. It requires technology, data, visualization, and execution expertise working together. AMK creates spaces that are intelligent, efficient, sustainable, and timeless.</p>
           </Card>
