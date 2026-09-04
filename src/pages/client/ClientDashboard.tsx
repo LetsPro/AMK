@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
-  ArrowRight, Bookmark, CalendarClock, CheckCircle2, FileText, FolderOpen,
+  ArrowRight, CalendarClock, CheckCircle2, FileText, FolderOpen,
   LayoutDashboard, Link2, ShieldCheck, TrendingUp
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
@@ -91,7 +91,7 @@ export function ClientDashboard() {
     { label: "Active Projects", value: activeProjects.length, caption: `${projects.length} total tracked`, icon: TrendingUp, tone: "bg-emerald-50 text-emerald-600", action: () => navigate("/client/progress") },
     { label: "Overall Progress", value: `${overallProgress}%`, caption: "Average project completion", icon: CheckCircle2, tone: "bg-blue-50 text-blue-600", action: () => navigate("/client/progress") },
     { label: "Shared Files", value: assignments.length, caption: `${stagesWithFiles}/${stageCount} stages with files`, icon: FileText, tone: "bg-violet-50 text-violet-600", action: () => navigate("/client/files") },
-    { label: "Blueprint Links", value: blueprintCount, caption: "Approved links available", icon: Link2, tone: "bg-amber-50 text-amber-600", action: () => navigate("/client/blueprints") },
+    { label: "Links", value: blueprintCount, caption: "Approved links available", icon: Link2, tone: "bg-amber-50 text-amber-600", action: () => navigate("/client/blueprints") },
   ];
 
   if (loading) {
@@ -118,7 +118,7 @@ export function ClientDashboard() {
               Welcome back{profile?.full_name ? `, ${profile.full_name.split(" ")[0]}` : ""}
             </h1>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500">
-              Review shared project files, stage progress, blueprint links, and account activity in one place.
+              Review shared project files, stage progress, links, and account activity in one place.
             </p>
             <div className="mt-5 flex flex-wrap gap-2">
               <button onClick={() => navigate("/client/progress")} className="inline-flex items-center gap-2 rounded-xl bg-brand-primary px-4 py-2.5 text-sm font-bold text-white shadow-lg shadow-orange-100 transition-colors hover:bg-brand-primary/90">
@@ -222,7 +222,7 @@ export function ClientDashboard() {
         {[
           { label: "Progress", caption: "Stage files and updates", icon: TrendingUp, path: "/client/progress", tone: "bg-emerald-50 text-emerald-600" },
           { label: "Files", caption: "Preview and download", icon: FileText, path: "/client/files", tone: "bg-violet-50 text-violet-600" },
-          { label: "Blueprints", caption: "Approved external links", icon: Bookmark, path: "/client/blueprints", tone: "bg-amber-50 text-amber-600" },
+          { label: "Links", caption: "Approved external links", icon: Link2, path: "/client/blueprints", tone: "bg-amber-50 text-amber-600" },
         ].map((item) => (
           <button key={item.label} onClick={() => navigate(item.path)} className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white p-4 text-left transition-all hover:border-brand-primary/30 hover:shadow-md">
             <span className={cn("grid h-11 w-11 place-items-center rounded-xl", item.tone)}>
@@ -239,4 +239,3 @@ export function ClientDashboard() {
     </div>
   );
 }
-

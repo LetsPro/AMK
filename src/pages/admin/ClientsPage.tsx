@@ -345,7 +345,7 @@ export function ClientsPage() {
       });
       if (aErr) throw aErr;
 
-      toast.success("Blueprint added");
+      toast.success("Link added");
       setBpForm({ title: "", url: "" });
       setShowBpForm(false);
       await reloadDetail(viewClient.id);
@@ -821,13 +821,13 @@ export function ClientsPage() {
                   <div>
                     <div className="flex items-center justify-between mb-3">
                       <h3 className="text-xs font-bold uppercase tracking-wide text-slate-400">
-                        Blueprint Links {!loadingDetail && `(${clientBlueprints.length})`}
+                        Links {!loadingDetail && `(${clientBlueprints.length})`}
                       </h3>
                       <button
                         onClick={() => setShowBpForm((v) => !v)}
                         className={cn("text-xs font-semibold rounded-lg px-2.5 py-1 transition-colors", showBpForm ? "bg-brand-primary text-white" : "text-brand-primary hover:bg-brand-primary/10")}
                       >
-                        {showBpForm ? "Cancel" : "+ Add Blueprint"}
+                        {showBpForm ? "Cancel" : "+ Add Link"}
                       </button>
                     </div>
 
@@ -835,11 +835,11 @@ export function ClientsPage() {
                       {showBpForm && (
                         <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden mb-3">
                           <div className="rounded-xl border border-brand-primary/20 bg-orange-50/50 p-4 space-y-3">
-                            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">New Blueprint Link</p>
+                            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">New Link</p>
                             <Input value={bpForm.title} onChange={(e) => setBpForm((p) => ({ ...p, title: e.target.value }))} placeholder="Title *" className="h-9" />
                             <Input value={bpForm.url} onChange={(e) => setBpForm((p) => ({ ...p, url: e.target.value }))} placeholder="URL * (https://...)" className="h-9" />
                             <Button onClick={addBlueprint} disabled={savingBp} className="w-full">
-                              {savingBp ? "Adding..." : "Add Blueprint"}
+                              {savingBp ? "Adding..." : "Add Link"}
                             </Button>
                           </div>
                         </motion.div>
@@ -851,7 +851,7 @@ export function ClientsPage() {
                     ) : clientBlueprints.length === 0 && !showBpForm ? (
                       <div className="rounded-lg border border-dashed border-slate-200 py-6 text-center">
                         <Link2 className="mx-auto h-6 w-6 text-slate-300 mb-1.5" />
-                        <p className="text-xs text-slate-400">No blueprints added yet.</p>
+                        <p className="text-xs text-slate-400">No links added yet.</p>
                       </div>
                     ) : (
                       <div className="space-y-1.5">

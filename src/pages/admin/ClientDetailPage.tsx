@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  ArrowLeft, Bookmark, CheckCircle2, ChevronDown, ChevronUp, Clock, FileText,
+  ArrowLeft, Link2, CheckCircle2, ChevronDown, ChevronUp, Clock, FileText,
   IndianRupee, Pencil, Plus, Trash2, X
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
@@ -19,7 +19,7 @@ type ClientProjectStage = TableRow<"client_project_stages"> & { stage?: TableRow
 type FileAssignment = TableRow<"client_file_assignments"> & { file?: { display_name: string; mime_type: string | null } | null };
 type BlueprintAssignment = TableRow<"client_blueprint_assignments"> & { blueprint?: { title: string; url: string } | null };
 
-const TABS = ["Overview", "Project Progress", "Assigned Files", "Blueprints", "Activity"] as const;
+const TABS = ["Overview", "Project Progress", "Assigned Files", "Links", "Activity"] as const;
 type Tab = typeof TABS[number];
 
 const statusColor: Record<string, string> = {
@@ -168,7 +168,7 @@ export function ClientDetailPage() {
                 ["Projects", projects.length],
                 ["Active Projects", projects.filter((p) => p.status === "Active").length],
                 ["Files Assigned", fileAssignments.length],
-                ["Blueprints", blueprints.length],
+                ["Links", blueprints.length],
               ].map(([label, value]) => (
                 <div key={String(label)} className="rounded-lg bg-slate-50 p-3">
                   <div className="text-2xl font-black text-slate-900">{value}</div>
@@ -289,24 +289,24 @@ export function ClientDetailPage() {
         </div>
       )}
 
-      {activeTab === "Blueprints" && (
+      {activeTab === "Links" && (
         <div className="space-y-3">
           <div className="flex items-center justify-between">
-            <h2 className="font-bold text-slate-800">{blueprints.length} Blueprint{blueprints.length !== 1 ? "s" : ""}</h2>
+            <h2 className="font-bold text-slate-800">{blueprints.length} Link{blueprints.length !== 1 ? "s" : ""}</h2>
             <Button onClick={() => navigate(`/app/blueprints?client=${id}`)}>
-              <Plus className="h-4 w-4" /> Assign Blueprint
+              <Plus className="h-4 w-4" /> Assign Link
             </Button>
           </div>
           {blueprints.length === 0 ? (
             <div className="py-12 text-center rounded-xl border border-dashed border-slate-300">
-              <Bookmark className="mx-auto h-10 w-10 text-slate-300 mb-3" />
-              <p className="text-slate-400">No blueprints assigned yet.</p>
+              <Link2 className="mx-auto h-10 w-10 text-slate-300 mb-3" />
+              <p className="text-slate-400">No links assigned yet.</p>
             </div>
           ) : blueprints.map((ba) => (
             <div key={ba.id} className="flex items-center gap-4 rounded-xl border border-slate-200 bg-white px-4 py-3">
-              <Bookmark className="h-5 w-5 shrink-0 text-brand-primary" />
+              <Link2 className="h-5 w-5 shrink-0 text-brand-primary" />
               <div className="flex-1 min-w-0">
-                <div className="font-medium text-slate-900">{ba.blueprint?.title ?? "Blueprint"}</div>
+                <div className="font-medium text-slate-900">{ba.blueprint?.title ?? "Link"}</div>
                 <div className="text-xs text-slate-400 truncate">{ba.blueprint?.url}</div>
               </div>
               <a href={ba.blueprint?.url} target="_blank" rel="noopener noreferrer" className="text-xs text-brand-primary hover:underline">Open</a>

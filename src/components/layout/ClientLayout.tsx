@@ -1,7 +1,7 @@
 import { Outlet, NavLink, useNavigate } from "react-router-dom";
 import { useState, useEffect, useMemo } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { Bell, Bookmark, ChevronLeft, ChevronRight, Eye, FileText, IndianRupee, LayoutDashboard, LogOut, Menu, TrendingUp, User, X } from "lucide-react";
+import { Bell, Link2, ChevronLeft, ChevronRight, Eye, FileText, IndianRupee, LayoutDashboard, LogOut, Menu, TrendingUp, User, X } from "lucide-react";
 import { cn, initials } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
 import { useAppSettings } from "@/hooks/useAppSettings";
@@ -11,7 +11,7 @@ const navItems = [
   { to: "/client", label: "Dashboard", icon: LayoutDashboard, end: true },
   { to: "/client/progress", label: "Project Progress", icon: TrendingUp },
   { to: "/client/files", label: "My Files", icon: FileText },
-  { to: "/client/blueprints", label: "Blueprints", icon: Bookmark },
+  { to: "/client/blueprints", label: "Links", icon: Link2 },
   { to: "/client/360-interiors", label: "360 Interiors", icon: Eye },
   { to: "/client/profile", label: "Profile", icon: User },
 ];

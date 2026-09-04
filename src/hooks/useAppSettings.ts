@@ -38,7 +38,7 @@ function asRecord(value: Json | undefined) {
 }
 
 export function useAppSettings() {
-  const { data = [] } = useTable("app_settings", { eq: { key: "branding" } });
+  const { data = [], isLoading } = useTable("app_settings", { eq: { key: "branding" } });
   const branding = useMemo<BrandingSettings>(() => ({ ...defaults, ...asRecord(data[0]?.value) }), [data]);
 
   useEffect(() => {
@@ -60,5 +60,5 @@ export function useAppSettings() {
     fontLink.href = googleFontsUrl([branding.bodyFont, branding.headingFont]);
   }, [branding]);
 
-  return { branding, settingRow: data[0] };
+  return { branding, settingRow: data[0], isLoading };
 }

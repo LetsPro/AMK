@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { ArrowRight, Bookmark, ExternalLink, Layers3, Link2, Search } from "lucide-react";
+import { ArrowRight, ExternalLink, Layers3, Link2, Search } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/contexts/AuthContext";
 import { cn } from "@/lib/utils";
@@ -43,10 +43,10 @@ export function ClientBlueprintsPage() {
           <div className="relative flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
             <div className="max-w-2xl">
               <div className="inline-flex items-center gap-2 rounded-full bg-orange-50 px-3 py-1 text-xs font-black text-brand-primary ring-1 ring-orange-100">
-                <Bookmark className="h-3.5 w-3.5" />
-                Blueprint library
+                <Link2 className="h-3.5 w-3.5" />
+                Link library
               </div>
-              <h1 className="mt-4 text-3xl font-black tracking-tight text-slate-950 md:text-4xl">Blueprint Links</h1>
+              <h1 className="mt-4 text-3xl font-black tracking-tight text-slate-950 md:text-4xl">Links</h1>
               <p className="mt-2 text-sm leading-6 text-slate-500">
                 Open approved drawings, plans, and project references shared by the AMK team.
               </p>
@@ -69,7 +69,7 @@ export function ClientBlueprintsPage() {
       <div className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm sm:flex-row sm:items-center">
         <div className="relative flex-1">
           <Search className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
-          <Input placeholder="Search blueprint links..." value={search} onChange={(e) => setSearch(e.target.value)} className="h-9 rounded-xl border-slate-200 pl-9" />
+          <Input placeholder="Search links..." value={search} onChange={(e) => setSearch(e.target.value)} className="h-9 rounded-xl border-slate-200 pl-9" />
         </div>
         <div className="flex items-center gap-2 rounded-xl bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-500">
           <Layers3 className="h-4 w-4 text-brand-primary" />
@@ -86,8 +86,8 @@ export function ClientBlueprintsPage() {
           <div className="mx-auto mb-4 grid h-14 w-14 place-items-center rounded-2xl bg-slate-100 text-slate-400">
             <Link2 className="h-7 w-7" />
           </div>
-          <h2 className="text-lg font-black text-slate-900">{search ? "No matching blueprint links" : "No blueprint links yet"}</h2>
-          <p className="mt-1 text-sm text-slate-500">{search ? "Try a different title or description." : "Approved blueprint links will appear here once shared."}</p>
+          <h2 className="text-lg font-black text-slate-900">{search ? "No matching links" : "No links yet"}</h2>
+          <p className="mt-1 text-sm text-slate-500">{search ? "Try a different title or description." : "Approved links will appear here once shared."}</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 xl:grid-cols-3">
@@ -111,7 +111,7 @@ export function ClientBlueprintsPage() {
               <div className="mt-5 min-w-0 flex-1">
                 <h2 className="truncate text-lg font-black text-slate-950 transition-colors group-hover:text-brand-primary">{a.blueprint!.title}</h2>
                 <p className="mt-2 line-clamp-2 text-sm leading-6 text-slate-500">
-                  {a.blueprint!.description || "Project blueprint link shared for review."}
+                  {a.blueprint!.description || "Project link shared for review."}
                 </p>
               </div>
 

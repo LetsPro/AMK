@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
-  Activity, ArrowRight, Bookmark, Building2, CheckCircle2, CircleAlert,
+  Activity, ArrowRight, Link2, Building2, CheckCircle2, CircleAlert,
   Clock, FileCheck, Files, FolderOpen, Gauge, LayoutGrid, Plus, TrendingUp,
   Upload, Users
 } from "lucide-react";
@@ -156,7 +156,7 @@ export function AdminDashboard() {
     { label: "Assign File", caption: "Share to client stage", icon: FileCheck, tone: "bg-emerald-50 text-emerald-600", action: () => navigate("/app/assignments?new=1") },
     { label: "Add Portfolio", caption: "Publish project case", icon: Building2, tone: "bg-orange-50 text-orange-600", action: () => navigate("/app/portfolio?new=1") },
     { label: "Create Stage", caption: "Manage workflow", icon: Gauge, tone: "bg-cyan-50 text-cyan-600", action: () => navigate("/app/stages?new=1") },
-    { label: "Add Blueprint", caption: "Attach drawings link", icon: Bookmark, tone: "bg-indigo-50 text-indigo-600", action: () => navigate("/app/blueprints?new=1") },
+    { label: "Add Link", caption: "Share a project link", icon: Link2, tone: "bg-indigo-50 text-indigo-600", action: () => navigate("/app/blueprints?new=1") },
   ];
 
   const healthItems = [

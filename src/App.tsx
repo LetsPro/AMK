@@ -1,6 +1,5 @@
-import { useEffect, lazy, Suspense, useState } from "react";
+import { useCallback, useEffect, lazy, Suspense, useState } from "react";
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
-import { Building2 } from "lucide-react";
 import { ProtectedRoute } from "@/components/layout/ProtectedRoute";
 import { useAppSettings } from "@/hooks/useAppSettings";
 import { Seo } from "@/components/seo/Seo";
@@ -52,23 +51,29 @@ function PageLoader({ fixed = false }: { fixed?: boolean }) {
 }
 
 function InitialSplash({ onComplete }: { onComplete: () => void }) {
-  const { branding } = useAppSettings();
+  const { branding, isLoading } = useAppSettings();
+  const [logoLoaded, setLogoLoaded] = useState(false);
 
   useEffect(() => {
-    const timer = window.setTimeout(onComplete, 2000);
+    const timer = window.setTimeout(onComplete, 5000);
     return () => window.clearTimeout(timer);
   }, [onComplete]);
 
+  useEffect(() => {
+    if (isLoading) return;
+    if (!branding.logoUrl) {
+      onComplete();
+      return;
+    }
+    if (!logoLoaded) return;
+    const timer = window.setTimeout(onComplete, 2000);
+    return () => window.clearTimeout(timer);
+  }, [branding.logoUrl, isLoading, logoLoaded, onComplete]);
+
   return (
     <div className="fixed inset-0 z-[1000] grid min-h-screen place-items-center overflow-hidden bg-white p-6 md:p-10">
-      {branding.logoUrl ? (
-        <img src={branding.logoUrl} alt={branding.companyName} loading="eager" decoding="async" fetchPriority="high" className="max-h-[86vh] max-w-[90vw] animate-[logo-fade-in_1s_ease-out_both] object-contain" />
-      ) : (
-        <div className="flex animate-[logo-fade-in_1s_ease-out_both] flex-col items-center text-center">
-          <Building2 className="h-24 w-24 text-brand-primary" />
-          <h1 className="mt-5 text-3xl font-black text-slate-950">{branding.companyName}</h1>
-          <p className="mt-1 text-sm font-semibold uppercase tracking-[0.22em] text-brand-primary">{branding.companySuffix}</p>
-        </div>
+      {branding.logoUrl && (
+        <img src={branding.logoUrl} alt={branding.companyName} loading="eager" decoding="async" fetchPriority="high" onLoad={() => setLogoLoaded(true)} onError={onComplete} className={`max-h-[86vh] max-w-[90vw] object-contain ${logoLoaded ? "animate-[logo-fade-in_1s_ease-out_both]" : "invisible"}`} />
       )}
     </div>
   );
@@ -82,6 +87,7 @@ function ScrollToTop() {
 
 export function App() {
   const [splashComplete, setSplashComplete] = useState(false);
+  const completeSplash = useCallback(() => setSplashComplete(true), []);
 
   return (
     <>
@@ -126,7 +132,7 @@ export function App() {
 
         {/* Client routes */}
         <Route element={<ProtectedRoute requireClient />}>
-          <Route path="client" element={<><Seo title="Client Project Portal | AMK Architects & Engineers" description="Secure AMK client portal for project progress, files, blueprints, and 360 interior views." noIndex /><ClientLayout /></>}>
+          <Route path="client" element={<><Seo title="Client Project Portal | AMK Architects & Engineers" description="Secure AMK client portal for project progress, files, links, and 360 interior views." noIndex /><ClientLayout /></>}>
             <Route index element={<Suspense fallback={<PageLoader />}><ClientDashboard /></Suspense>} />
             <Route path="progress" element={<Suspense fallback={<PageLoader />}><ClientProgressPage /></Suspense>} />
             <Route path="files" element={<Suspense fallback={<PageLoader />}><ClientFilesPage /></Suspense>} />
@@ -139,7 +145,7 @@ export function App() {
         <Route path="*" element={<Navigate to="/" replace />} />
        </Routes>
       </Suspense>
-      {!splashComplete && <InitialSplash onComplete={() => setSplashComplete(true)} />}
+      {!splashComplete && <InitialSplash onComplete={completeSplash} />}
     </>
   );
 }

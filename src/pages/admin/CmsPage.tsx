@@ -247,13 +247,17 @@ export function CmsPage() {
           {table === "banners" && (
             <>
               <label>
-                <span className="mb-1 block text-sm font-medium">Button label</span>
+                <span className="mb-1 block text-sm font-medium">Button label (optional)</span>
                 <Input value={form.cta_label ?? ""} onChange={(e) => setForm({ ...form, cta_label: e.target.value })} placeholder="Start a Project" />
               </label>
               <label>
                 <span className="mb-1 block text-sm font-medium">Button destination</span>
                 <Input value={form.cta_url ?? ""} onChange={(e) => setForm({ ...form, cta_url: e.target.value })} placeholder="/contact or #enquiry" />
               </label>
+              <div className="flex flex-wrap items-center gap-3 md:col-span-2">
+                <p className="text-xs text-slate-500">Add a label and destination to show a slide button. Leave them empty to hide it.</p>
+                {(form.cta_label || form.cta_url) && <Button type="button" variant="secondary" onClick={() => setForm({ ...form, cta_label: "", cta_url: "" })}><Trash2 className="h-4 w-4" /> Remove slide button</Button>}
+              </div>
             </>
           )}
 

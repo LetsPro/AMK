@@ -69,7 +69,7 @@ export function BlueprintsAdminPage() {
       if (editItem) {
         const { error } = await supabase.from("blueprint_links").update({ title: form.title, url: form.url, description: form.description, is_active: form.is_active, updated_by: profile?.id }).eq("id", editItem.id);
         if (error) throw error;
-        toast.success("Blueprint updated");
+        toast.success("Link updated");
       } else {
         const { data: newBp, error } = await supabase.from("blueprint_links").insert({ title: form.title, url: form.url, description: form.description, is_active: form.is_active, created_by: profile?.id }).select("id").single();
         if (error) throw error;
@@ -83,7 +83,7 @@ export function BlueprintsAdminPage() {
             created_by: profile?.id,
           });
         }
-        toast.success("Blueprint created" + (form.client_id ? " and assigned" : ""));
+        toast.success("Link created" + (form.client_id ? " and assigned" : ""));
       }
       setShowForm(false);
       load();
@@ -95,7 +95,7 @@ export function BlueprintsAdminPage() {
 
   async function toggleActive(b: Blueprint) {
     await supabase.from("blueprint_links").update({ is_active: !b.is_active }).eq("id", b.id);
-    toast.success(`Blueprint ${!b.is_active ? "activated" : "deactivated"}`);
+    toast.success(`Link ${!b.is_active ? "activated" : "deactivated"}`);
     load();
   }
 
@@ -103,7 +103,7 @@ export function BlueprintsAdminPage() {
     if (!deleteTarget) return;
     const { error } = await supabase.from("blueprint_links").delete().eq("id", deleteTarget.id);
     if (error) { toast.error("Error", error.message); return; }
-    toast.success("Blueprint deleted");
+    toast.success("Link deleted");
     setDeleteTarget(null);
     load();
   }
@@ -120,7 +120,7 @@ export function BlueprintsAdminPage() {
         created_by: profile?.id,
       });
       if (error) throw error;
-      toast.success("Blueprint assigned");
+      toast.success("Link assigned");
       loadAssignments(assignTarget.id);
       setAssignForm(defaultAssignForm);
     } catch (err) {
@@ -141,15 +141,15 @@ export function BlueprintsAdminPage() {
     <div className="space-y-5">
       <div className="flex items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-black text-slate-900">Blueprint Links</h1>
+          <h1 className="text-2xl font-black text-slate-900">Links</h1>
           <p className="text-sm text-slate-500">{blueprints.length} link{blueprints.length !== 1 ? "s" : ""}</p>
         </div>
-        <Button onClick={openAdd}><Plus className="h-4 w-4" /> Add Blueprint</Button>
+        <Button onClick={openAdd}><Plus className="h-4 w-4" /> Add Link</Button>
       </div>
 
       <div className="relative max-w-xs">
         <Search className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
-        <Input placeholder="Search blueprints..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9 h-9" />
+        <Input placeholder="Search links..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9 h-9" />
       </div>
 
       {loading ? (
@@ -157,8 +157,8 @@ export function BlueprintsAdminPage() {
       ) : filtered.length === 0 ? (
         <div className="py-16 text-center rounded-xl border border-dashed border-slate-300">
           <ExternalLink className="mx-auto h-10 w-10 text-slate-300 mb-3" />
-          <p className="font-semibold text-slate-700">No blueprint links yet</p>
-          <Button className="mt-4" onClick={openAdd}><Plus className="h-4 w-4" /> Add Blueprint</Button>
+          <p className="font-semibold text-slate-700">No links yet</p>
+          <Button className="mt-4" onClick={openAdd}><Plus className="h-4 w-4" /> Add Link</Button>
         </div>
       ) : (
         <div className="rounded-xl border border-slate-200 bg-white overflow-hidden">
@@ -224,7 +224,7 @@ export function BlueprintsAdminPage() {
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-40 bg-slate-950/40" onClick={() => setShowForm(false)} />
             <motion.aside initial={{ x: "100%" }} animate={{ x: 0 }} exit={{ x: "100%" }} transition={{ type: "spring", stiffness: 320, damping: 32 }} className="fixed inset-y-0 right-0 z-50 w-full max-w-md overflow-y-auto bg-white shadow-2xl">
               <div className="flex items-center justify-between border-b px-6 py-4">
-                <h2 className="font-bold text-lg">{editItem ? "Edit Blueprint" : "Add Blueprint"}</h2>
+                <h2 className="font-bold text-lg">{editItem ? "Edit Link" : "Add Link"}</h2>
                 <button onClick={() => setShowForm(false)} className="grid h-8 w-8 place-items-center rounded-lg hover:bg-slate-100"><X className="h-4 w-4" /></button>
               </div>
               <div className="p-6 space-y-4">
@@ -262,7 +262,7 @@ export function BlueprintsAdminPage() {
             <motion.aside initial={{ x: "100%" }} animate={{ x: 0 }} exit={{ x: "100%" }} transition={{ type: "spring", stiffness: 320, damping: 32 }} className="fixed inset-y-0 right-0 z-50 w-full max-w-md overflow-y-auto bg-white shadow-2xl">
               <div className="flex items-center justify-between border-b px-6 py-4">
                 <div>
-                  <h2 className="font-bold text-lg">Assign Blueprint</h2>
+                  <h2 className="font-bold text-lg">Assign Link</h2>
                   <p className="text-xs text-slate-500 mt-0.5">{assignTarget.title}</p>
                 </div>
                 <button onClick={() => setShowAssignForm(false)} className="grid h-8 w-8 place-items-center rounded-lg hover:bg-slate-100"><X className="h-4 w-4" /></button>
@@ -310,8 +310,8 @@ export function BlueprintsAdminPage() {
         {deleteTarget && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 grid place-items-center bg-slate-950/50 p-4">
             <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }} className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl">
-              <h3 className="font-bold text-lg">Delete Blueprint?</h3>
-              <p className="mt-2 text-sm text-slate-600">Delete <strong>{deleteTarget.title}</strong>? All client assignments for this blueprint will also be removed.</p>
+              <h3 className="font-bold text-lg">Delete Link?</h3>
+              <p className="mt-2 text-sm text-slate-600">Delete <strong>{deleteTarget.title}</strong>? All client assignments for this link will also be removed.</p>
               <div className="mt-5 flex gap-3">
                 <Button variant="danger" onClick={deleteBlueprint} className="flex-1">Delete</Button>
                 <Button variant="secondary" onClick={() => setDeleteTarget(null)}>Cancel</Button>

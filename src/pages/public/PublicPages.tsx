@@ -811,20 +811,13 @@ export function HomePage() {
               >
                 <span className="inline-flex items-center gap-2"><LogIn className="h-5 w-5" /> Login to Your Portal</span>
               </button>
-              <button
+              {slide.cta_label?.trim() && slide.cta_url?.trim() && <button
                 type="button"
-                onClick={() => (slide.cta_url === "#enquiry" || slide.cta_url === legacyEnquiryRoute || slide.cta_label?.toLowerCase() === "get started") ? openEnquiryModal() : location.href = slide.cta_url ?? "/contact"}
+                onClick={() => (slide.cta_url === "#enquiry" || slide.cta_url === legacyEnquiryRoute || slide.cta_label?.toLowerCase() === "get started") ? openEnquiryModal() : location.href = slide.cta_url!}
                 className="group relative overflow-hidden rounded-full bg-white px-6 py-4 text-sm font-semibold text-slate-950 shadow-2xl shadow-orange-950/25 transition hover:-translate-y-1 hover:bg-brand-primary hover:text-white"
               >
-                <span className="relative z-10 inline-flex items-center gap-2">{slide.cta_label ?? "Start a Project"} <ArrowRight className="h-4 w-4 transition group-hover:translate-x-1" /></span>
-              </button>
-              <button
-                type="button"
-                onClick={() => location.href = "/projects"}
-                className="group rounded-full border border-white/20 bg-white/10 px-6 py-4 text-sm font-semibold text-white backdrop-blur transition hover:-translate-y-1 hover:border-brand-accent hover:bg-white hover:text-slate-950"
-              >
-                <span className="inline-flex items-center gap-2">View Projects <Eye className="h-4 w-4" /></span>
-              </button>
+                <span className="relative z-10 inline-flex items-center gap-2">{slide.cta_label} <ArrowRight className="h-4 w-4 transition group-hover:translate-x-1" /></span>
+              </button>}
             </div>
           </div>
         </div>
@@ -986,9 +979,9 @@ export function ListingPage({ type }: { type: "projects" | "services" | "gallery
         </div>
       </Section>
       <Section title="Meet the Founder" description="AMK is led with a focus on architecture, computation, BIM, visualization, and delivery discipline.">
-        <div className="grid gap-8 lg:grid-cols-[0.8fr_1.2fr]">
-          <Card className="overflow-hidden p-0">
-            <div className="aspect-[4/3] overflow-hidden bg-gradient-to-br from-orange-50 to-slate-100">
+        <div className="grid items-center gap-8 md:grid-cols-[0.8fr_1.2fr]">
+          <Card className="mx-auto w-full max-w-md overflow-hidden p-0">
+            <div className="aspect-[4/5] overflow-hidden bg-gradient-to-br from-orange-50 to-slate-100">
               {aboutPage?.image_url ? (
                 <img src={aboutPage.image_url} alt="Ar. Andra Manoj Kumar, founder of AMK Architects & Engineers" loading="eager" decoding="async" className="h-full w-full object-cover object-top" />
               ) : (
@@ -1008,16 +1001,19 @@ export function ListingPage({ type }: { type: "projects" | "services" | "gallery
           </Card>
         </div>
       </Section>
-      <Section title="Our Philosophy" description="Open each idea to see how it affects project decisions, documentation, and site execution.">
+      <Section title="Our Philosophy">
         <div className="grid gap-8 lg:grid-cols-[0.8fr_1.2fr]">
           <Card>
             <h3 className="text-2xl font-black">Design should not only look exceptional; it should perform exceptionally.</h3>
           </Card>
-          <InteractiveAccordion items={[
-            { title: "Collaborative discovery", text: "Every project begins with a deep understanding of the client's vision and evolves through a collaborative process that integrates design thinking, data-driven decisions, and technical expertise.", meta: "Idea 01" },
-            { title: "Performance-led design", text: "Plans, materials, services, structure, and approval constraints are tested against real project outcomes so the design works beyond presentation visuals.", meta: "Idea 02" },
-            { title: "Execution continuity", text: "From concept development and approvals to execution and delivery, AMK remains committed to creating spaces that inspire, function, and endure.", meta: "Idea 03" }
-          ]} />
+          <div>
+            <p className="mb-4 text-sm leading-7 text-slate-500">Open each idea to see how it affects project decisions, documentation, and site execution.</p>
+            <InteractiveAccordion items={[
+              { title: "Collaborative discovery", text: "Every project begins with a deep understanding of the client's vision and evolves through a collaborative process that integrates design thinking, data-driven decisions, and technical expertise.", meta: "Idea 01" },
+              { title: "Performance-led design", text: "Plans, materials, services, structure, and approval constraints are tested against real project outcomes so the design works beyond presentation visuals.", meta: "Idea 02" },
+              { title: "Execution continuity", text: "From concept development and approvals to execution and delivery, AMK remains committed to creating spaces that inspire, function, and endure.", meta: "Idea 03" }
+            ]} />
+          </div>
         </div>
       </Section>
       <VisionMissionToggle />
@@ -1029,12 +1025,6 @@ export function ListingPage({ type }: { type: "projects" | "services" | "gallery
             ["Technology", "BIM, parametric design, digital fabrication, and visualization are integrated into the design process."],
             ["Performance", "Spaces are planned to inspire, function, endure, and deliver long-term value."]
           ].map(([title, text], index) => <FlipInfoCard key={title} title={title} text={text} detail="This principle is checked through concept reviews, technical coordination, client decisions, and site follow-through." icon={index === 0 ? Sparkles : index === 1 ? Layers3 : BarChart3} />)}
-        </div>
-      </Section>
-      <Section title="Our Mysuru Design Approach" description="The studio balances local context, approvals, client lifestyles, and modern performance.">
-        <div className="grid gap-8 lg:grid-cols-[0.9fr_1.1fr]">
-          <HoverRevealTile title="Mysuru context, modern performance" text="AMK balances local climate, client lifestyles, approvals, construction realities, and contemporary design ambition." image="https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?auto=format&fit=crop&w=1400&q=80" label="Approach" />
-          <InteractiveAccordion items={["Design should not only look exceptional; it should perform exceptionally.", "Every project evolves through collaboration, data-driven decision making, and technical expertise.", "From concept development and approvals to execution and delivery, AMK creates spaces that inspire, function, and endure."].map((item, index) => ({ title: item, text: "This checkpoint keeps aesthetics, usability, engineering, approvals, and delivery aligned through the project lifecycle.", meta: `Focus 0${index + 1}` }))} />
         </div>
       </Section>
     </>
