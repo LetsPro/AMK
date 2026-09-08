@@ -14,6 +14,9 @@ type BrandingSettings = {
   location: string;
   email: string;
   phone: string;
+  facebookUrl: string;
+  instagramUrl: string;
+  linkedinUrl: string;
   bodyFont: string;
   headingFont: string;
 };
@@ -29,6 +32,9 @@ const defaults: BrandingSettings = {
   location: "Mysuru, Karnataka, India",
   email: import.meta.env.VITE_COMPANY_EMAIL ?? "ar.amk6616@gmail.com",
   phone: import.meta.env.VITE_COMPANY_PHONE ?? "+91 98458 99066",
+  facebookUrl: "",
+  instagramUrl: "",
+  linkedinUrl: "",
   bodyFont: "Inter",
   headingFont: "Manrope"
 };

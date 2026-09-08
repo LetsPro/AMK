@@ -39,7 +39,7 @@ export function SettingsPage() {
     <div className="space-y-5">
       <div>
         <h1 className="text-3xl font-black">Settings</h1>
-        <p className="text-sm text-slate-500">Manage the logo, typography, contact details, and theme used across the public website, admin area, and client portal.</p>
+        <p className="text-sm text-slate-500">Manage the logo, typography, contact details, social links, and theme used across the public website, admin area, and client portal.</p>
       </div>
       <Card>
         <form className="grid gap-5 md:grid-cols-2" onSubmit={save}>
@@ -67,6 +67,22 @@ export function SettingsPage() {
             <span className="mb-1 block text-sm font-medium">Location</span>
             <Input value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} />
           </label>
+          <fieldset className="grid gap-5 rounded-lg border border-slate-200 bg-slate-50 p-5 md:col-span-2 md:grid-cols-2">
+            <legend className="px-2 text-sm font-bold text-slate-900">Footer Social Links</legend>
+            <label>
+              <span className="mb-1 block text-sm font-medium">Facebook URL</span>
+              <Input type="url" placeholder="https://facebook.com/your-page" value={form.facebookUrl} onChange={(e) => setForm({ ...form, facebookUrl: e.target.value })} />
+            </label>
+            <label>
+              <span className="mb-1 block text-sm font-medium">Instagram URL</span>
+              <Input type="url" placeholder="https://instagram.com/your-profile" value={form.instagramUrl} onChange={(e) => setForm({ ...form, instagramUrl: e.target.value })} />
+            </label>
+            <label className="md:col-span-2">
+              <span className="mb-1 block text-sm font-medium">LinkedIn URL</span>
+              <Input type="url" placeholder="https://linkedin.com/company/your-company" value={form.linkedinUrl} onChange={(e) => setForm({ ...form, linkedinUrl: e.target.value })} />
+            </label>
+            <p className="text-xs leading-5 text-slate-500 md:col-span-2">Only social networks with a saved URL are shown in the public footer.</p>
+          </fieldset>
           <div className="md:col-span-2 grid gap-5 rounded-lg border border-slate-200 bg-slate-50 p-5 md:grid-cols-2">
             <label>
               <span className="mb-1 block text-sm font-medium">Body Font</span>

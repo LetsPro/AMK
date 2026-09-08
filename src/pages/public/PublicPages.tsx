@@ -1086,7 +1086,7 @@ export function ListingPage({ type }: { type: "projects" | "services" | "gallery
               signature: "From Concept to Completion."
             };
             return (
-              <motion.div key={service.id} className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm" initial={false} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, amount: 0.05 }} whileHover={{ y: -4 }}>
+              <motion.div id={serviceKey(service)} key={service.id} className="scroll-mt-28 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm" initial={false} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, amount: 0.05 }} whileHover={{ y: -4 }}>
                 <div className="grid lg:grid-cols-[0.9fr_1.1fr]">
                   <div className="group relative min-h-72 overflow-hidden bg-slate-200">
                     <img src={service.image_url ?? "https://images.unsplash.com/photo-1503387762-592deb58ef4e?auto=format&fit=crop&w=1200&q=80"} alt={service.name ?? "AMK architecture service"} loading="lazy" decoding="async" className="absolute inset-0 h-full w-full object-cover transition duration-700 group-hover:scale-110" />

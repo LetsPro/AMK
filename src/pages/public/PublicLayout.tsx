@@ -32,6 +32,14 @@ const budgetRanges = ["Below 25 Lakhs", "25-50 Lakhs", "50 Lakhs-1 Crore", "1-3 
 const timelines = ["Immediately", "Within 1 Month", "1-3 Months", "3-6 Months", "Planning Stage"];
 const serviceOptions = ["Architecture", "Interior", "BIM", "Approvals", "Visualization", "Execution"];
 
+const footerServices = [
+  { label: "Architecture & Master Planning", slug: "architecture-master-planning" },
+  { label: "Interior Design", slug: "interior-design-space-experience" },
+  { label: "BIM & Digital Engineering", slug: "bim-digital-engineering" },
+  { label: "Parametric Design", slug: "parametric-computational-design" },
+  { label: "3D Printing & Fabrication", slug: "3d-printing-digital-fabrication" },
+];
+
 export function PublicLayout() {
   const [open, setOpen] = useState(false);
   const [enquiryOpen, setEnquiryOpen] = useState(false);
@@ -40,6 +48,11 @@ export function PublicLayout() {
   const { branding } = useAppSettings();
   const navItems = ["home", "about", "projects", "services", "gallery", "contact"];
   const hrefFor = (item: string) => item === "home" ? "/" : `/${item}`;
+  const socialLinks = [
+    { label: "Facebook", url: branding.facebookUrl, icon: Facebook },
+    { label: "Instagram", url: branding.instagramUrl, icon: Instagram },
+    { label: "LinkedIn", url: branding.linkedinUrl, icon: Linkedin },
+  ].filter((social) => social.url.trim());
 
   useEffect(() => {
     const listener = () => setEnquiryOpen(true);
@@ -142,9 +155,15 @@ export function PublicLayout() {
           <div>
             <div className="flex items-center gap-3 text-lg font-bold"><span className="grid h-20 w-32 place-items-center bg-transparent">{branding.logoUrl && <img src={branding.logoUrl} alt={branding.companyName} loading="lazy" decoding="async" className="max-h-20 max-w-full object-contain brightness-0 invert" />}</span></div>
             <p className="mt-4 max-w-sm text-sm leading-6 text-slate-400">Technology-driven architecture, engineering, BIM, parametric design, visualization, digital fabrication, and project execution support.</p>
-            <div className="mt-5 flex gap-3">
-              {[Facebook, Instagram, Linkedin].map((Icon, index) => <span key={index} className="grid h-9 w-9 place-items-center rounded-full bg-white/10 text-slate-200"><Icon className="h-4 w-4" /></span>)}
-            </div>
+            {socialLinks.length > 0 && (
+              <div className="mt-5 flex gap-3">
+                {socialLinks.map(({ label, url, icon: Icon }) => (
+                  <a key={label} href={url} target="_blank" rel="noopener noreferrer" aria-label={`Visit ${branding.companyName} on ${label}`} className="grid h-9 w-9 place-items-center rounded-full bg-white/10 text-slate-200 transition hover:bg-brand-primary hover:text-white focus:outline-none focus:ring-2 focus:ring-brand-accent">
+                    <Icon className="h-4 w-4" />
+                  </a>
+                ))}
+              </div>
+            )}
           </div>
           <div>
             <h4 className="font-semibold">Company</h4>
@@ -155,7 +174,7 @@ export function PublicLayout() {
           <div>
             <h4 className="font-semibold">Services</h4>
             <div className="mt-4 grid gap-3 text-sm text-slate-400">
-              {["Architecture & Master Planning", "Interior Design", "BIM & Digital Engineering", "Parametric Design", "3D Printing & Fabrication"].map((item) => <span key={item}>{item}</span>)}
+              {footerServices.map((service) => <Link key={service.slug} to={`/services#${service.slug}`} className="hover:text-white">{service.label}</Link>)}
             </div>
           </div>
           <div>
