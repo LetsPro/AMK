@@ -58,6 +58,20 @@ type UploadOptions = {
   onProgress?: (percentage: number) => void;
 };
 
+export function storageSafeFileName(fileName: string) {
+  const normalized = fileName.normalize("NFKD");
+  const extensionMatch = normalized.match(/(\.[a-zA-Z0-9]{1,10})$/);
+  const extension = extensionMatch?.[1]?.toLowerCase() ?? "";
+  const stem = normalized
+    .slice(0, extension ? -extension.length : undefined)
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 100);
+
+  return `${stem || "file"}${extension}`;
+}
+
 const RESUMABLE_UPLOAD_THRESHOLD = 6 * 1024 * 1024;
 
 async function uploadFileResumable(bucket: string, path: string, file: File, options?: UploadOptions) {

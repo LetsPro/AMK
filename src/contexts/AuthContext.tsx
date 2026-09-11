@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import type { Session, User } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase";
+import { normalizePhoneNumber } from "@/lib/phone";
 import type { RoleName, TableRow } from "@/types/database";
 
 type Profile = TableRow<"profiles"> & { roles?: TableRow<"roles"> | null };
@@ -14,7 +15,7 @@ type AuthContextValue = {
   isClient: boolean;
   clientId: string | null;
   loading: boolean;
-  signIn: (email: string, password: string) => Promise<"/app" | "/client">;
+  signIn: (identifier: string, password: string) => Promise<"/app" | "/client">;
   signOut: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
   updatePassword: (password: string) => Promise<void>;
@@ -91,8 +92,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       isClient,
       clientId,
       loading,
-      async signIn(email, password) {
-        const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+      async signIn(identifier, password) {
+        const normalizedIdentifier = identifier.trim();
+        const credentials = normalizedIdentifier.includes("@")
+          ? { email: normalizedIdentifier.toLowerCase(), password }
+          : { phone: normalizePhoneNumber(normalizedIdentifier) ?? "", password };
+        if ("phone" in credentials && !credentials.phone) throw new Error("Enter a valid email address or phone number");
+
+        const { data, error } = await supabase.auth.signInWithPassword(credentials);
         if (error) throw error;
         if (!data.session?.user) return "/app";
 

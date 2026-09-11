@@ -10,6 +10,8 @@ import { Input } from "@/components/ui/Input";
 import { useToast } from "@/contexts/ToastContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { attachFileAccessUrls } from "@/lib/fileUrls";
+import { normalizePhoneNumber } from "@/lib/phone";
+import { storageSafeFileName } from "@/services/crud";
 import type { Database, TableRow, ClientStatus } from "@/types/database";
 
 type Client = TableRow<"clients">;
@@ -189,6 +191,7 @@ export function ClientsPage() {
 
   // Portal credentials
   const [portalEmail, setPortalEmail] = useState("");
+  const [portalPhone, setPortalPhone] = useState("");
   const [portalPassword, setPortalPassword] = useState("");
   const [showPortalPassword, setShowPortalPassword] = useState(false);
 
@@ -277,7 +280,7 @@ export function ClientsPage() {
 
     setUploadingStageId(stageId);
     try {
-      const path = `clients/${viewClient.id}/${Date.now()}_${file.name}`;
+      const path = `clients/${viewClient.id}/${Date.now()}-${storageSafeFileName(file.name)}`;
       const { error: upErr } = await supabase.storage.from("documents").upload(path, file, { upsert: false });
       if (upErr) throw upErr;
 
@@ -370,6 +373,7 @@ export function ClientsPage() {
     setEditClient(null);
     setForm(defaultForm);
     setPortalEmail("");
+    setPortalPhone("");
     setPortalPassword("");
     setShowPortalPassword(false);
     setShowForm(true);
@@ -391,6 +395,7 @@ export function ClientsPage() {
     });
     // Pre-fill portal email with client email so user only needs to enter password
     setPortalEmail(client.email ?? "");
+    setPortalPhone(client.mobile ?? "");
     setPortalPassword("");
     setShowPortalPassword(false);
     setShowForm(true);
@@ -403,6 +408,7 @@ export function ClientsPage() {
     for (let i = 0; i < 9; i += 1) password += chars[Math.floor(Math.random() * chars.length)];
     password += symbols[Math.floor(Math.random() * symbols.length)];
     setPortalEmail(portalEmail || form.email);
+    setPortalPhone(portalPhone || form.mobile);
     setPortalPassword(password);
     setShowPortalPassword(true);
   }
@@ -425,6 +431,8 @@ export function ClientsPage() {
       };
       // Resolve portal email: explicit entry or fall back to client email
       const effectivePortalEmail = portalEmail.trim() || form.email.trim();
+      const effectivePortalPhone = portalPhone.trim() || form.mobile.trim();
+      const normalizedPortalPhone = effectivePortalPhone ? normalizePhoneNumber(effectivePortalPhone) : null;
 
       if (editClient) {
         const { error } = await supabase.from("clients").update(clientPayload).eq("id", editClient.id);
@@ -433,11 +441,12 @@ export function ClientsPage() {
 
         if (portalPassword.trim()) {
           if (!effectivePortalEmail) throw new Error("Portal email is required to set credentials");
+          if (effectivePortalPhone && !normalizedPortalPhone) throw new Error("Enter a valid portal phone number, including the country code when outside India");
           if (portalPassword.length < 8) throw new Error("Password must be at least 8 characters");
           try {
-            await createPortalUser({ email: normalizeEmail(effectivePortalEmail), password: portalPassword, full_name: form.name, existing_user_id: editClient.auth_user_id ?? null, client_id: editClient.id });
+            await createPortalUser({ email: normalizeEmail(effectivePortalEmail), phone: normalizedPortalPhone, password: portalPassword, full_name: form.name, existing_user_id: editClient.auth_user_id ?? null, client_id: editClient.id });
           } catch (credentialError) {
-            if (!editClient.auth_user_id) {
+            if (!editClient.auth_user_id && !normalizedPortalPhone) {
               try {
                 await createPortalUserWithSignup({ email: normalizeEmail(effectivePortalEmail), password: portalPassword, fullName: form.name, clientId: editClient.id });
               } catch (fallbackError) {
@@ -458,18 +467,33 @@ export function ClientsPage() {
         const { data: newClient, error } = await supabase.from("clients").insert(clientPayload).select("id").single();
         if (error) throw error;
         const clientId = (newClient as { id: string }).id;
+        const { error: folderError } = await supabase.from("folders").insert({
+          name: form.name.trim(),
+          parent_id: null,
+          path: "/",
+          created_by: profile?.id ?? null,
+        });
+        if (folderError) {
+          await supabase.from("clients").delete().eq("id", clientId);
+          throw new Error(`Client folder could not be created: ${folderError.message}`);
+        }
         let portalError = "";
 
         if (portalPassword.trim()) {
           if (!effectivePortalEmail) throw new Error("Portal email is required to set credentials");
+          if (effectivePortalPhone && !normalizedPortalPhone) throw new Error("Enter a valid portal phone number, including the country code when outside India");
           if (portalPassword.length < 8) throw new Error("Password must be at least 8 characters");
           try {
-            await createPortalUser({ email: normalizeEmail(effectivePortalEmail), password: portalPassword, full_name: form.name, client_id: clientId });
+            await createPortalUser({ email: normalizeEmail(effectivePortalEmail), phone: normalizedPortalPhone, password: portalPassword, full_name: form.name, client_id: clientId });
           } catch (credentialError) {
-            try {
-              await createPortalUserWithSignup({ email: normalizeEmail(effectivePortalEmail), password: portalPassword, fullName: form.name, clientId });
-            } catch (fallbackError) {
-              portalError = `${errorMessage(credentialError)}; fallback failed: ${errorMessage(fallbackError)}`;
+            if (!normalizedPortalPhone) {
+              try {
+                await createPortalUserWithSignup({ email: normalizeEmail(effectivePortalEmail), password: portalPassword, fullName: form.name, clientId });
+              } catch (fallbackError) {
+                portalError = `${errorMessage(credentialError)}; fallback failed: ${errorMessage(fallbackError)}`;
+              }
+            } else {
+              portalError = errorMessage(credentialError);
             }
           }
         }
@@ -1018,7 +1042,7 @@ export function ClientsPage() {
                   <p className="text-xs text-slate-500">
                     {editClient?.auth_user_id
                       ? "Enter a new password to update portal login. Leave password blank to keep existing."
-                      : "Enter a password to give this client portal access. Email defaults to the client email above."}
+                      : "Enter a password to give this client portal access. They can sign in with either the email or phone number below."}
                   </p>
                   <div>
                     <label className="block text-xs font-medium text-slate-600 mb-1">Portal Email</label>
@@ -1030,6 +1054,18 @@ export function ClientsPage() {
                       className="h-9 text-sm"
                     />
                     <p className="mt-1 text-xs text-slate-400">Leave blank to use the client email above.</p>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-slate-600 mb-1">Portal Phone Number</label>
+                    <Input
+                      type="tel"
+                      inputMode="tel"
+                      value={portalPhone}
+                      onChange={(e) => setPortalPhone(e.target.value)}
+                      placeholder={form.mobile || "+91 98765 43210"}
+                      className="h-9 text-sm"
+                    />
+                    <p className="mt-1 text-xs text-slate-400">Leave blank to use the client mobile number above. Indian 10-digit numbers automatically use +91.</p>
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-slate-600 mb-1">Password</label>

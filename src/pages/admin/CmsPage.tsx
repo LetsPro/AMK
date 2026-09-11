@@ -17,7 +17,7 @@ function testimonialSeconds(value: unknown) {
 }
 
 const tableDetails: Record<CmsTable, { label: string; description: string; icon: React.ElementType }> = {
-  banners: { label: "Hero Slider", description: "Manage hero images, messages, buttons, visibility, and slide order.", icon: LayoutTemplate },
+  banners: { label: "Hero Slider", description: "Manage hero images, messages, visibility, and slide order. Standard website actions appear automatically on every slide.", icon: LayoutTemplate },
   testimonials: { label: "Testimonials", description: "Publish client reviews, ratings, company details, profile images, and videos.", icon: MessageSquareQuote },
   gallery: { label: "Gallery", description: "Upload, categorize, feature, order, and remove gallery images.", icon: ImageIcon },
   services: { label: "Services", description: "Maintain service copy, images, slugs, and publishing status.", icon: Edit3 },
@@ -121,7 +121,7 @@ export function CmsPage() {
           ? { title: form.title, image_url: form.image_url, category: form.category || null, is_featured: form.status === "published", display_order: displayOrder }
           : table === "testimonials"
             ? { name: form.title, company: form.company || null, quote: form.content ?? "", rating: Number(form.rating || 5), avatar_url: form.image_url || null, video_url: form.video_url || null, is_published: form.status === "published", display_order: displayOrder }
-            : { title: form.title, subtitle: form.content || null, image_url: form.image_url || null, cta_label: form.cta_label || null, cta_url: form.cta_url || null, is_active: form.status === "published", display_order: displayOrder };
+            : { title: form.title, subtitle: form.content || null, image_url: form.image_url || null, is_active: form.status === "published", display_order: displayOrder };
 
     if (editingId) await update.mutateAsync({ id: editingId, payload: payload as never });
     else await create.mutateAsync(payload as never);
@@ -142,8 +142,6 @@ export function CmsPage() {
       category: value(record, "category"),
       company: value(record, "company"),
       rating: value(record, "rating") || "5",
-      cta_label: value(record, "cta_label"),
-      cta_url: value(record, "cta_url"),
       display_order: value(record, "display_order") || "0"
     });
     setEditorOpen(true);
@@ -245,20 +243,9 @@ export function CmsPage() {
           )}
 
           {table === "banners" && (
-            <>
-              <label>
-                <span className="mb-1 block text-sm font-medium">Button label (optional)</span>
-                <Input value={form.cta_label ?? ""} onChange={(e) => setForm({ ...form, cta_label: e.target.value })} placeholder="Start a Project" />
-              </label>
-              <label>
-                <span className="mb-1 block text-sm font-medium">Button destination</span>
-                <Input value={form.cta_url ?? ""} onChange={(e) => setForm({ ...form, cta_url: e.target.value })} placeholder="/contact or #enquiry" />
-              </label>
-              <div className="flex flex-wrap items-center gap-3 md:col-span-2">
-                <p className="text-xs text-slate-500">Add a label and destination to show a slide button. Leave them empty to hide it.</p>
-                {(form.cta_label || form.cta_url) && <Button type="button" variant="secondary" onClick={() => setForm({ ...form, cta_label: "", cta_url: "" })}><Trash2 className="h-4 w-4" /> Remove slide button</Button>}
-              </div>
-            </>
+            <div className="rounded-lg border border-orange-200 bg-orange-50 px-4 py-3 text-sm leading-6 text-slate-600 md:col-span-2">
+              Every hero slide automatically shows <strong>View Projects</strong>, <strong>Login</strong>, and <strong>Get Started</strong> in that order.
+            </div>
           )}
 
           {table === "testimonials" && (

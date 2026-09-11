@@ -18,18 +18,26 @@ async function upsertClientProfile(
   supabaseAdmin: ReturnType<typeof createClient>,
   userId: string,
   email: string,
+  phone?: string,
   fullName?: string
 ) {
   const payload = {
     id: userId,
     full_name: fullName || email.split("@")[0] || email,
     email,
+    ...(phone ? { phone } : {}),
     role_id: null,
     is_active: true,
   };
 
   const { error } = await supabaseAdmin.from("profiles").upsert(payload, { onConflict: "id" });
   if (error) throw error;
+}
+
+function normalizePhone(value: unknown) {
+  if (typeof value !== "string" || !value.trim()) return "";
+  const digits = value.replace(/\D/g, "").replace(/^00/, "");
+  return digits.length >= 8 && digits.length <= 15 ? `+${digits}` : "";
 }
 
 async function linkClient(
@@ -64,8 +72,9 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    const { email, password, full_name, existing_user_id, client_id } = await req.json();
+    const { email, phone, password, full_name, existing_user_id, client_id } = await req.json();
     const normalizedEmail = typeof email === "string" ? email.trim().toLowerCase() : "";
+    const normalizedPhone = normalizePhone(phone);
     const fullName = typeof full_name === "string" && full_name.trim() ? full_name.trim() : normalizedEmail;
 
     if (!normalizedEmail || !password) {
@@ -74,6 +83,10 @@ Deno.serve(async (req: Request) => {
 
     if (String(password).length < 8) {
       return ok({ error: "Password must be at least 8 characters" });
+    }
+
+    if (phone && !normalizedPhone) {
+      return ok({ error: "Phone number must be in a valid international format" });
     }
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
@@ -92,10 +105,10 @@ Deno.serve(async (req: Request) => {
     if (existing_user_id) {
       const { data: updated, error } = await supabaseAdmin.auth.admin.updateUserById(
         existing_user_id,
-        { email: normalizedEmail, password, email_confirm: true, user_metadata: { full_name: fullName, client_id: client_id ?? null, account_type: "client" } }
+        { email: normalizedEmail, password, email_confirm: true, ...(normalizedPhone ? { phone: normalizedPhone, phone_confirm: true } : {}), user_metadata: { full_name: fullName, client_id: client_id ?? null, account_type: "client" } }
       );
       if (error) return ok({ error: error.message });
-      await upsertClientProfile(supabaseAdmin, updated.user.id, normalizedEmail, fullName);
+      await upsertClientProfile(supabaseAdmin, updated.user.id, normalizedEmail, normalizedPhone, fullName);
       await linkClient(supabaseAdmin, client_id, updated.user.id);
       return ok({ user_id: updated.user.id });
     }
@@ -104,16 +117,17 @@ Deno.serve(async (req: Request) => {
     if (existing) {
       const { data: updated, error } = await supabaseAdmin.auth.admin.updateUserById(
         existing.id,
-        { password, email_confirm: true, user_metadata: { ...(existing.user_metadata ?? {}), full_name: fullName, client_id: client_id ?? null, account_type: "client" } }
+        { password, email_confirm: true, ...(normalizedPhone ? { phone: normalizedPhone, phone_confirm: true } : {}), user_metadata: { ...(existing.user_metadata ?? {}), full_name: fullName, client_id: client_id ?? null, account_type: "client" } }
       );
       if (error) return ok({ error: error.message });
-      await upsertClientProfile(supabaseAdmin, updated.user.id, normalizedEmail, fullName);
+      await upsertClientProfile(supabaseAdmin, updated.user.id, normalizedEmail, normalizedPhone, fullName);
       await linkClient(supabaseAdmin, client_id, updated.user.id);
       return ok({ user_id: updated.user.id });
     }
 
     const { data: created, error: createErr } = await supabaseAdmin.auth.admin.createUser({
       email: normalizedEmail,
+      ...(normalizedPhone ? { phone: normalizedPhone, phone_confirm: true } : {}),
       password,
       email_confirm: true,
       user_metadata: { full_name: fullName, client_id: client_id ?? null, account_type: "client" },
@@ -123,7 +137,7 @@ Deno.serve(async (req: Request) => {
 
     const userId = created.user.id;
 
-    await upsertClientProfile(supabaseAdmin, userId, normalizedEmail, fullName);
+    await upsertClientProfile(supabaseAdmin, userId, normalizedEmail, normalizedPhone, fullName);
     await linkClient(supabaseAdmin, client_id, userId);
 
     return ok({ user_id: userId });

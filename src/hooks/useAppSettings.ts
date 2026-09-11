@@ -35,8 +35,8 @@ const defaults: BrandingSettings = {
   facebookUrl: "",
   instagramUrl: "",
   linkedinUrl: "",
-  bodyFont: "Inter",
-  headingFont: "Manrope"
+  bodyFont: "DM Sans",
+  headingFont: "Cormorant Garamond"
 };
 
 function asRecord(value: Json | undefined) {
@@ -45,7 +45,15 @@ function asRecord(value: Json | undefined) {
 
 export function useAppSettings() {
   const { data = [], isLoading } = useTable("app_settings", { eq: { key: "branding" } });
-  const branding = useMemo<BrandingSettings>(() => ({ ...defaults, ...asRecord(data[0]?.value) }), [data]);
+  const branding = useMemo<BrandingSettings>(() => {
+    const saved = asRecord(data[0]?.value);
+    return {
+      ...defaults,
+      ...saved,
+      bodyFont: !saved.bodyFont || saved.bodyFont === "Inter" ? defaults.bodyFont : saved.bodyFont,
+      headingFont: !saved.headingFont || saved.headingFont === "Manrope" ? defaults.headingFont : saved.headingFont,
+    };
+  }, [data]);
 
   useEffect(() => {
     document.documentElement.style.setProperty("--brand-primary", branding.primary);

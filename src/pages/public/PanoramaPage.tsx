@@ -4,6 +4,7 @@ import { Eye, Maximize2, Move, X } from "lucide-react";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Seo } from "@/components/seo/Seo";
 import { useTable } from "@/hooks/useSupabaseTable";
+import { useAppSettings } from "@/hooks/useAppSettings";
 import type { TableRow } from "@/types/database";
 
 type PanoramaCategory = TableRow<"panorama_categories">;
@@ -105,6 +106,7 @@ export function PanoramaModal({
   onClose: () => void;
 }) {
   const [activePanorama, setActivePanorama] = useState(panorama);
+  const { branding } = useAppSettings();
 
   useEffect(() => setActivePanorama(panorama), [panorama]);
 
@@ -147,6 +149,7 @@ export function PanoramaModal({
         </div>
         <div className="relative min-h-0 flex-1 bg-slate-950">
           <PanoramaViewer panorama={activePanorama} />
+          {branding.logoUrl && <div className="pointer-events-none absolute right-4 top-4 z-20 flex h-14 w-28 items-center justify-center rounded-lg bg-white/90 p-2 shadow-xl backdrop-blur"><img src={branding.logoUrl} alt={`${branding.companyName} logo`} className="max-h-full max-w-full object-contain" /></div>}
           <div className="pointer-events-none absolute bottom-4 left-1/2 flex -translate-x-1/2 items-center gap-2 rounded-full bg-slate-950/70 px-4 py-2 text-xs font-semibold text-white backdrop-blur">
             <Move className="h-4 w-4" /> Drag to look around · Scroll to zoom
           </div>

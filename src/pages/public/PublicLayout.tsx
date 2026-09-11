@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import { Link, Outlet } from "react-router-dom";
-import { CalendarDays, Facebook, Instagram, Linkedin, LogIn, Mail, MapPin, Menu, MessageCircle, Phone, Send, UserPlus, X } from "lucide-react";
+import { ArrowUpRight, CalendarDays, Facebook, Instagram, Linkedin, LogIn, Mail, MapPin, Menu, Phone, Send, UserPlus, X } from "lucide-react";
+import { FaWhatsapp } from "react-icons/fa";
 import { Button } from "@/components/ui/Button";
 import { Input, Select, Textarea } from "@/components/ui/Input";
 import { useAppSettings } from "@/hooks/useAppSettings";
@@ -117,19 +118,20 @@ export function PublicLayout() {
   }
 
   return (
-    <div className="min-h-screen bg-white text-slate-900">
-      <header className="sticky top-0 z-[100] border-b border-slate-200 bg-white/95 backdrop-blur">
-        <div className="mx-auto flex h-24 max-w-7xl items-center justify-between gap-3 overflow-hidden px-4">
+    <div className="public-shell min-h-screen text-slate-900">
+      <header className="sticky top-0 z-[100] border-b border-slate-200/80 bg-[#faf9f6]/95 backdrop-blur-xl">
+        <div className="mx-auto flex h-24 max-w-7xl items-center justify-between gap-3 overflow-hidden border-x border-slate-200/60 px-4 md:px-6">
           <Link to="/" className="flex items-center" aria-label={`${branding.companyName} ${branding.companySuffix}`}>
             <span className="grid h-20 w-32 place-items-center bg-transparent text-brand-primary md:w-40">
               {branding.logoUrl && <img src={branding.logoUrl} alt={branding.companyName} loading="eager" decoding="async" className="max-h-16 max-w-full object-contain md:max-h-20" />}
             </span>
           </Link>
-          <nav className="hidden items-center gap-5 text-sm font-medium xl:flex">
-            {navItems.map((item) => <Link key={item} className="capitalize hover:text-brand-primary" to={hrefFor(item)}>{item.replace("-", " ")}</Link>)}
+          <nav className="hidden items-center gap-7 text-xs font-semibold uppercase tracking-[0.12em] xl:flex">
+            {navItems.map((item) => <Link key={item} className="relative capitalize after:absolute after:-bottom-2 after:left-0 after:h-px after:w-0 after:bg-brand-primary after:transition-all hover:text-brand-primary hover:after:w-full" to={hrefFor(item)}>{item.replace("-", " ")}</Link>)}
           </nav>
           <div className="hidden items-center gap-2 xl:flex">
             <Link className="inline-flex h-10 items-center justify-center rounded-md bg-brand-accent px-4 text-sm font-bold text-slate-950 shadow-sm transition hover:brightness-95" to="/360-interiors">360 Interiors</Link>
+            <Link className="inline-flex h-10 items-center justify-center gap-2 rounded-md border border-slate-300 bg-white px-4 text-sm font-bold text-slate-800 transition hover:border-brand-primary hover:text-brand-primary" to="/login"><LogIn className="h-4 w-4" /> Login</Link>
             <Button onClick={() => setEnquiryOpen(true)}><UserPlus className="h-4 w-4" /> Get Started</Button>
           </div>
           <button className="grid h-10 w-10 place-items-center rounded-md border border-slate-200 bg-white text-slate-800 xl:hidden" onClick={() => setOpen((value) => !value)} aria-label="Toggle menu">
@@ -142,7 +144,7 @@ export function PublicLayout() {
               {navItems.map((item) => <Link key={item} className="rounded-md px-3 py-2 capitalize hover:bg-orange-50 hover:text-brand-primary" to={hrefFor(item)} onClick={() => setOpen(false)}>{item.replace("-", " ")}</Link>)}
             </nav>
             <div className="mt-4 grid gap-2">
-              <Link className="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-brand-accent px-4 text-sm font-bold text-slate-950" to="/login" onClick={() => setOpen(false)}><LogIn className="h-4 w-4" /> Login to Your Portal</Link>
+              <Link className="inline-flex h-10 items-center justify-center gap-2 rounded-md border border-slate-300 bg-white px-4 text-sm font-bold text-slate-800" to="/login" onClick={() => setOpen(false)}><LogIn className="h-4 w-4" /> Login</Link>
               <Link className="inline-flex h-10 items-center justify-center rounded-md bg-brand-accent px-4 text-sm font-bold text-slate-950" to="/360-interiors" onClick={() => setOpen(false)}>360 Interiors</Link>
               <Button onClick={() => { setOpen(false); setEnquiryOpen(true); }}><UserPlus className="h-4 w-4" /> Get Started</Button>
             </div>
@@ -150,46 +152,25 @@ export function PublicLayout() {
         )}
       </header>
       <main className="public-content"><Outlet /></main>
-      <footer className="bg-slate-950 px-4 pt-14 text-white">
-        <div className="mx-auto grid max-w-7xl gap-10 border-b border-white/10 pb-10 lg:grid-cols-[1.4fr_0.8fr_0.8fr_1fr]">
-          <div>
-            <div className="flex items-center gap-3 text-lg font-bold"><span className="grid h-20 w-32 place-items-center bg-transparent">{branding.logoUrl && <img src={branding.logoUrl} alt={branding.companyName} loading="lazy" decoding="async" className="max-h-20 max-w-full object-contain brightness-0 invert" />}</span></div>
-            <p className="mt-4 max-w-sm text-sm leading-6 text-slate-400">Technology-driven architecture, engineering, BIM, parametric design, visualization, digital fabrication, and project execution support.</p>
-            {socialLinks.length > 0 && (
-              <div className="mt-5 flex gap-3">
-                {socialLinks.map(({ label, url, icon: Icon }) => (
-                  <a key={label} href={url} target="_blank" rel="noopener noreferrer" aria-label={`Visit ${branding.companyName} on ${label}`} className="grid h-9 w-9 place-items-center rounded-full bg-white/10 text-slate-200 transition hover:bg-brand-primary hover:text-white focus:outline-none focus:ring-2 focus:ring-brand-accent">
-                    <Icon className="h-4 w-4" />
-                  </a>
-                ))}
-              </div>
-            )}
+      <footer className="relative overflow-hidden bg-[#080c16] px-4 text-white">
+        <div className="pointer-events-none absolute inset-0 opacity-25 [background-image:linear-gradient(rgba(255,255,255,.06)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,.06)_1px,transparent_1px)] [background-size:72px_72px]" />
+        <div className="relative mx-auto max-w-7xl">
+          <div className="grid gap-8 border-b border-white/10 py-12 md:grid-cols-[1fr_auto] md:items-end md:py-16">
+            <div><div className="text-[10px] font-bold uppercase tracking-[.24em] text-brand-accent">Begin a conversation</div><h2 className="mt-4 max-w-3xl text-4xl font-medium leading-none md:text-6xl">Have a space in mind?<br />Let’s shape it together.</h2></div>
+            <button onClick={() => setEnquiryOpen(true)} className="group inline-flex h-14 items-center justify-center gap-3 bg-brand-primary px-7 text-sm font-bold text-white transition hover:bg-brand-accent hover:text-slate-950">Start a project <ArrowUpRight className="h-5 w-5 transition group-hover:-translate-y-1 group-hover:translate-x-1" /></button>
           </div>
-          <div>
-            <h4 className="font-semibold">Company</h4>
-            <div className="mt-4 grid gap-3 text-sm text-slate-400">
-              {["Home", "About", "Projects", "Services", "Gallery", "360 Interiors", "Contact"].map((item) => <Link key={item} to={item === "360 Interiors" ? "/360-interiors" : hrefFor(item.toLowerCase())} className="hover:text-white">{item}</Link>)}
+
+          <div className="grid gap-10 border-b border-white/10 py-12 lg:grid-cols-[1.5fr_.75fr_.9fr_1.1fr]">
+            <div>
+              <div className="flex h-20 w-40 items-center justify-center rounded-xl bg-white p-2 shadow-lg shadow-black/20">{branding.logoUrl && <img src={branding.logoUrl} alt={branding.companyName} loading="lazy" decoding="async" className="max-h-full max-w-full object-contain" />}</div>
+              <p className="mt-6 max-w-sm text-sm leading-7 text-slate-400">Architecture, engineering, BIM, visualization, and execution support connected through one accountable studio.</p>
+              {socialLinks.length > 0 && <div className="mt-6 flex gap-2">{socialLinks.map(({ label, url, icon: Icon }) => <a key={label} href={url} target="_blank" rel="noopener noreferrer" aria-label={`Visit ${branding.companyName} on ${label}`} className="grid h-10 w-10 place-items-center border border-white/10 text-slate-300 transition hover:border-brand-primary hover:bg-brand-primary hover:text-white"><Icon className="h-4 w-4" /></a>)}</div>}
             </div>
+            <div><h4 className="text-[10px] font-bold uppercase tracking-[.2em] text-slate-500">Navigate</h4><div className="mt-5 grid gap-3 text-sm text-slate-300">{["Home", "About", "Projects", "Services", "Gallery", "360 Interiors", "Contact"].map((item) => <Link key={item} to={item === "360 Interiors" ? "/360-interiors" : hrefFor(item.toLowerCase())} className="w-fit transition hover:translate-x-1 hover:text-brand-accent">{item}</Link>)}</div></div>
+            <div><h4 className="text-[10px] font-bold uppercase tracking-[.2em] text-slate-500">Expertise</h4><div className="mt-5 grid gap-3 text-sm text-slate-300">{footerServices.map((service) => <Link key={service.slug} to={`/services#${service.slug}`} className="transition hover:translate-x-1 hover:text-brand-accent">{service.label}</Link>)}</div></div>
+            <div><h4 className="text-[10px] font-bold uppercase tracking-[.2em] text-slate-500">Studio</h4><div className="mt-5 grid gap-4 text-sm text-slate-300"><a href={`mailto:${branding.email}`} className="flex min-w-0 items-center gap-3 hover:text-white"><Mail className="h-4 w-4 shrink-0 text-brand-accent" /><span className="truncate">{branding.email}</span></a><a href={`tel:${branding.phone.replace(/\s/g, "")}`} className="flex items-center gap-3 hover:text-white"><Phone className="h-4 w-4 shrink-0 text-brand-accent" />{branding.phone}</a><span className="flex items-start gap-3"><MapPin className="mt-0.5 h-4 w-4 shrink-0 text-brand-accent" />{branding.location}</span></div></div>
           </div>
-          <div>
-            <h4 className="font-semibold">Services</h4>
-            <div className="mt-4 grid gap-3 text-sm text-slate-400">
-              {footerServices.map((service) => <Link key={service.slug} to={`/services#${service.slug}`} className="hover:text-white">{service.label}</Link>)}
-            </div>
-          </div>
-          <div>
-            <h4 className="font-semibold">Contact</h4>
-            <div className="mt-4 grid gap-3 text-base font-medium text-slate-300">
-              <a href={`mailto:${branding.email}`} className="flex items-center gap-2 hover:text-white"><Mail className="h-5 w-5 shrink-0 text-brand-accent" />{branding.email}</a>
-              <a href={`tel:${branding.phone.replace(/\s/g, "")}`} className="flex items-center gap-2 hover:text-white"><Phone className="h-5 w-5 shrink-0 text-brand-accent" />{branding.phone}</a>
-              <span className="flex items-start gap-2"><MapPin className="mt-0.5 h-5 w-5 shrink-0 text-brand-accent" />{branding.location}</span>
-            </div>
-            <Button className="mt-5" onClick={() => setEnquiryOpen(true)}>Get Started</Button>
-          </div>
-        </div>
-        <div className="mx-auto flex max-w-7xl flex-col gap-2 py-5 text-xs text-slate-500 md:flex-row md:items-center md:justify-between">
-          <span>© 2026 {branding.companyName} {branding.companySuffix}. All rights reserved.</span>
-          <span>Powered by <a className="font-semibold text-brand-accent hover:text-white" href="https://dreambuzz.in" target="_blank" rel="noreferrer">Dreambuzz Solutions</a></span>
+          <div className="flex flex-col gap-2 py-6 text-[10px] uppercase tracking-[.12em] text-slate-600 md:flex-row md:items-center md:justify-between"><span>© {new Date().getFullYear()} {branding.companyName} {branding.companySuffix}. All rights reserved.</span><span>Designed & developed by <a className="font-semibold text-brand-accent hover:text-white" href="https://dreambuzz.in" target="_blank" rel="noreferrer">Dreambuzz Solutions</a></span></div>
         </div>
       </footer>
       <a
@@ -199,7 +180,7 @@ export function PublicLayout() {
         className="fixed bottom-5 right-5 z-[90] inline-flex h-14 items-center gap-2 rounded-full bg-emerald-500 px-4 font-bold text-white shadow-2xl shadow-emerald-950/30 transition hover:-translate-y-1 hover:bg-emerald-600 focus:outline-none focus:ring-4 focus:ring-emerald-200"
         aria-label="Chat with AMK on WhatsApp"
       >
-        <MessageCircle className="h-6 w-6" />
+        <FaWhatsapp className="h-6 w-6" aria-hidden="true" />
         <span className="hidden sm:inline">WhatsApp</span>
       </a>
       {enquiryOpen && (

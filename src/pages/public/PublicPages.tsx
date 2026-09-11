@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import { ArrowRight, BarChart3, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, ClipboardCheck, Eye, Layers3, LogIn, MapPin, MessageCircle, Play, Ruler, Send, ShieldCheck, Sparkles, Star, X } from "lucide-react";
+import { AnimatePresence, motion, useInView, useReducedMotion } from "framer-motion";
+import { ArrowRight, BarChart3, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, ClipboardCheck, Eye, Layers3, LogIn, MapPin, Play, Ruler, Send, Sparkles, Star, X } from "lucide-react";
+import { FaWhatsapp } from "react-icons/fa";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Input, Textarea } from "@/components/ui/Input";
@@ -10,27 +11,21 @@ import { useAppSettings } from "@/hooks/useAppSettings";
 import { useTable, useTableMutations } from "@/hooks/useSupabaseTable";
 import { Seo } from "@/components/seo/Seo";
 
-function Section({ title, eyebrow = "AMK Studio", description, children }: { title: string; eyebrow?: string; description?: string; children: React.ReactNode }) {
+function Section({ id, title, eyebrow = "AMK Studio", description, children }: { id?: string; title: string; eyebrow?: string; description?: string; children: React.ReactNode }) {
   return (
-    <motion.section
-      className="mx-auto max-w-7xl px-4 py-14"
-      initial={false}
-      whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true, amount: 0.18 }}
-      transition={{ duration: 0.45 }}
-    >
-      <div className="mb-7 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+    <section id={id} className="architectural-section mx-auto max-w-7xl scroll-mt-24 px-4 py-14 md:py-28">
+      <div className="mb-10 flex flex-col gap-5 border-l border-brand-primary/40 pl-5 md:flex-row md:items-end md:justify-between md:pl-8">
         <div>
-          <div className="inline-flex items-center gap-2 rounded-full border border-orange-200 bg-orange-50 px-3 py-1 text-xs font-bold uppercase tracking-wide text-brand-primary">
-            <Sparkles className="h-3.5 w-3.5" />
+          <div className="inline-flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.24em] text-brand-primary">
+            <span className="h-px w-8 bg-brand-primary" />
             {eyebrow}
           </div>
-          <h2 className="mt-3 max-w-4xl text-3xl font-black tracking-tight text-slate-950 md:text-4xl">{title}</h2>
+          <h2 className="mt-4 max-w-4xl text-4xl font-medium leading-[1.02] tracking-[-0.025em] text-slate-950 md:text-6xl">{title}</h2>
         </div>
-        {description && <p className="max-w-xl text-sm leading-7 text-slate-500">{description}</p>}
+        {description && <p className="max-w-xl text-sm leading-7 text-slate-500 md:text-base">{description}</p>}
       </div>
       {children}
-    </motion.section>
+    </section>
   );
 }
 
@@ -96,6 +91,93 @@ function FlipInfoCard({ title, text, detail, icon: Icon }: { title: string; text
   );
 }
 
+function ServiceExplorer({ items }: { items: Array<{ id: string; name?: string; slug?: string; description?: string | null; image_url?: string | null }> }) {
+  const [active, setActive] = useState(0);
+  const reduceMotion = useReducedMotion();
+  if (!items.length) return null;
+
+  const activeIndex = active % items.length;
+  const service = items[activeIndex];
+  const detail = serviceDetails[serviceKey(service)] ?? {
+    intro: service.description ?? "Design, documentation, coordination, and delivery support developed as one connected service.",
+    includes: [],
+    signature: "From concept to completion."
+  };
+  const image = service.image_url ?? "https://images.unsplash.com/photo-1503387762-592deb58ef4e?auto=format&fit=crop&w=1400&q=80";
+
+  return (
+    <div className="grid overflow-hidden border-y border-slate-200 bg-white lg:grid-cols-[0.78fr_1.22fr]">
+      <div className="relative z-10 bg-white lg:border-r lg:border-slate-200">
+        <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4 md:px-7">
+          <span className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Service index</span>
+          <span className="text-xs font-semibold tabular-nums text-slate-400">{String(activeIndex + 1).padStart(2, "0")} / {String(items.length).padStart(2, "0")}</span>
+        </div>
+        <div className="grid sm:grid-cols-2 lg:grid-cols-1">
+          {items.map((item, index) => {
+            const Icon = index % 3 === 0 ? Ruler : index % 3 === 1 ? Layers3 : ClipboardCheck;
+            const isActive = index === activeIndex;
+            return (
+              <button
+                key={item.id}
+                type="button"
+                onMouseEnter={() => setActive(index)}
+                onFocus={() => setActive(index)}
+                onClick={() => setActive(index)}
+                aria-pressed={isActive}
+                className={`group relative flex min-h-16 items-center gap-4 border-b border-slate-200 px-5 py-4 text-left outline-none transition-colors md:px-7 ${isActive ? "bg-slate-950 text-white" : "bg-white text-slate-700 hover:bg-slate-50 focus-visible:bg-slate-50"}`}
+              >
+                {isActive && <motion.span layoutId="active-service-rule" className="absolute inset-y-0 left-0 w-1 bg-brand-primary" transition={{ type: "spring", stiffness: 420, damping: 34 }} />}
+                <span className={`text-xs font-semibold tabular-nums ${isActive ? "text-brand-accent" : "text-slate-400"}`}>{String(index + 1).padStart(2, "0")}</span>
+                <Icon className={`h-4 w-4 shrink-0 ${isActive ? "text-white" : "text-slate-400 group-hover:text-brand-primary"}`} />
+                <span className="text-sm font-semibold leading-5 md:text-base">{item.name}</span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      <div className="relative min-h-[34rem] overflow-hidden bg-slate-950 text-white lg:min-h-[39rem]">
+        <AnimatePresence initial={false} mode="wait">
+          <motion.div
+            key={`${service.id}-image`}
+            initial={reduceMotion ? false : { opacity: 0, scale: 1.045 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={reduceMotion ? undefined : { opacity: 0 }}
+            transition={{ duration: reduceMotion ? 0 : 0.55, ease: [0.22, 1, 0.36, 1] }}
+            className="absolute inset-0"
+          >
+            <img src={image} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover" />
+            <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(2,6,23,.12),rgba(2,6,23,.94))]" />
+          </motion.div>
+        </AnimatePresence>
+        <div className="pointer-events-none absolute inset-0 opacity-20 [background-image:linear-gradient(rgba(255,255,255,.18)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,.18)_1px,transparent_1px)] [background-size:72px_72px]" />
+        <div className="relative z-10 flex min-h-[34rem] flex-col justify-end p-6 md:p-10 lg:min-h-[39rem] lg:p-12">
+          <AnimatePresence initial={false} mode="wait">
+            <motion.div
+              key={service.id}
+              initial={reduceMotion ? false : { opacity: 0, y: 22 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={reduceMotion ? undefined : { opacity: 0, y: -12 }}
+              transition={{ duration: reduceMotion ? 0 : 0.42, ease: [0.22, 1, 0.36, 1] }}
+              className="max-w-2xl"
+            >
+              <div className="mb-5 flex items-center gap-3 text-xs font-semibold uppercase tracking-[0.22em] text-brand-accent"><span className="h-px w-10 bg-brand-accent" />AMK discipline</div>
+              <h3 className="max-w-xl text-3xl font-medium leading-[1.04] tracking-[-0.025em] md:text-5xl">{service.name}</h3>
+              <p className="mt-5 max-w-xl text-base leading-7 text-slate-200">{detail.intro || service.description}</p>
+              {detail.includes.length > 0 && (
+                <div className="mt-6 flex flex-wrap gap-x-6 gap-y-2 text-sm text-slate-300">
+                  {detail.includes.slice(0, 3).map((item) => <span key={item} className="border-l border-brand-primary pl-3">{item}</span>)}
+                </div>
+              )}
+              <p className="mt-8 border-t border-white/20 pt-5 text-sm font-semibold text-white">{detail.signature}</p>
+            </motion.div>
+          </AnimatePresence>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function HoverRevealTile({ title, text, image, label }: { title: string; text: string; image: string; label?: string }) {
   return (
     <motion.div className="group relative min-h-80 overflow-hidden rounded-lg bg-slate-900 shadow-sm" whileHover={{ y: -5 }} transition={{ duration: 0.22 }}>
@@ -110,7 +192,8 @@ function HoverRevealTile({ title, text, image, label }: { title: string; text: s
   );
 }
 
-type PublicProject = { id: string; name: string; slug?: string; description?: string | null; category?: string | null; location?: string | null; cover_image_url?: string | null; progress?: number | null; status?: string | null; budget?: number | null };
+type PublicProjectGalleryImage = { id: string; image_url: string; caption?: string | null; display_order?: number | null };
+type PublicProject = { id: string; name: string; slug?: string; description?: string | null; category?: string | null; location?: string | null; cover_image_url?: string | null; progress?: number | null; status?: string | null; budget?: number | null; portfolio_gallery?: PublicProjectGalleryImage[] };
 type PublicGallery = { id: string; title: string; category?: string | null; image_url: string; description?: string | null };
 type PublicTestimonial = { id: string; name: string; company?: string | null; quote: string; rating?: number | null; avatar_url?: string | null; video_url?: string | null };
 
@@ -124,8 +207,6 @@ function openEnquiryModal() {
   window.dispatchEvent(new CustomEvent("open-enquiry-modal"));
 }
 
-const legacyEnquiryRoute = "/customer" + "-register";
-
 const demoServices = [
   { id: "demo-service-1", name: "Architecture & Master Planning", slug: "architecture-master-planning", description: "Luxury residences, villas, apartments, commercial buildings, healthcare, hospitality, institutional, mixed-use, urban design, and master planning solutions.", image_url: "https://images.unsplash.com/photo-1503387762-592deb58ef4e?auto=format&fit=crop&w=1200&q=80" },
   { id: "demo-service-2", name: "Interior Design & Space Experience", slug: "interior-design-space-experience", description: "Residential interiors, corporate offices, retail environments, hospitality interiors, space planning, custom furniture, and material selection.", image_url: "https://images.unsplash.com/photo-1600210492486-724fe5c67fb0?auto=format&fit=crop&w=1200&q=80" },
@@ -138,9 +219,18 @@ const demoServices = [
 ];
 
 const demoProjects = [
-  { id: "demo-project-1", name: "Chamundi Hill Residence", slug: "chamundi-hill-residence", description: "A contemporary family residence planned for natural ventilation, framed views, and warm material finishes.", category: "Residential", location: "Chamundi Hill Road, Mysuru, Karnataka, India", cover_image_url: "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1400&q=80" },
-  { id: "demo-project-2", name: "Vijayanagar Courtyard Home", slug: "vijayanagar-courtyard-home", description: "A courtyard-led home with shaded transitions, efficient planning, and indoor-outdoor living.", category: "Residential", location: "Vijayanagar, Mysuru, Karnataka, India", cover_image_url: "https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?auto=format&fit=crop&w=1400&q=80" },
-  { id: "demo-project-3", name: "Hebbal Workspace Studio", slug: "hebbal-workspace-studio", description: "A compact commercial studio designed for flexible workstations, client meetings, and daylight.", category: "Commercial", location: "Hebbal Industrial Area, Mysuru, Karnataka, India", cover_image_url: "https://images.unsplash.com/photo-1497366754035-f200968a6e72?auto=format&fit=crop&w=1400&q=80" }
+  { id: "demo-project-1", name: "Chamundi Hill Residence", slug: "chamundi-hill-residence", description: "A contemporary family residence planned for natural ventilation, framed views, and warm material finishes.", category: "Residential", location: "Chamundi Hill Road, Mysuru, Karnataka, India", cover_image_url: "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1400&q=80", portfolio_gallery: [
+    { id: "demo-project-1-gallery-1", image_url: "https://images.unsplash.com/photo-1600566753190-17f0baa2a6c3?auto=format&fit=crop&w=1400&q=80", display_order: 1 },
+    { id: "demo-project-1-gallery-2", image_url: "https://images.unsplash.com/photo-1600607687920-4e2a09cf159d?auto=format&fit=crop&w=1400&q=80", display_order: 2 },
+  ] },
+  { id: "demo-project-2", name: "Vijayanagar Courtyard Home", slug: "vijayanagar-courtyard-home", description: "A courtyard-led home with shaded transitions, efficient planning, and indoor-outdoor living.", category: "Residential", location: "Vijayanagar, Mysuru, Karnataka, India", cover_image_url: "https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?auto=format&fit=crop&w=1400&q=80", portfolio_gallery: [
+    { id: "demo-project-2-gallery-1", image_url: "https://images.unsplash.com/photo-1600566753086-00f18fb6b3ea?auto=format&fit=crop&w=1400&q=80", display_order: 1 },
+    { id: "demo-project-2-gallery-2", image_url: "https://images.unsplash.com/photo-1615874694520-474822394e73?auto=format&fit=crop&w=1400&q=80", display_order: 2 },
+  ] },
+  { id: "demo-project-3", name: "Hebbal Workspace Studio", slug: "hebbal-workspace-studio", description: "A compact commercial studio designed for flexible workstations, client meetings, and daylight.", category: "Commercial", location: "Hebbal Industrial Area, Mysuru, Karnataka, India", cover_image_url: "https://images.unsplash.com/photo-1497366754035-f200968a6e72?auto=format&fit=crop&w=1400&q=80", portfolio_gallery: [
+    { id: "demo-project-3-gallery-1", image_url: "https://images.unsplash.com/photo-1497366811353-6870744d04b2?auto=format&fit=crop&w=1400&q=80", display_order: 1 },
+    { id: "demo-project-3-gallery-2", image_url: "https://images.unsplash.com/photo-1497366216548-37526070297c?auto=format&fit=crop&w=1400&q=80", display_order: 2 },
+  ] }
 ];
 
 const demoGallery = [
@@ -163,25 +253,19 @@ const demoBanners = [
     id: "demo-banner-1",
     title: "Beyond Buildings. We Design Experiences.",
     subtitle: "Technology-driven architecture and engineering studio in Mysuru creating intelligent, sustainable, and future-ready spaces.",
-    image_url: "https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=1800&q=80",
-    cta_label: "Start a Project",
-    cta_url: "/contact"
+    image_url: "https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=1800&q=80"
   },
   {
     id: "demo-banner-2",
     title: "Where Architecture Meets Innovation",
     subtitle: "Architecture, engineering, BIM workflows, parametric design, visualization, and execution support from concept to completion.",
-    image_url: "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1800&q=80",
-    cta_label: "View Projects",
-    cta_url: "/projects"
+    image_url: "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1800&q=80"
   },
   {
     id: "demo-banner-3",
     title: "Designing Tomorrow. Building Beyond.",
     subtitle: "From luxury residences and commercial spaces to healthcare, hospitality, institutional, and large-scale development projects.",
-    image_url: "https://images.unsplash.com/photo-1497366754035-f200968a6e72?auto=format&fit=crop&w=1800&q=80",
-    cta_label: "Get Started",
-    cta_url: "#enquiry"
+    image_url: "https://images.unsplash.com/photo-1497366754035-f200968a6e72?auto=format&fit=crop&w=1800&q=80"
   }
 ];
 
@@ -288,10 +372,10 @@ const designProcess: ProcessStep[] = [
 ];
 
 const performanceStats = [
-  { value: "250+", label: "Projects Across South India", detail: "Residential, commercial, institutional, and large-scale developments handled through a structured studio process." },
-  { value: "675,000+", label: "Square Feet of Thoughtfully Designed Spaces", detail: "Spaces planned with attention to function, engineering coordination, material comfort, and long-term use." },
-  { value: "Multi-Sector", label: "Residential, Commercial, and Institutional Expertise", detail: "A portfolio spanning homes, workplaces, healthcare, hospitality, education, layouts, and adaptive reuse." },
-  { value: "Complete Partner", label: "Architecture, Engineering, BIM, Visualization, and Execution", detail: "One integrated team connecting design strategy, technical documentation, digital workflows, and site delivery." }
+  { value: 250, suffix: "+", label: "Projects delivered", detail: "Across residential, commercial, and institutional work." },
+  { value: 675000, suffix: "+", label: "Square feet designed", detail: "Planned for performance, comfort, and long-term value." },
+  { value: 8, suffix: "+", label: "Studio disciplines", detail: "From architecture and BIM to visualization and execution." },
+  { value: 6, suffix: "+", label: "Sectors served", detail: "Homes, workplaces, healthcare, hospitality, education, and layouts." }
 ];
 
 const serviceAliases: Record<string, string> = {
@@ -317,13 +401,76 @@ function mergeServiceRows<T extends { id: string; name?: string; slug?: string }
 }
 
 function ProjectModal({ project, onClose }: { project: PublicProject; onClose: () => void }) {
+  const reduceMotion = useReducedMotion();
+  const [imageIndex, setImageIndex] = useState(0);
+  const [imageDirection, setImageDirection] = useState(1);
+  const images = useMemo(() => {
+    const gallery = [...(project.portfolio_gallery ?? [])]
+      .sort((a, b) => (a.display_order ?? 0) - (b.display_order ?? 0))
+      .map((image) => ({ url: image.image_url, caption: image.caption }));
+    const allImages = project.cover_image_url
+      ? [{ url: project.cover_image_url, caption: project.name }, ...gallery]
+      : gallery;
+    const uniqueImages = new Map<string, { url: string; caption?: string | null }>();
+    allImages.forEach((image) => image.url && !uniqueImages.has(image.url) && uniqueImages.set(image.url, image));
+    return [...uniqueImages.values()];
+  }, [project]);
+  const fallbackImage = "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1400&q=80";
+  const visibleImages = images.length ? images : [{ url: fallbackImage, caption: project.name }];
+  const activeImage = visibleImages[imageIndex % visibleImages.length];
+  const goToImage = (nextIndex: number) => {
+    setImageDirection(nextIndex > imageIndex ? 1 : -1);
+    setImageIndex((nextIndex + visibleImages.length) % visibleImages.length);
+  };
+
+  useEffect(() => {
+    setImageIndex(0);
+    setImageDirection(1);
+  }, [project.id]);
+
+  useEffect(() => {
+    const closeOnEscape = (event: KeyboardEvent) => event.key === "Escape" && onClose();
+    window.addEventListener("keydown", closeOnEscape);
+    return () => window.removeEventListener("keydown", closeOnEscape);
+  }, [onClose]);
+
   return (
-    <div className="fixed inset-0 z-[1001] grid place-items-center bg-slate-950/75 p-4">
-      <motion.div initial={{ opacity: 0, y: 20, scale: 0.98 }} animate={{ opacity: 1, y: 0, scale: 1 }} className="max-h-[90vh] w-full max-w-5xl overflow-y-auto rounded-lg bg-white shadow-2xl">
-        <div className="relative">
-          <img src={project.cover_image_url ?? "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1400&q=80"} alt={project.name} loading="eager" decoding="async" className="aspect-[16/8] w-full bg-slate-200 object-cover" />
-          <button className="absolute right-4 top-4 grid h-10 w-10 place-items-center rounded-full bg-white/90 text-slate-900 shadow" onClick={onClose} aria-label="Close project"><X className="h-5 w-5" /></button>
+    <div className="fixed inset-0 z-[1001] grid place-items-center bg-slate-950/75 p-4" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
+      <motion.div initial={{ opacity: 0, y: 20, scale: 0.98 }} animate={{ opacity: 1, y: 0, scale: 1 }} className="max-h-[90vh] w-full max-w-5xl overflow-y-auto rounded-3xl bg-white shadow-2xl">
+        <div className="relative aspect-[16/8] overflow-hidden bg-slate-900">
+          <AnimatePresence initial={false} custom={imageDirection} mode="popLayout">
+            <motion.img
+              key={activeImage.url}
+              src={activeImage.url}
+              alt={activeImage.caption || `${project.name} gallery image ${imageIndex + 1}`}
+              loading="eager"
+              decoding="async"
+              initial={reduceMotion ? false : { opacity: 0.65, x: imageDirection * 110 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={reduceMotion ? undefined : { opacity: 0.4, x: imageDirection * -110 }}
+              transition={{ duration: reduceMotion ? 0 : 0.65, ease: [0.22, 1, 0.36, 1] }}
+              className="absolute inset-0 h-full w-full object-cover"
+            />
+          </AnimatePresence>
+          <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-slate-950/40 via-transparent to-slate-950/20" />
+          <button className="absolute right-4 top-4 z-20 grid h-10 w-10 place-items-center rounded-full bg-white/90 text-slate-900 shadow transition hover:bg-white" onClick={onClose} aria-label="Close project"><X className="h-5 w-5" /></button>
+          {visibleImages.length > 1 && (
+            <>
+              <button type="button" onClick={() => goToImage(imageIndex - 1)} className="absolute left-4 top-1/2 z-20 grid h-12 w-12 -translate-y-1/2 place-items-center rounded-full border border-white/30 bg-slate-950/45 text-white backdrop-blur transition hover:bg-white hover:text-slate-950" aria-label="Previous gallery image"><ChevronLeft className="h-5 w-5" /></button>
+              <button type="button" onClick={() => goToImage(imageIndex + 1)} className="absolute right-4 top-1/2 z-20 grid h-12 w-12 -translate-y-1/2 place-items-center rounded-full border border-white/30 bg-slate-950/45 text-white backdrop-blur transition hover:bg-white hover:text-slate-950" aria-label="Next gallery image"><ChevronRight className="h-5 w-5" /></button>
+              <div className="absolute bottom-4 right-4 z-20 rounded-full border border-white/25 bg-slate-950/55 px-3 py-1.5 text-[10px] font-semibold tabular-nums tracking-[0.16em] text-white backdrop-blur">{String(imageIndex + 1).padStart(2, "0")} / {String(visibleImages.length).padStart(2, "0")}</div>
+            </>
+          )}
         </div>
+        {visibleImages.length > 1 && (
+          <div className="flex gap-2 overflow-x-auto border-b border-slate-200 px-6 py-4" aria-label={`Gallery image ${imageIndex + 1} of ${visibleImages.length}`}>
+            {visibleImages.map((image, index) => (
+              <button key={image.url} type="button" onClick={() => goToImage(index)} className={`h-16 w-24 shrink-0 overflow-hidden rounded-lg border-2 transition ${index === imageIndex ? "border-brand-primary opacity-100 shadow-sm" : "border-transparent opacity-55 hover:opacity-100"}`} aria-label={`Show gallery image ${index + 1}`}>
+                <img src={image.url} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover" />
+              </button>
+            ))}
+          </div>
+        )}
         <div className="grid gap-6 p-6 lg:grid-cols-[1.3fr_0.7fr]">
           <div>
             <div className="text-sm font-semibold uppercase tracking-wide text-brand-primary">{project.category ?? "Architecture Project"}</div>
@@ -546,50 +693,197 @@ function VisionMissionToggle() {
   );
 }
 
+function AnimatedCounter({ value, suffix }: { value: number; suffix: string }) {
+  const ref = useRef<HTMLSpanElement>(null);
+  const inView = useInView(ref, { once: true, amount: 0.7 });
+  const reduceMotion = useReducedMotion();
+  const [displayValue, setDisplayValue] = useState(reduceMotion ? value : 0);
+
+  useEffect(() => {
+    if (!inView) return;
+    if (reduceMotion) {
+      setDisplayValue(value);
+      return;
+    }
+
+    let frame = 0;
+    const startedAt = performance.now();
+    const duration = 1500;
+    const update = (now: number) => {
+      const progress = Math.min(1, (now - startedAt) / duration);
+      const eased = 1 - Math.pow(1 - progress, 4);
+      setDisplayValue(Math.round(value * eased));
+      if (progress < 1) frame = requestAnimationFrame(update);
+    };
+    frame = requestAnimationFrame(update);
+    return () => cancelAnimationFrame(frame);
+  }, [inView, reduceMotion, value]);
+
+  return <span ref={ref}>{displayValue.toLocaleString("en-IN")}{suffix}</span>;
+}
+
 function PerformanceSection() {
-  const [active, setActive] = useState(0);
-  const selected = performanceStats[active];
   return (
-    <section className="mx-auto max-w-7xl px-4 py-14">
-      <div className="mb-6 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
-        <h2 className="text-3xl font-bold tracking-tight">Creating Spaces. Building Trust.</h2>
-        <p className="max-w-xl text-sm leading-7 text-slate-500">Key measures from AMK's project portfolio and integrated studio delivery.</p>
-      </div>
-      <div className="grid gap-5 lg:grid-cols-[0.95fr_1.05fr]">
-        <motion.div
-          key={selected.label}
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.25 }}
-          className="rounded-xl bg-slate-950 p-7 text-white"
-        >
-          <div className="text-sm font-bold uppercase tracking-wide text-brand-accent">Selected Metric</div>
-          <div className="mt-5 text-5xl font-black text-brand-accent md:text-6xl">{selected.value}</div>
-          <h3 className="mt-4 text-2xl font-black">{selected.label}</h3>
-          <p className="mt-4 text-sm leading-7 text-slate-300">{selected.detail}</p>
-        </motion.div>
-        <div className="grid gap-4 sm:grid-cols-2">
-          {performanceStats.map((stat, index) => (
-            <motion.button
-              key={stat.label}
-              type="button"
-              onMouseEnter={() => setActive(index)}
-              onFocus={() => setActive(index)}
-              onClick={() => setActive(index)}
-              className={`rounded-lg border p-5 text-left shadow-sm transition ${active === index ? "border-orange-200 bg-orange-50" : "border-slate-200 bg-white hover:border-orange-200"}`}
-              whileHover={{ y: -3 }}
-              whileTap={{ scale: 0.98 }}
-            >
-              <div className="text-3xl font-black text-brand-primary">{stat.value}</div>
-              <div className="mt-2 text-sm font-semibold leading-6 text-slate-600">{stat.label}</div>
-              <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-slate-100">
-                <motion.div className="h-full rounded-full bg-brand-primary" animate={{ width: active === index ? "100%" : "35%" }} transition={{ duration: 0.25 }} />
-              </div>
-            </motion.button>
-          ))}
+    <motion.section
+      className="relative overflow-hidden border-y border-slate-200 bg-[#f3efe7] px-4 py-20 md:py-28"
+      initial={{ opacity: 0 }}
+      whileInView={{ opacity: 1 }}
+      viewport={{ once: true, amount: 0.15 }}
+      transition={{ duration: 0.8 }}
+    >
+      <div className="pointer-events-none absolute inset-0 opacity-40 [background-image:linear-gradient(rgba(15,23,42,.08)_1px,transparent_1px),linear-gradient(90deg,rgba(15,23,42,.08)_1px,transparent_1px)] [background-size:80px_80px]" />
+      <div className="relative mx-auto max-w-7xl">
+      <div className="mb-12 grid gap-5 lg:grid-cols-[1.15fr_.85fr] lg:items-end">
+        <div>
+          <div className="text-[11px] font-semibold uppercase tracking-[0.25em] text-brand-primary">Studio in numbers</div>
+          <h2 className="mt-4 max-w-3xl text-4xl font-medium leading-none tracking-[-0.03em] text-slate-950 md:text-6xl">Measured experience.<br />Thoughtful outcomes.</h2>
         </div>
+        <p className="max-w-xl border-l border-slate-300 pl-5 text-sm leading-7 text-slate-600 md:text-base">A concise view of the scale, range, and connected expertise behind AMK's architecture and engineering work.</p>
       </div>
-    </section>
+      <div className="grid border-l border-t border-slate-300 sm:grid-cols-2 lg:grid-cols-4">
+          {performanceStats.map((stat, index) => (
+            <motion.div
+              key={stat.label}
+              className="group relative min-h-64 border-b border-r border-slate-300 bg-white/55 p-6 backdrop-blur-sm md:p-8"
+              initial={{ opacity: 0, y: 24 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, amount: 0.5 }}
+              transition={{ duration: 0.65, delay: index * 0.08, ease: [0.22, 1, 0.36, 1] }}
+              whileHover={{ backgroundColor: "rgba(255,255,255,0.9)" }}
+            >
+              <div className="text-xs tabular-nums text-slate-400">0{index + 1}</div>
+              <div className="mt-10 text-4xl font-medium tracking-[-0.04em] text-slate-950 md:text-5xl"><AnimatedCounter value={stat.value} suffix={stat.suffix} /></div>
+              <h3 className="mt-5 text-base font-semibold text-slate-800">{stat.label}</h3>
+              <p className="mt-3 text-sm leading-6 text-slate-500">{stat.detail}</p>
+              <motion.span className="absolute bottom-0 left-0 h-1 bg-brand-primary" initial={{ width: 0 }} whileInView={{ width: "38%" }} whileHover={{ width: "100%" }} transition={{ duration: 0.55 }} />
+            </motion.div>
+          ))}
+      </div>
+      </div>
+    </motion.section>
+  );
+}
+
+function ProjectCarousel3D({ items, active, onChange, onOpen }: { items: PublicProject[]; active: number; onChange: (index: number) => void; onOpen: (project: PublicProject) => void }) {
+  const reduceMotion = useReducedMotion();
+  const [imageIndex, setImageIndex] = useState(0);
+  const activeProjectRef = useRef(active);
+  const currentProject = items[active % items.length];
+  const currentImages = useMemo(() => {
+    if (!currentProject) return [];
+    return [...new Set([
+      currentProject.cover_image_url,
+      ...(currentProject.portfolio_gallery ?? []).sort((a, b) => (a.display_order ?? 0) - (b.display_order ?? 0)).map((image) => image.image_url),
+    ].filter((url): url is string => Boolean(url)))];
+  }, [currentProject]);
+
+  useEffect(() => setImageIndex(0), [active]);
+  useEffect(() => { activeProjectRef.current = active; }, [active]);
+  useEffect(() => {
+    if (items.length <= 1) return;
+    let repeatTimer: number | undefined;
+    const advanceProject = () => onChange((activeProjectRef.current + 1) % items.length);
+    const holdTimer = window.setTimeout(() => {
+      advanceProject();
+      repeatTimer = window.setInterval(advanceProject, 4000);
+    }, 3000);
+    return () => {
+      window.clearTimeout(holdTimer);
+      if (repeatTimer !== undefined) window.clearInterval(repeatTimer);
+    };
+  }, [items.length, onChange]);
+
+  if (!items.length || !currentProject) return null;
+  const indexAt = (offset: number) => (active + offset + items.length) % items.length;
+  const fallbackImage = "https://images.unsplash.com/photo-1494526585095-c41746248156?auto=format&fit=crop&w=1200&q=80";
+
+  return (
+    <div className="relative overflow-hidden pb-0 pt-4 md:py-12" style={{ perspective: "1600px" }}>
+      <div className="pointer-events-none absolute inset-y-0 left-0 z-30 w-24 bg-gradient-to-r from-[#faf9f6] to-transparent md:w-40" />
+      <div className="pointer-events-none absolute inset-y-0 right-0 z-30 w-24 bg-gradient-to-l from-[#faf9f6] to-transparent md:w-40" />
+      <div className="relative h-[470px] md:h-[690px]">
+        {([-1, 0, 1] as const).map((offset) => {
+          const projectIndex = indexAt(offset);
+          const project = items[projectIndex];
+          const isActive = offset === 0;
+          const previewImage = isActive ? (currentImages[imageIndex] ?? project.cover_image_url ?? fallbackImage) : (project.cover_image_url ?? project.portfolio_gallery?.[0]?.image_url ?? fallbackImage);
+          return (
+            <motion.article
+              key={project.id}
+              data-project-id={project.id}
+              data-carousel-position={offset}
+              className={`absolute left-1/2 top-0 w-[78vw] max-w-[780px] cursor-pointer overflow-hidden rounded-3xl border bg-white shadow-[0_28px_90px_rgba(15,23,42,.18)] outline-none focus-visible:ring-4 focus-visible:ring-orange-200 ${isActive ? "z-20 border-slate-200" : "z-10 border-white/70"}`}
+              initial={false}
+              animate={{
+                x: offset === -1 ? "-118%" : offset === 1 ? "18%" : "-50%",
+                y: isActive ? 0 : 58,
+                scale: isActive ? 1 : 0.76,
+                rotateY: offset === -1 ? 24 : offset === 1 ? -24 : 0,
+                opacity: isActive ? 1 : 0.58,
+                filter: isActive ? "blur(0px)" : "blur(1px)",
+              }}
+              transition={{ duration: reduceMotion ? 0 : 1, ease: [0.22, 1, 0.36, 1] }}
+              onClick={() => isActive ? onOpen(project) : onChange(projectIndex)}
+              onKeyDown={(event) => {
+                if (event.target !== event.currentTarget || (event.key !== "Enter" && event.key !== " ")) return;
+                event.preventDefault();
+                isActive ? onOpen(project) : onChange(projectIndex);
+              }}
+              role="button"
+              tabIndex={0}
+              aria-label={isActive ? `Open ${project.name} details` : `Show ${project.name}`}
+            >
+              <div className="relative aspect-[16/9] overflow-hidden bg-slate-900">
+                <AnimatePresence mode="popLayout" initial={false}>
+                  <motion.img
+                    key={previewImage}
+                    src={previewImage}
+                    alt={project.name}
+                    loading={isActive ? "eager" : "lazy"}
+                    decoding="async"
+                    className="absolute inset-0 h-full w-full object-cover"
+                    initial={reduceMotion ? false : { opacity: 0, scale: 1.06, x: 28 }}
+                    animate={{ opacity: 1, scale: 1, x: 0 }}
+                    exit={reduceMotion ? undefined : { opacity: 0, scale: 0.98, x: -28 }}
+                    transition={{ duration: reduceMotion ? 0 : 0.7, ease: [0.22, 1, 0.36, 1] }}
+                  />
+                </AnimatePresence>
+                <div className="absolute inset-0 bg-gradient-to-t from-slate-950/75 via-transparent to-transparent" />
+                {isActive && currentImages.length > 1 && <div className="absolute right-5 top-5 z-10 rounded-full border border-white/25 bg-slate-950/45 px-3 py-1.5 text-[10px] font-semibold tabular-nums tracking-[0.16em] text-white backdrop-blur">{String(imageIndex + 1).padStart(2, "0")} / {String(currentImages.length).padStart(2, "0")}</div>}
+                <div className="absolute bottom-5 left-5 right-5 text-white">
+                  <div className="text-[10px] font-semibold uppercase tracking-[0.22em] text-brand-accent">{offset === -1 ? "Previous project" : offset === 1 ? "Next project" : project.category || "Featured project"}</div>
+                  <h3 className={`${isActive ? "mt-2 text-3xl md:text-4xl" : "mt-1 text-2xl"} font-medium leading-none`}>{project.name}</h3>
+                </div>
+                {isActive && currentImages.length > 1 && (
+                  <>
+                    <button type="button" onClick={(event) => { event.stopPropagation(); setImageIndex((index) => (index - 1 + currentImages.length) % currentImages.length); }} className="absolute left-4 top-1/2 z-10 grid h-11 w-11 -translate-y-1/2 place-items-center rounded-full border border-white/30 bg-slate-950/40 text-white backdrop-blur transition hover:bg-white hover:text-slate-950" aria-label="Previous project image"><ChevronLeft className="h-5 w-5" /></button>
+                    <button type="button" onClick={(event) => { event.stopPropagation(); setImageIndex((index) => (index + 1) % currentImages.length); }} className="absolute right-4 top-1/2 z-10 grid h-11 w-11 -translate-y-1/2 place-items-center rounded-full border border-white/30 bg-slate-950/40 text-white backdrop-blur transition hover:bg-white hover:text-slate-950" aria-label="Next project image"><ChevronRight className="h-5 w-5" /></button>
+                  </>
+                )}
+              </div>
+              {isActive && (
+                <div className="p-5 md:p-7">
+                  <div>
+                    <p className="text-sm leading-6 text-slate-500">{project.location}</p>
+                    {project.description && <p className="mt-2 line-clamp-2 text-sm leading-6 text-slate-600">{project.description}</p>}
+                    {currentImages.length > 1 && (
+                      <div className="mt-5 flex gap-2 overflow-x-auto pb-1" aria-label={`Image ${imageIndex + 1} of ${currentImages.length}`}>
+                        {currentImages.map((image, index) => <button key={image} type="button" onClick={(event) => { event.stopPropagation(); setImageIndex(index); }} className={`relative h-12 w-20 shrink-0 overflow-hidden border-2 transition-all ${index === imageIndex ? "border-brand-primary opacity-100" : "border-transparent opacity-50 hover:opacity-90"}`} aria-label={`Show project image ${index + 1}`}><img src={image} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover" /></button>)}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </motion.article>
+          );
+        })}
+      </div>
+      <div className="relative z-40 mt-3 flex items-center justify-center gap-4 border-t border-slate-200/80 pt-4 md:mt-6 md:pt-6">
+        <button type="button" onClick={() => onChange(indexAt(-1))} className="grid h-12 w-12 place-items-center rounded-full border border-slate-300 bg-white text-slate-700 shadow-sm transition hover:-translate-y-1 hover:border-brand-primary hover:text-brand-primary" aria-label="Previous project"><ChevronLeft className="h-5 w-5" /></button>
+        <span className="min-w-16 text-center text-xs font-semibold tabular-nums text-slate-500">{String(active + 1).padStart(2, "0")} / {String(items.length).padStart(2, "0")}</span>
+        <button type="button" onClick={() => onChange(indexAt(1))} className="grid h-12 w-12 place-items-center rounded-full border border-slate-300 bg-white text-slate-700 shadow-sm transition hover:-translate-y-1 hover:border-brand-primary hover:text-brand-primary" aria-label="Next project"><ChevronRight className="h-5 w-5" /></button>
+      </div>
+    </div>
   );
 }
 
@@ -599,6 +893,8 @@ function TestimonialCarousel({ items, autoplaySeconds }: { items: PublicTestimon
   const [videoOpen, setVideoOpen] = useState(false);
   const safeItems = items.length ? items : demoTestimonials;
   const testimonial = safeItems[active % safeItems.length];
+  const previousTestimonial = safeItems[(active - 1 + safeItems.length) % safeItems.length];
+  const nextTestimonial = safeItems[(active + 1) % safeItems.length];
   const rating = Math.max(1, Math.min(5, testimonial.rating ?? 5));
 
   useEffect(() => {
@@ -622,68 +918,71 @@ function TestimonialCarousel({ items, autoplaySeconds }: { items: PublicTestimon
   }, [videoOpen]);
 
   return (
-    <section className="mx-auto max-w-7xl px-4 py-14">
-      <div
-        className="grid gap-8 border-y border-slate-200 py-10 lg:grid-cols-[0.85fr_1.15fr]"
-        onMouseEnter={() => setPaused(true)}
-        onMouseLeave={() => setPaused(false)}
-      >
-        <div className="flex flex-col justify-center gap-5">
+    <section className="relative overflow-hidden bg-slate-950 px-4 py-20 text-white md:py-28" onMouseEnter={() => setPaused(true)} onMouseLeave={() => setPaused(false)}>
+      <div className="pointer-events-none absolute inset-0 opacity-25 [background-image:linear-gradient(rgba(255,255,255,.08)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,.08)_1px,transparent_1px)] [background-size:80px_80px]" />
+      <div className="relative mx-auto max-w-7xl">
+        <div className="mb-12 grid gap-6 border-l border-brand-accent/50 pl-5 md:grid-cols-[1fr_auto] md:items-end md:pl-8">
           <div>
-            <div className="text-sm font-semibold uppercase tracking-wide text-brand-primary">Client Testimonials</div>
-            <h2 className="mt-3 max-w-xl text-3xl font-semibold tracking-tight text-slate-950 md:text-4xl">What clients say about working with AMK.</h2>
-            <p className="mt-4 max-w-md text-sm font-normal leading-7 text-slate-500">Real feedback from residential, commercial, and development clients who trusted AMK for design, coordination, and project execution.</p>
-            <div className="mt-6 flex items-center gap-3">
-              <button type="button" onClick={() => setActive((current) => (current - 1 + safeItems.length) % safeItems.length)} disabled={safeItems.length <= 1} className="grid h-11 w-11 place-items-center rounded-full border border-slate-200 bg-white text-slate-700 shadow-sm transition hover:border-orange-200 hover:text-brand-primary disabled:cursor-not-allowed disabled:opacity-40" aria-label="Previous testimonial"><ChevronLeft className="h-5 w-5" /></button>
-              <button type="button" onClick={() => setActive((current) => (current + 1) % safeItems.length)} disabled={safeItems.length <= 1} className="grid h-11 w-11 place-items-center rounded-full border border-slate-200 bg-white text-slate-700 shadow-sm transition hover:border-orange-200 hover:text-brand-primary disabled:cursor-not-allowed disabled:opacity-40" aria-label="Next testimonial"><ChevronRight className="h-5 w-5" /></button>
-              <span className="text-sm font-semibold text-slate-500">{(active % safeItems.length) + 1} / {safeItems.length}</span>
-            </div>
+            <div className="text-[11px] font-semibold uppercase tracking-[0.25em] text-brand-accent">Client stories</div>
+            <h2 className="mt-4 max-w-3xl text-4xl font-medium leading-none tracking-[-0.03em] md:text-6xl">Voices behind<br />the spaces.</h2>
+            <p className="mt-5 max-w-xl text-sm leading-7 text-slate-400 md:text-base">Experiences from clients who trusted AMK with design, coordination, and delivery.</p>
+          </div>
+          <div className="flex items-center gap-3">
+            <button type="button" onClick={() => setActive((current) => (current - 1 + safeItems.length) % safeItems.length)} disabled={safeItems.length <= 1} className="grid h-12 w-12 place-items-center rounded-full border border-white/20 text-white transition hover:border-brand-accent hover:bg-brand-accent hover:text-slate-950 disabled:opacity-30" aria-label="Previous testimonial"><ChevronLeft className="h-5 w-5" /></button>
+            <span className="min-w-16 text-center text-xs font-semibold tabular-nums text-slate-400">{String((active % safeItems.length) + 1).padStart(2, "0")} / {String(safeItems.length).padStart(2, "0")}</span>
+            <button type="button" onClick={() => setActive((current) => (current + 1) % safeItems.length)} disabled={safeItems.length <= 1} className="grid h-12 w-12 place-items-center rounded-full border border-white/20 text-white transition hover:border-brand-accent hover:bg-brand-accent hover:text-slate-950 disabled:opacity-30" aria-label="Next testimonial"><ChevronRight className="h-5 w-5" /></button>
           </div>
         </div>
-        <div className="overflow-hidden rounded-lg text-slate-950">
-          <AnimatePresence mode="wait">
-            <motion.div
+
+        <div className="relative py-6 md:py-10">
+          {safeItems.length > 1 && (
+            <>
+              <button type="button" onClick={() => setActive((current) => (current - 1 + safeItems.length) % safeItems.length)} className="absolute left-0 top-1/2 z-0 hidden w-[34%] -translate-x-1/3 -translate-y-1/2 border border-white/10 bg-white/[.06] p-8 text-left opacity-55 lg:block" style={{ maskImage: "linear-gradient(to right, transparent, black 48%, black)" }} aria-label={`Show ${previousTestimonial.name}'s testimonial`}>
+                <p className="line-clamp-3 text-lg leading-8 text-slate-300">“{previousTestimonial.quote}”</p>
+                <div className="mt-5 text-sm font-semibold text-white">{previousTestimonial.name}</div>
+              </button>
+              <button type="button" onClick={() => setActive((current) => (current + 1) % safeItems.length)} className="absolute right-0 top-1/2 z-0 hidden w-[34%] translate-x-1/3 -translate-y-1/2 border border-white/10 bg-white/[.06] p-8 text-left opacity-55 lg:block" style={{ maskImage: "linear-gradient(to left, transparent, black 48%, black)" }} aria-label={`Show ${nextTestimonial.name}'s testimonial`}>
+                <p className="line-clamp-3 text-lg leading-8 text-slate-300">“{nextTestimonial.quote}”</p>
+                <div className="mt-5 text-sm font-semibold text-white">{nextTestimonial.name}</div>
+              </button>
+            </>
+          )}
+          <div className="pointer-events-none absolute inset-y-0 left-0 z-20 w-24 bg-gradient-to-r from-slate-950 to-transparent md:w-44" />
+          <div className="pointer-events-none absolute inset-y-0 right-0 z-20 w-24 bg-gradient-to-l from-slate-950 to-transparent md:w-44" />
+
+          <AnimatePresence mode="wait" initial={false}>
+            <motion.article
               key={testimonial.id}
-              initial={{ opacity: 0, x: 80 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -80 }}
-              transition={{ duration: 1, ease: [0.22, 1, 0.36, 1] }}
-              className="min-h-80 rounded-lg border border-slate-200 bg-white p-6 shadow-sm md:p-8"
+              initial={{ opacity: 0, x: 90, scale: 0.94 }}
+              animate={{ opacity: 1, x: 0, scale: 1 }}
+              exit={{ opacity: 0, x: -90, scale: 0.94 }}
+              transition={{ duration: 0.85, ease: [0.22, 1, 0.36, 1] }}
+              className={`relative z-10 mx-auto grid max-w-5xl overflow-hidden bg-[#f5f1e8] text-slate-950 shadow-[0_35px_100px_rgba(0,0,0,.35)] ${testimonial.video_url ? "lg:grid-cols-[1.05fr_.95fr]" : ""}`}
             >
               {testimonial.video_url && (
-                <button
-                  type="button"
-                  onClick={() => setVideoOpen(true)}
-                  className="group relative mb-6 block aspect-video w-full overflow-hidden rounded-lg bg-slate-950 text-white shadow-sm focus:outline-none focus:ring-4 focus:ring-orange-200"
-                  aria-label={`Play ${testimonial.name}'s testimonial video`}
-                >
-                  <video src={testimonial.video_url} muted playsInline preload="metadata" className="h-full w-full object-cover opacity-80 transition duration-300 group-hover:scale-[1.02] group-hover:opacity-65" />
-                  <span className="absolute inset-0 grid place-items-center bg-slate-950/20">
-                    <span className="grid h-16 w-16 place-items-center rounded-full bg-white/95 text-brand-primary shadow-xl transition group-hover:scale-110">
-                      <Play className="ml-1 h-7 w-7 fill-current" />
-                    </span>
+                <button type="button" onClick={() => setVideoOpen(true)} className="group relative min-h-80 overflow-hidden bg-slate-900 text-white lg:min-h-[520px]" aria-label={`Play ${testimonial.name}'s testimonial video`}>
+                  <video src={testimonial.video_url} muted playsInline preload="metadata" className="absolute inset-0 h-full w-full object-cover opacity-80 transition duration-700 group-hover:scale-105 group-hover:opacity-60" />
+                  <span className="absolute inset-0 grid place-items-center bg-gradient-to-t from-slate-950/65 via-transparent to-transparent">
+                    <span className="grid h-20 w-20 place-items-center rounded-full border border-white/40 bg-white/95 text-slate-950 shadow-2xl transition duration-500 group-hover:scale-110"><Play className="ml-1 h-7 w-7 fill-current" /></span>
                   </span>
-                  <span className="absolute bottom-4 left-4 rounded-full bg-slate-950/75 px-3 py-1.5 text-xs font-bold uppercase tracking-wide">Watch video testimonial</span>
+                  <span className="absolute bottom-6 left-6 text-[10px] font-semibold uppercase tracking-[0.22em] text-white">Watch their story</span>
                 </button>
               )}
-              <div className="flex gap-1 text-yellow-400">
-                {Array.from({ length: 5 }).map((_, index) => (
-                  <Star key={index} className={`h-5 w-5 ${index < rating ? "fill-yellow-400" : "text-slate-200"}`} />
-                ))}
-              </div>
-              <p className="mt-8 text-2xl font-normal leading-10 text-slate-600">"{testimonial.quote}"</p>
-              <div className="mt-8 flex items-center gap-4 border-t border-slate-200 pt-5">
-                {testimonial.avatar_url ? (
-                  <img src={testimonial.avatar_url} alt={testimonial.name} loading="lazy" decoding="async" className="h-14 w-14 rounded-full object-cover ring-2 ring-orange-100" />
-                ) : (
-                  <div className="grid h-14 w-14 place-items-center rounded-full bg-orange-50 text-lg font-black text-brand-primary">{testimonial.name.charAt(0)}</div>
-                )}
-                <div>
-                  <div className="text-xl font-semibold text-slate-950">{testimonial.name}</div>
-                  <div className="mt-1 text-sm font-normal text-slate-500">{testimonial.company}</div>
+              <div className="flex min-h-[420px] flex-col p-7 md:p-10 lg:p-12">
+                <div className="flex gap-1 text-brand-primary">
+                  {Array.from({ length: 5 }).map((_, index) => <Star key={index} className={`h-4 w-4 ${index < rating ? "fill-current" : "text-slate-300"}`} />)}
+                </div>
+                <div className="mt-7 text-7xl font-light leading-none text-brand-primary/25">“</div>
+                <p className="-mt-5 text-2xl font-normal leading-9 text-slate-700 md:text-3xl md:leading-10">{testimonial.quote}</p>
+                <div className="mt-auto flex items-center gap-4 border-t border-slate-300 pt-6">
+                  {testimonial.avatar_url ? <img src={testimonial.avatar_url} alt={testimonial.name} loading="lazy" decoding="async" className="h-14 w-14 rounded-full object-cover" /> : <div className="grid h-14 w-14 place-items-center rounded-full bg-white text-lg font-semibold text-brand-primary">{testimonial.name.charAt(0)}</div>}
+                  <div>
+                    <div className="text-lg font-semibold text-slate-950">{testimonial.name}</div>
+                    <div className="mt-1 text-sm text-slate-500">{testimonial.company}</div>
+                  </div>
                 </div>
               </div>
-            </motion.div>
+            </motion.article>
           </AnimatePresence>
         </div>
       </div>
@@ -726,7 +1025,19 @@ function TestimonialCarousel({ items, autoplaySeconds }: { items: PublicTestimon
 export function HomePage() {
   const { data: services = [] } = useTable("services", { limit: 6, orderBy: "created_at", eq: { status: "published" } });
   const { data: rawProjects = [] } = useTable("portfolio_projects", { limit: 6, orderBy: "display_order", eq: { status: "published" } });
-  const projects: PublicProject[] = (rawProjects as Array<{ id: string; title: string; short_description?: string | null; category_id?: string | null; location?: string | null; cover_image_url?: string | null; slug: string }>).map((p) => ({ id: p.id, name: p.title, slug: p.slug, description: p.short_description, category: p.category_id ?? undefined, location: p.location, cover_image_url: p.cover_image_url }));
+  const { data: projectCategories = [] } = useTable("portfolio_categories", { orderBy: "display_order", ascending: true });
+  const { data: projectGallery = [] } = useTable("portfolio_gallery", { orderBy: "display_order", ascending: true });
+  const projectCategoryNames = new Map((projectCategories as Array<{ id: string; name: string }>).map((category) => [category.id, category.name]));
+  const projects: PublicProject[] = (rawProjects as Array<{ id: string; title: string; short_description?: string | null; category_id?: string | null; location?: string | null; cover_image_url?: string | null; slug: string }>).map((p) => ({
+    id: p.id,
+    name: p.title,
+    slug: p.slug,
+    description: p.short_description,
+    category: p.category_id ? projectCategoryNames.get(p.category_id) : undefined,
+    location: p.location,
+    cover_image_url: p.cover_image_url,
+    portfolio_gallery: (projectGallery as Array<PublicProjectGalleryImage & { portfolio_project_id: string }>).filter((image) => image.portfolio_project_id === p.id),
+  }));
   const { data: testimonials = [] } = useTable("testimonials", { limit: 6, orderBy: "display_order", ascending: true, eq: { is_published: true } });
   const { data: testimonialSettings = [] } = useTable("app_settings", { eq: { key: "testimonial_carousel" }, limit: 1 });
   const { data: banners = [] } = useTable("banners", { orderBy: "display_order", ascending: true, eq: { is_active: true } });
@@ -734,7 +1045,7 @@ export function HomePage() {
   const [activeProjectIndex, setActiveProjectIndex] = useState(0);
   const [selectedProject, setSelectedProject] = useState<PublicProject | null>(null);
   const serviceRows = mergeServiceRows(services as typeof demoServices);
-  const projectRows = projects.length ? projects : demoProjects;
+  const projectRows = projects;
   const testimonialRows = testimonials.length ? testimonials : demoTestimonials;
   const testimonialInterval = testimonialAutoplaySeconds(testimonialSettings[0]?.value);
   const bannerRows = banners.length ? banners : demoBanners;
@@ -762,7 +1073,6 @@ export function HomePage() {
     nextImage.src = nextSlideImageUrl;
     return () => preload?.remove();
   }, [slideImageUrl, nextSlideImageUrl]);
-  const visibleProjects = [0, 1, 2].map((offset) => projectRows[(activeProjectIndex + offset) % projectRows.length]).filter(Boolean);
   return (
     <>
       <Seo
@@ -781,7 +1091,7 @@ export function HomePage() {
           knowsAbout: ["Architecture", "BIM", "Parametric Design", "3D Visualization", "Structural Engineering", "Interior Design", "Project Management"],
         }}
       />
-      <section className="relative min-h-[720px] overflow-hidden bg-slate-950 px-4 py-20 text-white">
+      <section className="relative min-h-[760px] overflow-hidden bg-slate-950 px-4 py-16 text-white">
         <AnimatePresence initial={false} mode="sync">
           <motion.div
             key={slide.id}
@@ -789,108 +1099,64 @@ export function HomePage() {
             initial={{ opacity: 0, scale: 1.04 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0 }}
-            transition={{ duration: 0.9 }}
-            style={{ backgroundImage: `linear-gradient(90deg, rgba(2,6,23,0.82), rgba(15,23,42,0.66)), linear-gradient(180deg, rgba(2,6,23,0.18), rgba(2,6,23,0.74)), url(${slideImageUrl})`, backgroundSize: "cover", backgroundPosition: "center" }}
+            transition={{ duration: 1.4, ease: [0.22, 1, 0.36, 1] }}
+            style={{ backgroundImage: `linear-gradient(90deg, rgba(2,6,23,0.94) 0%, rgba(2,6,23,0.76) 46%, rgba(2,6,23,0.24) 100%), linear-gradient(180deg, rgba(2,6,23,0.05), rgba(2,6,23,0.82)), url(${slideImageUrl})`, backgroundSize: "cover", backgroundPosition: "center" }}
           />
         </AnimatePresence>
-        <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.035)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.035)_1px,transparent_1px)] bg-[size:72px_72px]" />
+        <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.04)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.04)_1px,transparent_1px)] bg-[size:80px_80px]" />
+        <motion.div className="absolute bottom-0 left-[8%] top-0 w-px bg-white/15" initial={{ scaleY: 0 }} animate={{ scaleY: 1 }} transition={{ duration: 1.2 }} />
+        <motion.div className="absolute bottom-0 right-[8%] top-0 w-px bg-white/15" initial={{ scaleY: 0 }} animate={{ scaleY: 1 }} transition={{ duration: 1.2, delay: 0.1 }} />
 
-        <div className="relative mx-auto flex min-h-[560px] max-w-7xl items-center justify-center">
-          <div className="mx-auto max-w-5xl text-center">
-            <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/10 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-orange-100 backdrop-blur">
-              <span className="h-2 w-2 rounded-full bg-brand-accent shadow-[0_0_20px_rgba(255,155,74,0.9)]" />
-              Technology Driven Studio
+        <div className="relative mx-auto grid min-h-[620px] max-w-7xl items-center gap-12 lg:grid-cols-[1.15fr_.85fr]">
+          <div className="max-w-4xl border-l border-white/20 pl-5 md:pl-10">
+            <motion.div initial={{ opacity: 0, x: -16 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.7 }} className="flex items-center gap-4 text-[10px] font-semibold uppercase tracking-[0.26em] text-brand-accent">
+              <span className="tabular-nums">{String(activeSlide % bannerRows.length + 1).padStart(2, "0")}</span><span className="h-px w-12 bg-brand-accent" /> Technology Driven Studio
             </motion.div>
-            <motion.h1 key={slide.title} initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} className="mx-auto mt-7 max-w-5xl text-5xl font-bold leading-tight tracking-normal md:text-6xl xl:text-7xl">{slide.title}</motion.h1>
-            <p className="mx-auto mt-6 max-w-3xl text-lg leading-8 text-slate-200 md:text-xl">{slide.subtitle}</p>
-            <div className="mt-9 flex flex-wrap items-center justify-center gap-4">
+            <motion.h1 key={slide.title} initial={{ opacity: 0, y: 32 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.9, ease: [0.22, 1, 0.36, 1] }} className="mt-8 max-w-4xl text-5xl font-medium leading-[0.94] tracking-[-0.04em] md:text-7xl xl:text-[5.6rem]">{slide.title}</motion.h1>
+            <motion.p key={`${slide.id}-subtitle`} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8, delay: 0.12 }} className="mt-7 max-w-2xl text-base font-light leading-8 text-slate-300 md:text-lg">{slide.subtitle}</motion.p>
+            <motion.div initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8, delay: 0.22 }} className="mt-10 flex flex-wrap items-center gap-3">
+              <button
+                type="button"
+                onClick={() => location.href = "/projects"}
+                className="group inline-flex min-w-40 items-center justify-center gap-2 rounded-sm bg-white px-6 py-4 text-sm font-semibold text-slate-950 transition duration-300 hover:-translate-y-1 hover:bg-brand-accent"
+              >
+                View Projects <ArrowRight className="h-4 w-4 transition group-hover:translate-x-1" />
+              </button>
               <button
                 type="button"
                 onClick={() => location.href = "/login"}
-                className="group rounded-full border-2 border-white bg-brand-accent px-7 py-4 text-sm font-black text-slate-950 shadow-2xl shadow-orange-950/40 ring-4 ring-brand-accent/30 transition hover:-translate-y-1 hover:brightness-110"
+                className="group inline-flex min-w-40 items-center justify-center gap-2 rounded-sm border border-white/50 bg-transparent px-6 py-4 text-sm font-semibold text-white transition duration-300 hover:-translate-y-1 hover:border-white hover:bg-white hover:text-slate-950"
               >
-                <span className="inline-flex items-center gap-2"><LogIn className="h-5 w-5" /> Login to Your Portal</span>
+                <LogIn className="h-4 w-4" /> Login
               </button>
-              {slide.cta_label?.trim() && slide.cta_url?.trim() && <button
+              <button
                 type="button"
-                onClick={() => (slide.cta_url === "#enquiry" || slide.cta_url === legacyEnquiryRoute || slide.cta_label?.toLowerCase() === "get started") ? openEnquiryModal() : location.href = slide.cta_url!}
-                className="group relative overflow-hidden rounded-full bg-white px-6 py-4 text-sm font-semibold text-slate-950 shadow-2xl shadow-orange-950/25 transition hover:-translate-y-1 hover:bg-brand-primary hover:text-white"
+                onClick={openEnquiryModal}
+                className="group inline-flex min-w-40 items-center justify-center gap-2 rounded-sm bg-brand-primary px-6 py-4 text-sm font-semibold text-white transition duration-300 hover:-translate-y-1 hover:brightness-110"
               >
-                <span className="relative z-10 inline-flex items-center gap-2">{slide.cta_label} <ArrowRight className="h-4 w-4 transition group-hover:translate-x-1" /></span>
-              </button>}
-            </div>
+                Get Started <ArrowRight className="h-4 w-4 transition group-hover:translate-x-1" />
+              </button>
+            </motion.div>
           </div>
+          <motion.div initial={{ opacity: 0, x: 40 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 1, delay: .2, ease: [0.22, 1, 0.36, 1] }} className="relative hidden self-end pb-10 lg:block">
+            <div className="ml-auto w-72 border border-white/15 bg-slate-950/55 p-3 backdrop-blur-xl">
+              <div className="mb-3 flex items-center justify-between text-[9px] font-semibold uppercase tracking-[.2em] text-slate-400"><span>Next perspective</span><span>{String((activeSlide + 1) % bannerRows.length + 1).padStart(2, "0")}</span></div>
+              <div className="relative aspect-[4/3] overflow-hidden"><img src={nextSlideImageUrl} alt="" className="h-full w-full object-cover opacity-75" /><div className="absolute inset-0 bg-gradient-to-t from-slate-950/70 to-transparent" /></div>
+              <div className="mt-3 line-clamp-2 text-sm font-semibold leading-5 text-white">{nextSlide?.title}</div>
+            </div>
+          </motion.div>
         </div>
-        <div className="absolute bottom-8 left-1/2 flex -translate-x-1/2 items-center gap-3 rounded-full border border-white/10 bg-slate-950/45 px-4 py-3 backdrop-blur">
+        <div className="absolute bottom-7 left-1/2 flex -translate-x-1/2 items-center gap-3 border border-white/10 bg-slate-950/45 px-4 py-3 backdrop-blur lg:left-[calc(50%-34rem)] lg:translate-x-0">
           {bannerRows.map((item, index) => (
             <button key={item.id} aria-label={`Go to slide ${index + 1}`} onClick={() => setActiveSlide(index)} className={`h-2.5 rounded-full transition-all ${index === activeSlide % bannerRows.length ? "w-12 bg-brand-primary" : "w-2.5 bg-white/45 hover:bg-white"}`} />
           ))}
         </div>
       </section>
-      <DesignProcessSection />
       <Section title="End-to-End Design, Engineering & Construction Solutions" description="Architecture, engineering, BIM, visualization, and site support are planned as one connected studio service.">
-        <div className="grid gap-5 md:grid-cols-3">
-          {serviceRows.map((service, index) => (
-            <motion.div
-              key={service.id}
-              initial={{ opacity: 0, y: 16 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true, amount: 0.2 }}
-              transition={{ duration: 0.3, delay: Math.min(index * 0.04, 0.24) }}
-              whileHover={{ y: -4 }}
-            >
-              <FlipInfoCard
-                title={service.name}
-                text={service.description ?? "Complete design, documentation, coordination, and execution support for this service."}
-                detail={(serviceDetails[serviceKey(service)]?.signature ?? "Concept, documentation, coordination, and site support stay connected from day one.")}
-                icon={index % 3 === 0 ? Ruler : index % 3 === 1 ? Layers3 : ClipboardCheck}
-              />
-            </motion.div>
-          ))}
-        </div>
+        <ServiceExplorer items={serviceRows} />
       </Section>
-      <Section title="Integrated Capabilities" description="Each capability supports design clarity, technical coordination, and construction-ready documentation.">
-        <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
-          {[
-            [Ruler, "Architecture", "Functional, sustainable, and visually compelling environments for people and future possibilities."],
-            [Layers3, "BIM Workflows", "Digital modelling and coordination that reduce conflicts and improve construction efficiency."],
-            [ClipboardCheck, "Parametric Design", "Computational workflows for optimized facades, complex geometry, and performance-led forms."],
-            [ShieldCheck, "Visualization", "Renderings, walkthroughs, VR, and digital reviews so clients can see it before it is built."]
-          ].map(([Icon, title, text]) => (
-            <motion.div key={String(title)} className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm" whileHover={{ y: -5, borderColor: "rgba(248, 106, 13, 0.38)" }}>
-              <div className="mb-4 grid h-11 w-11 place-items-center rounded-lg bg-orange-100 text-brand-primary"><Icon className="h-6 w-6" /></div>
-              <h3 className="font-bold">{String(title)}</h3>
-              <p className="mt-2 text-sm leading-6 text-slate-500">{String(text)}</p>
-              <div className="mt-5 h-1.5 overflow-hidden rounded-full bg-slate-100">
-                <motion.div className="h-full rounded-full bg-brand-primary" initial={{ width: "24%" }} whileInView={{ width: "72%" }} whileHover={{ width: "100%" }} />
-              </div>
-            </motion.div>
-          ))}
-        </div>
-      </Section>
-      <Section title="Featured Projects">
-        <div className="mb-5 flex items-center justify-between gap-3">
-          <p className="max-w-2xl text-sm leading-6 text-slate-500">Explore selected residential, commercial, and interior architecture projects in Mysuru. Click a project to view scope, location, and delivery details.</p>
-          <div className="flex gap-2">
-            <Button variant="secondary" onClick={() => setActiveProjectIndex((current) => (current - 1 + projectRows.length) % projectRows.length)}><ChevronLeft className="h-4 w-4" /></Button>
-            <Button variant="secondary" onClick={() => setActiveProjectIndex((current) => (current + 1) % projectRows.length)}><ChevronRight className="h-4 w-4" /></Button>
-          </div>
-        </div>
-        <div className="grid gap-5 md:grid-cols-3">
-          {visibleProjects.map((project) => (
-            <button key={project.id} className="text-left" onClick={() => setSelectedProject(project as PublicProject)}>
-              <Card className="group overflow-hidden p-0">
-                <div className="aspect-[4/3] overflow-hidden bg-slate-200"><img src={project.cover_image_url ?? "https://images.unsplash.com/photo-1494526585095-c41746248156?auto=format&fit=crop&w=900&q=80"} alt={project.name} loading="lazy" decoding="async" className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.03]" /></div>
-                <div className="p-5">
-                  <div className="mb-2 text-xs font-bold uppercase tracking-wide text-brand-primary">{project.category}</div>
-                  <h3 className="font-bold">{project.name}</h3>
-                  <p className="mt-2 text-sm text-slate-500">{project.location}</p>
-                  <span className="mt-4 inline-flex items-center gap-2 text-sm font-semibold text-brand-primary">View details <ArrowRight className="h-4 w-4" /></span>
-                </div>
-              </Card>
-            </button>
-          ))}
-        </div>
+      <Section id="featured-projects" title="Featured Projects" description="Explore selected architecture, interiors, and commercial work from the AMK portfolio.">
+        {projectRows.length ? <ProjectCarousel3D items={projectRows as PublicProject[]} active={activeProjectIndex} onChange={setActiveProjectIndex} onOpen={setSelectedProject} /> : <EmptyState title="No featured projects yet" description="Published projects added from the admin portfolio will appear here." />}
       </Section>
       <Section title="Sectors We Serve" description="AMK works across residential, commercial, healthcare, hospitality, institutional, and layout development projects.">
         <div className="grid gap-5 md:grid-cols-3">
@@ -928,13 +1194,13 @@ export function HomePage() {
 
 export function ListingPage({ type }: { type: "projects" | "services" | "gallery" | "about" }) {
   const table = type === "services" ? "services" : type === "gallery" ? "gallery" : "portfolio_projects";
-  const { data = [] } = useTable(table as never, { orderBy: type === "gallery" ? "display_order" : "created_at", ascending: type === "gallery" });
+  const { data = [] } = useTable(table as never, { orderBy: type === "gallery" ? "display_order" : "created_at", ascending: type === "gallery", eq: type === "projects" || type === "services" ? { status: "published" } : undefined });
   const { data: aboutPages = [] } = useTable("website_pages", { eq: { slug: "about", status: "published" }, limit: 1 });
   const [filter, setFilter] = useState("");
   const [selectedProject, setSelectedProject] = useState<PublicProject | null>(null);
   const [preview, setPreview] = useState<PublicGallery | null>(null);
-  const fallbackRows = type === "services" ? demoServices : type === "gallery" ? demoGallery : demoProjects;
-  const sourceRows = type === "services" ? mergeServiceRows(data as typeof demoServices) : data.length ? data : fallbackRows;
+  const fallbackRows = type === "services" ? demoServices : demoGallery;
+  const sourceRows = type === "services" ? mergeServiceRows(data as typeof demoServices) : type === "gallery" ? (data.length ? data : fallbackRows) : data;
   const rows = useMemo(() => sourceRows.filter((item: { name?: string; title?: string; category?: string }) => `${item.name ?? item.title ?? ""} ${item.category ?? ""}`.toLowerCase().includes(filter.toLowerCase())), [sourceRows, filter]);
   const aboutPage = aboutPages[0];
   if (type === "about") return (
@@ -1151,7 +1417,7 @@ export function ProjectDetailPage() {
   const { slug } = useParams();
   const { data: projects = [] } = useTable("portfolio_projects", { eq: { slug: slug ?? "", status: "published" } });
   const rawProject = projects[0] as { id: string; title?: string; name?: string; short_description?: string | null; description?: string | null; location?: string | null; cover_image_url?: string | null } | undefined;
-  const project: PublicProject | undefined = rawProject ? { id: rawProject.id, name: rawProject.title ?? rawProject.name ?? "", description: rawProject.short_description ?? rawProject.description, location: rawProject.location, cover_image_url: rawProject.cover_image_url } : demoProjects.find((item) => item.slug === slug);
+  const project: PublicProject | undefined = rawProject ? { id: rawProject.id, name: rawProject.title ?? rawProject.name ?? "", description: rawProject.short_description ?? rawProject.description, location: rawProject.location, cover_image_url: rawProject.cover_image_url } : undefined;
   if (!project) return <><Seo title="Project Not Found | AMK Architects & Engineers" description="The requested AMK Architects & Engineers project is not published or does not exist." noIndex /><Section title="Project not found"><EmptyState title="No project found" description="The requested project is not published or does not exist." /></Section></>;
   return <><Seo title={`${project.name} | AMK Architects Mysuru Project`} description={`${project.name} by AMK Architects & Engineers in ${project.location ?? "Mysuru"}. View architecture project details, scope, and design approach.`} keywords={[`${project.name} Mysuru`, "architecture project", project.location ?? "Mysuru", "AMK Architects project", "architecture design Mysuru"]} canonical={`/projects/${slug ?? ""}`} ogImage={project.cover_image_url ?? undefined} ogType="article" jsonLd={{ "@context": "https://schema.org", "@type": "CreativeWork", name: project.name, description: project.description ?? `${project.name} by AMK Architects & Engineers`, creator: { "@type": "ArchitecturalOrganization", name: "AMK Architects & Engineers" }, contentLocation: { "@type": "Place", name: project.location ?? "Mysuru" } }} /><Section title={project.name}><Card><div className="aspect-video rounded-lg bg-slate-200 bg-cover" style={{ backgroundImage: `url(${project.cover_image_url ?? ""})` }} /><p className="mt-6 leading-7 text-slate-600">{project.description}</p><p className="mt-3 flex items-center gap-2 text-sm text-slate-500"><MapPin className="h-4 w-4" />{project.location}</p></Card></Section></>;
 }
@@ -1216,7 +1482,7 @@ export function ContactPage({ compact = false }: { compact?: boolean }) {
                 <span className="text-xs font-bold uppercase tracking-wide text-emerald-400">WhatsApp</span>
                 <span className="mt-2 block text-lg font-semibold">Chat with AMK about your project</span>
               </span>
-              <MessageCircle className="h-8 w-8 shrink-0 text-emerald-400" />
+              <FaWhatsapp className="h-8 w-8 shrink-0 text-emerald-400" aria-hidden="true" />
             </a>
           </motion.div>
         </div>

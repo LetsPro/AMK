@@ -8,7 +8,7 @@ import {
 import { supabase } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/Button";
-import { Input } from "@/components/ui/Input";
+import { Input, Select } from "@/components/ui/Input";
 import { useToast } from "@/contexts/ToastContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { attachStoredFileAccessUrls } from "@/lib/fileUrls";
@@ -45,6 +45,18 @@ function downloadUrl(file: FileRecord) {
   return file.download_url || previewUrl(file);
 }
 
+function fileType(file: FileRecord) {
+  const mime = file.mime_type ?? "";
+  const name = file.display_name.toLowerCase();
+  if (mime.startsWith("image/")) return "images";
+  if (mime === "application/pdf" || name.endsWith(".pdf")) return "pdf";
+  if (mime.startsWith("video/")) return "videos";
+  if (mime.startsWith("audio/")) return "audio";
+  if (mime.includes("sheet") || mime.includes("excel") || /\.(xlsx?|csv)$/.test(name)) return "spreadsheets";
+  if (mime.includes("word") || mime.includes("document") || /\.(docx?|txt|rtf)$/.test(name)) return "documents";
+  return "other";
+}
+
 export function FilesPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const toast = useToast();
@@ -56,6 +68,7 @@ export function FilesPage() {
   const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [search, setSearch] = useState("");
+  const [typeFilter, setTypeFilter] = useState("all");
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [newFolderName, setNewFolderName] = useState("");
   const [showNewFolder, setShowNewFolder] = useState(false);
@@ -166,7 +179,7 @@ export function FilesPage() {
   }
 
   const filteredFolders = folders.filter((f) => f.name.toLowerCase().includes(search.toLowerCase()));
-  const filteredFiles = files.filter((f) => f.display_name.toLowerCase().includes(search.toLowerCase()));
+  const filteredFiles = files.filter((f) => f.display_name.toLowerCase().includes(search.toLowerCase()) && (typeFilter === "all" || fileType(f) === typeFilter));
 
   const allIds = filteredFiles.map((f) => f.id);
   const allSelected = allIds.length > 0 && allIds.every((id) => selected.has(id));
@@ -200,11 +213,21 @@ export function FilesPage() {
       </div>
 
       {/* Toolbar */}
-      <div className="flex items-center gap-3">
-        <div className="relative flex-1 max-w-xs">
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="relative min-w-56 flex-1 max-w-sm">
           <Search className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
-          <Input placeholder="Search..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9 h-9" />
+          <Input placeholder="Search folders and files..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9 h-9" />
         </div>
+        <Select aria-label="Filter by file type" value={typeFilter} onChange={(event) => setTypeFilter(event.target.value)} className="h-9 w-44 bg-white text-sm">
+          <option value="all">All file types</option>
+          <option value="images">Images</option>
+          <option value="pdf">PDF files</option>
+          <option value="documents">Documents</option>
+          <option value="spreadsheets">Spreadsheets</option>
+          <option value="videos">Videos</option>
+          <option value="audio">Audio</option>
+          <option value="other">Other files</option>
+        </Select>
         <div className="ml-auto flex gap-1.5 rounded-lg border border-slate-200 bg-white p-1">
           <button onClick={() => setViewMode("grid")} className={cn("rounded p-1.5 transition-colors", viewMode === "grid" ? "bg-slate-900 text-white" : "text-slate-500 hover:bg-slate-100")}><Grid3X3 className="h-4 w-4" /></button>
           <button onClick={() => setViewMode("list")} className={cn("rounded p-1.5 transition-colors", viewMode === "list" ? "bg-slate-900 text-white" : "text-slate-500 hover:bg-slate-100")}><List className="h-4 w-4" /></button>

@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { useToast } from "@/contexts/ToastContext";
 import { useAuth } from "@/contexts/AuthContext";
+import { storageSafeFileName } from "@/services/crud";
 import type { TableRow } from "@/types/database";
 
 type PortfolioGalleryImage = Pick<TableRow<"portfolio_gallery">, "id" | "image_url" | "caption" | "display_order">;
@@ -42,6 +43,12 @@ function slugify(str: string) {
   return str.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 }
 
+function errorMessage(error: unknown) {
+  if (error instanceof Error && error.message) return error.message;
+  if (error && typeof error === "object" && "message" in error && typeof error.message === "string") return error.message;
+  return "Could not save the project. Please check the form and try again.";
+}
+
 export function PortfolioPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const toast = useToast();
@@ -59,12 +66,16 @@ export function PortfolioPage() {
   const [uploadingImage, setUploadingImage] = useState(false);
   const [uploadingGallery, setUploadingGallery] = useState(false);
   const [galleryImages, setGalleryImages] = useState<PortfolioGalleryImage[]>([]);
+  const [showCategoryManager, setShowCategoryManager] = useState(false);
+  const [categoryName, setCategoryName] = useState("");
+  const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
+  const [savingCategory, setSavingCategory] = useState(false);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const galleryInputRef = useRef<HTMLInputElement>(null);
 
   async function uploadCoverImage(file: globalThis.File) {
     setUploadingImage(true);
-    const path = `portfolio/${Date.now()}_${file.name}`;
+    const path = `portfolio/${Date.now()}-${storageSafeFileName(file.name)}`;
     const { data: uploaded, error } = await supabase.storage.from("website").upload(path, file, { upsert: false });
     if (error) { toast.error("Upload failed", error.message); setUploadingImage(false); return; }
     const { data: { publicUrl } } = supabase.storage.from("website").getPublicUrl(uploaded.path);
@@ -79,7 +90,7 @@ export function PortfolioPage() {
     try {
       const uploadedImages: PortfolioGalleryImage[] = [];
       for (const [index, file] of selectedFiles.entries()) {
-        const cleanName = file.name.toLowerCase().replace(/[^a-z0-9.]+/g, "-");
+        const cleanName = storageSafeFileName(file.name);
         const path = `portfolio/gallery/${Date.now()}-${index}-${cleanName}`;
         const { data: uploaded, error } = await supabase.storage.from("website").upload(path, file, { upsert: false });
         if (error) throw error;
@@ -131,14 +142,26 @@ export function PortfolioPage() {
 
   async function save() {
     if (!form.title.trim()) { toast.error("Title required"); return; }
+    const projectSlug = slugify(form.slug || form.title);
+    if (!projectSlug) { toast.error("Valid title required", "Use at least one letter or number in the project title."); return; }
     setSaving(true);
     const payload = {
       ...form,
-      slug: form.slug || slugify(form.title),
+      title: form.title.trim(),
+      slug: projectSlug,
+      short_description: form.short_description.trim() || null,
+      detailed_description: form.detailed_description.trim() || null,
+      client_name: form.client_name.trim() || null,
+      location: form.location.trim() || null,
+      completion_date: form.completion_date || null,
+      cover_image_url: form.cover_image_url.trim() || null,
+      website_url: form.website_url.trim() || null,
+      seo_title: form.seo_title.trim() || null,
+      seo_description: form.seo_description.trim() || null,
       services_provided: form.services_provided ? form.services_provided.split(",").map((s) => s.trim()).filter(Boolean) : [],
       technologies_used: form.technologies_used ? form.technologies_used.split(",").map((s) => s.trim()).filter(Boolean) : [],
       category_id: form.category_id || null,
-      updated_by: profile?.id,
+      updated_by: profile?.id ?? null,
     };
     try {
       let projectId = editProject?.id;
@@ -146,7 +169,7 @@ export function PortfolioPage() {
         const { error } = await supabase.from("portfolio_projects").update(payload).eq("id", editProject.id);
         if (error) throw error;
       } else {
-        const { data: createdProject, error } = await supabase.from("portfolio_projects").insert({ ...payload, created_by: profile?.id }).select("id").single();
+        const { data: createdProject, error } = await supabase.from("portfolio_projects").insert({ ...payload, created_by: profile?.id ?? null }).select("id").single();
         if (error) throw error;
         projectId = createdProject.id;
       }
@@ -172,7 +195,7 @@ export function PortfolioPage() {
       setShowForm(false);
       load();
     } catch (err) {
-      toast.error("Error", err instanceof Error ? err.message : "Failed");
+      toast.error(editProject ? "Project update failed" : "Project creation failed", errorMessage(err));
     }
     setSaving(false);
   }
@@ -195,6 +218,45 @@ export function PortfolioPage() {
     toast.success("Project deleted");
     setDeleteTarget(null);
     load();
+  }
+
+  async function saveCategory() {
+    const name = categoryName.trim();
+    if (!name) { toast.error("Category name required"); return; }
+    setSavingCategory(true);
+    try {
+      if (editingCategoryId) {
+        const { error } = await supabase.from("portfolio_categories").update({ name, slug: slugify(name) }).eq("id", editingCategoryId);
+        if (error) throw error;
+        toast.success("Category updated");
+      } else {
+        const { data: created, error } = await supabase.from("portfolio_categories").insert({ name, slug: slugify(name), description: null, display_order: categories.length }).select("*").single();
+        if (error) throw error;
+        setForm((current) => ({ ...current, category_id: created.id }));
+        toast.success("Category added");
+      }
+      setCategoryName("");
+      setEditingCategoryId(null);
+      await load();
+    } catch (error) {
+      toast.error("Category could not be saved", errorMessage(error));
+    }
+    setSavingCategory(false);
+  }
+
+  function startCategoryEdit(category: PortfolioCategory) {
+    setEditingCategoryId(category.id);
+    setCategoryName(category.name);
+  }
+
+  async function deleteCategory(category: PortfolioCategory) {
+    if (!window.confirm(`Delete the “${category.name}” category? Projects using it will become uncategorized.`)) return;
+    const { error } = await supabase.from("portfolio_categories").delete().eq("id", category.id);
+    if (error) { toast.error("Category could not be deleted", error.message); return; }
+    if (form.category_id === category.id) setForm((current) => ({ ...current, category_id: "" }));
+    if (editingCategoryId === category.id) { setEditingCategoryId(null); setCategoryName(""); }
+    toast.success("Category deleted");
+    await load();
   }
 
   return (
@@ -315,13 +377,17 @@ export function PortfolioPage() {
                 <div><label className="block text-sm font-medium mb-1">Detailed Description</label><textarea value={form.detailed_description} onChange={(e) => setForm({ ...form, detailed_description: e.target.value })} className="h-24 w-full rounded-md border border-slate-200 px-3 py-2 text-sm resize-none focus:border-brand-primary focus:outline-none" placeholder="Full project description" /></div>
                 <div className="grid grid-cols-2 gap-3">
                   <div><label className="block text-sm font-medium mb-1">Client Name</label><Input value={form.client_name} onChange={(e) => setForm({ ...form, client_name: e.target.value })} /></div>
-                  <div><label className="block text-sm font-medium mb-1">Category</label>
+                  <div><div className="mb-1 flex items-center justify-between gap-2"><label className="block text-sm font-medium">Category</label><button type="button" onClick={() => setShowCategoryManager((value) => !value)} className="text-xs font-semibold text-brand-primary hover:underline">{showCategoryManager ? "Close manager" : "+ Manage"}</button></div>
                     <select value={form.category_id} onChange={(e) => setForm({ ...form, category_id: e.target.value })} className="h-10 w-full rounded-md border border-slate-200 bg-white px-3 text-sm focus:border-brand-primary focus:outline-none">
                       <option value="">Select category</option>
                       {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
                     </select>
                   </div>
                 </div>
+                {showCategoryManager && <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                  <div className="flex gap-2"><Input value={categoryName} onChange={(event) => setCategoryName(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); saveCategory(); } }} placeholder={editingCategoryId ? "Rename category" : "New category name"} className="bg-white" /><Button type="button" onClick={saveCategory} disabled={savingCategory} className="shrink-0 px-4">{savingCategory ? "Saving" : editingCategoryId ? "Update" : "Add"}</Button>{editingCategoryId && <button type="button" onClick={() => { setEditingCategoryId(null); setCategoryName(""); }} className="grid h-10 w-10 shrink-0 place-items-center rounded-md text-slate-400 hover:bg-white hover:text-slate-700"><X className="h-4 w-4" /></button>}</div>
+                  <div className="mt-3 max-h-40 space-y-1 overflow-y-auto">{categories.length ? categories.map((category) => <div key={category.id} className="flex items-center gap-2 rounded-md bg-white px-3 py-2"><span className="min-w-0 flex-1 truncate text-sm font-medium text-slate-700">{category.name}</span><button type="button" onClick={() => startCategoryEdit(category)} className="grid h-7 w-7 place-items-center rounded text-slate-400 hover:bg-blue-50 hover:text-blue-600" aria-label={`Edit ${category.name}`}><Edit2 className="h-3.5 w-3.5" /></button><button type="button" onClick={() => deleteCategory(category)} className="grid h-7 w-7 place-items-center rounded text-slate-400 hover:bg-red-50 hover:text-red-600" aria-label={`Delete ${category.name}`}><Trash2 className="h-3.5 w-3.5" /></button></div>) : <p className="py-3 text-center text-xs text-slate-400">No categories yet.</p>}</div>
+                </div>}
                 <div className="grid grid-cols-2 gap-3">
                   <div><label className="block text-sm font-medium mb-1">Location</label><Input value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} /></div>
                   <div><label className="block text-sm font-medium mb-1">Completion Date</label><Input type="date" value={form.completion_date} onChange={(e) => setForm({ ...form, completion_date: e.target.value })} /></div>

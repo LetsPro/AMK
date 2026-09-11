@@ -12,10 +12,11 @@ type PanoramaCategory = TableRow<"panorama_categories">;
 type Panorama = TableRow<"panoramas">;
 type Client = TableRow<"clients">;
 type PanoramaAssignment = TableRow<"client_panorama_assignments">;
+type PanoramaDesign = { id: string; title: string; panoramas: Panorama[] };
 
 const emptyCategory = { name: "", slug: "", description: "", display_order: "", is_active: "true" };
-type PanoramaDraft = { localId: string; category_id: string; title: string; description: string; image_url: string; display_order: string };
-type QuickCategoryTarget = { kind: "edit" } | { kind: "draft"; localId: string };
+type PanoramaDraft = { id?: string; localId: string; category_id: string; title: string; description: string; image_url: string; display_order: string };
+type QuickCategoryTarget = { kind: "draft"; localId: string };
 
 const emptyPanorama = { design_id: "", design_title: "", category_id: "", title: "", description: "", image_url: "", status: "published", is_public: true, display_order: "" };
 let panoramaDraftId = 0;
@@ -35,7 +36,6 @@ export function PanoramaAdminPage() {
   const { data: clientRows = [] } = useTable("clients", { orderBy: "name", ascending: true });
   const { data: assignmentRows = [] } = useTable("client_panorama_assignments", { orderBy: "created_at", ascending: true });
   const categoryMutations = useTableMutations("panorama_categories");
-  const panoramaMutations = useTableMutations("panoramas");
   const batchPanoramaMutations = useTableMutations("panoramas", { toast: false });
   const visibilityMutations = useTableMutations("panoramas", { toast: false });
   const assignmentMutations = useTableMutations("client_panorama_assignments", { toast: false });
@@ -58,11 +58,23 @@ export function PanoramaAdminPage() {
   const [quickCategoryName, setQuickCategoryName] = useState("");
   const [quickCategoryDescription, setQuickCategoryDescription] = useState("");
   const [savingQuickCategory, setSavingQuickCategory] = useState(false);
-  const [assignmentPanorama, setAssignmentPanorama] = useState<Panorama | null>(null);
+  const [assignmentDesign, setAssignmentDesign] = useState<PanoramaDesign | null>(null);
   const [selectedClientIds, setSelectedClientIds] = useState<string[]>([]);
   const [savingAssignments, setSavingAssignments] = useState(false);
 
   const categoryById = useMemo(() => new Map(categories.map((category) => [category.id, category])), [categories]);
+  const designs = useMemo(() => {
+    const groups = new Map<string, PanoramaDesign>();
+    panoramas.forEach((panorama) => {
+      const current = groups.get(panorama.design_id);
+      if (current) current.panoramas.push(panorama);
+      else groups.set(panorama.design_id, { id: panorama.design_id, title: panorama.design_title, panoramas: [panorama] });
+    });
+    return [...groups.values()].map((design) => ({
+      ...design,
+      panoramas: [...design.panoramas].sort((a, b) => a.display_order - b.display_order)
+    })).sort((a, b) => (a.panoramas[0]?.display_order ?? 0) - (b.panoramas[0]?.display_order ?? 0));
+  }, [panoramas]);
 
   useEffect(() => {
     if (!categoryModalOpen) return;
@@ -77,16 +89,16 @@ export function PanoramaAdminPage() {
   }, [categoryModalOpen]);
 
   useEffect(() => {
-    if (!assignmentPanorama) return;
+    if (!assignmentDesign) return;
     const previousOverflow = document.body.style.overflow;
-    const closeOnEscape = (event: KeyboardEvent) => event.key === "Escape" && setAssignmentPanorama(null);
+    const closeOnEscape = (event: KeyboardEvent) => event.key === "Escape" && setAssignmentDesign(null);
     document.body.style.overflow = "hidden";
     window.addEventListener("keydown", closeOnEscape);
     return () => {
       document.body.style.overflow = previousOverflow;
       window.removeEventListener("keydown", closeOnEscape);
     };
-  }, [assignmentPanorama]);
+  }, [assignmentDesign]);
 
   useEffect(() => {
     if (!panoramaModalOpen) return;
@@ -179,11 +191,7 @@ export function PanoramaAdminPage() {
         display_order: categories.length + 1,
         is_active: true
       });
-      if (quickCategoryTarget.kind === "edit") {
-        setPanoramaForm((current) => ({ ...current, category_id: created.id }));
-      } else {
-        updatePanoramaDraft(quickCategoryTarget.localId, { category_id: created.id });
-      }
+      updatePanoramaDraft(quickCategoryTarget.localId, { category_id: created.id });
       closeQuickCategory();
     } finally {
       setSavingQuickCategory(false);
@@ -206,34 +214,6 @@ export function PanoramaAdminPage() {
 
   async function savePanorama(event: React.FormEvent) {
     event.preventDefault();
-    if (panoramaEditingId) {
-      if (!panoramaForm.image_url) {
-        window.alert("Please upload or select a panoramic image before saving.");
-        return;
-      }
-      await panoramaMutations.update.mutateAsync({
-        id: panoramaEditingId,
-        payload: {
-          design_title: panoramaForm.design_title.trim(),
-          category_id: panoramaForm.category_id,
-          title: panoramaForm.title.trim(),
-          description: panoramaForm.description.trim() || null,
-          image_url: panoramaForm.image_url,
-          status: panoramaForm.status as "draft" | "published",
-          is_public: panoramaForm.is_public,
-          display_order: Number(panoramaForm.display_order || panoramas.length + 1)
-        }
-      });
-      const editedPanorama = panoramas.find((panorama) => panorama.id === panoramaEditingId);
-      if (editedPanorama) {
-        await Promise.all(panoramas
-          .filter((panorama) => panorama.design_id === editedPanorama.design_id && panorama.id !== panoramaEditingId)
-          .map((panorama) => batchPanoramaMutations.update.mutateAsync({ id: panorama.id, payload: { design_title: panoramaForm.design_title.trim() } })));
-      }
-      closePanoramaModal();
-      return;
-    }
-
     const incomplete = panoramaDrafts.find((draft) => !draft.category_id || !draft.title.trim() || !draft.image_url);
     if (!panoramaForm.design_title.trim() || incomplete) {
       window.alert("Please add the design title, select a space, add a view label, and choose an image for every panorama.");
@@ -242,10 +222,10 @@ export function PanoramaAdminPage() {
 
     setSavingBatch(true);
     try {
-      const designId = crypto.randomUUID();
+      const designId = panoramaEditingId ?? crypto.randomUUID();
       const createdPanoramas: Panorama[] = [];
       for (const [index, draft] of panoramaDrafts.entries()) {
-        const created = await batchPanoramaMutations.create.mutateAsync({
+        const payload = {
           design_id: designId,
           design_title: panoramaForm.design_title.trim(),
           category_id: draft.category_id,
@@ -255,11 +235,25 @@ export function PanoramaAdminPage() {
           status: panoramaForm.status as "draft" | "published",
           is_public: panoramaForm.is_public,
           display_order: Number(draft.display_order || panoramas.length + index + 1)
-        });
-        createdPanoramas.push(created as Panorama);
+        };
+        if (draft.id) await batchPanoramaMutations.update.mutateAsync({ id: draft.id, payload });
+        else createdPanoramas.push(await batchPanoramaMutations.create.mutateAsync(payload) as Panorama);
       }
-      await Promise.all(createdPanoramas.flatMap((panorama) => batchClientIds.map((clientId) => assignmentMutations.create.mutateAsync({ client_id: clientId, panorama_id: panorama.id }))));
-      toast.success("360 interiors added", `${createdPanoramas.length} panorama${createdPanoramas.length === 1 ? "" : "s"} created${batchClientIds.length ? ` and assigned to ${batchClientIds.length} client${batchClientIds.length === 1 ? "" : "s"}` : ""}.`);
+      if (panoramaEditingId) {
+        const retainedIds = new Set(panoramaDrafts.map((draft) => draft.id).filter(Boolean));
+        const removed = panoramas.filter((panorama) => panorama.design_id === panoramaEditingId && !retainedIds.has(panorama.id));
+        await Promise.all(removed.map((panorama) => batchPanoramaMutations.remove.mutateAsync(panorama.id)));
+      }
+      const savedPanoramaIds = [...panoramaDrafts.map((draft) => draft.id).filter((id): id is string => Boolean(id)), ...createdPanoramas.map((panorama) => panorama.id)];
+      const savedPanoramaIdSet = new Set(savedPanoramaIds);
+      const selectedClients = new Set(batchClientIds);
+      const existingAssignments = assignments.filter((assignment) => savedPanoramaIdSet.has(assignment.panorama_id));
+      const existingPairs = new Set(existingAssignments.map((assignment) => `${assignment.panorama_id}:${assignment.client_id}`));
+      await Promise.all([
+        ...savedPanoramaIds.flatMap((panoramaId) => batchClientIds.filter((clientId) => !existingPairs.has(`${panoramaId}:${clientId}`)).map((clientId) => assignmentMutations.create.mutateAsync({ client_id: clientId, panorama_id: panoramaId }))),
+        ...existingAssignments.filter((assignment) => !selectedClients.has(assignment.client_id)).map((assignment) => assignmentMutations.remove.mutateAsync(assignment.id))
+      ]);
+      toast.success(panoramaEditingId ? "360 design updated" : "360 design added", `${panoramaDrafts.length} panorama${panoramaDrafts.length === 1 ? "" : "s"} saved as one design.`);
       closePanoramaModal();
     } catch (error) {
       toast.error("Could not add panoramas", error instanceof Error ? error.message : "Please try again.");
@@ -280,31 +274,37 @@ export function PanoramaAdminPage() {
     });
   }
 
-  function editPanorama(panorama: Panorama) {
+  function editDesign(design: PanoramaDesign) {
     setPanoramaModalOpen(true);
-    setPanoramaEditingId(panorama.id);
+    setPanoramaEditingId(design.id);
+    const fullyPublic = design.panoramas.every((panorama) => panorama.status === "published" && panorama.is_public !== false);
+    const assignedClientIds = new Set(assignments.filter((assignment) => design.panoramas.some((panorama) => panorama.id === assignment.panorama_id)).map((assignment) => assignment.client_id));
     setPanoramaForm({
-      design_id: panorama.design_id,
-      design_title: panorama.design_title,
+      ...emptyPanorama,
+      design_id: design.id,
+      design_title: design.title,
+      status: design.panoramas.every((panorama) => panorama.status === "published") ? "published" : "draft",
+      is_public: fullyPublic
+    });
+    setPanoramaDrafts(design.panoramas.map((panorama) => ({
+      id: panorama.id,
+      localId: panorama.id,
       category_id: panorama.category_id,
       title: panorama.title,
       description: panorama.description ?? "",
       image_url: panorama.image_url,
-      status: panorama.status,
-      is_public: panorama.is_public !== false,
       display_order: String(panorama.display_order)
-    });
+    })));
+    setBatchClientIds([...assignedClientIds]);
+    setShowBatchClients(false);
   }
 
-  async function toggleWebsiteVisibility(panorama: Panorama) {
-    const currentlyVisible = panorama.status === "published" && panorama.is_public !== false;
+  async function toggleWebsiteVisibility(design: PanoramaDesign) {
+    const currentlyVisible = design.panoramas.every((panorama) => panorama.status === "published" && panorama.is_public !== false);
     const enable = !currentlyVisible;
     try {
-      await visibilityMutations.update.mutateAsync({
-        id: panorama.id,
-        payload: { is_public: enable, ...(enable ? { status: "published" as const } : {}) }
-      });
-      toast.success(enable ? "Website display enabled" : "Website display disabled", `${panorama.title} ${enable ? "will appear" : "will no longer appear"} on the public website.`);
+      await Promise.all(design.panoramas.map((panorama) => visibilityMutations.update.mutateAsync({ id: panorama.id, payload: { is_public: enable, ...(enable ? { status: "published" as const } : {}) } })));
+      toast.success(enable ? "Website display enabled" : "Website display disabled", `${design.title} ${enable ? "will appear" : "will no longer appear"} on the public website.`);
     } catch (error) {
       toast.error("Visibility update failed", error instanceof Error ? error.message : "Please try again.");
     }
@@ -316,13 +316,20 @@ export function PanoramaAdminPage() {
     if (window.confirm(`Delete space “${category.name}”?${detail}`)) categoryMutations.remove.mutate(category.id);
   }
 
-  function deletePanorama(panorama: Panorama) {
-    if (window.confirm(`Delete 360 interior “${panorama.title}”?`)) panoramaMutations.remove.mutate(panorama.id);
+  async function deleteDesign(design: PanoramaDesign) {
+    if (!window.confirm(`Delete 360 design “${design.title}” and all ${design.panoramas.length} of its panoramas?`)) return;
+    try {
+      await Promise.all(design.panoramas.map((panorama) => batchPanoramaMutations.remove.mutateAsync(panorama.id)));
+      toast.success("360 design deleted", `${design.title} and its panoramas were removed.`);
+    } catch (error) {
+      toast.error("Could not delete design", error instanceof Error ? error.message : "Please try again.");
+    }
   }
 
-  function openAssignments(panorama: Panorama) {
-    setSelectedClientIds(assignments.filter((assignment) => assignment.panorama_id === panorama.id).map((assignment) => assignment.client_id));
-    setAssignmentPanorama(panorama);
+  function openAssignments(design: PanoramaDesign) {
+    const panoramaIds = new Set(design.panoramas.map((panorama) => panorama.id));
+    setSelectedClientIds([...new Set(assignments.filter((assignment) => panoramaIds.has(assignment.panorama_id)).map((assignment) => assignment.client_id))]);
+    setAssignmentDesign(design);
   }
 
   function toggleClient(clientId: string) {
@@ -330,20 +337,21 @@ export function PanoramaAdminPage() {
   }
 
   async function saveAssignments() {
-    if (!assignmentPanorama) return;
+    if (!assignmentDesign) return;
     setSavingAssignments(true);
     try {
-      const existing = assignments.filter((assignment) => assignment.panorama_id === assignmentPanorama.id);
+      const panoramaIds = new Set(assignmentDesign.panoramas.map((panorama) => panorama.id));
+      const existing = assignments.filter((assignment) => panoramaIds.has(assignment.panorama_id));
       const selected = new Set(selectedClientIds);
-      const existingClientIds = new Set(existing.map((assignment) => assignment.client_id));
-      const toCreate = selectedClientIds.filter((clientId) => !existingClientIds.has(clientId));
       const toRemove = existing.filter((assignment) => !selected.has(assignment.client_id));
+      const existingPairs = new Set(existing.map((assignment) => `${assignment.panorama_id}:${assignment.client_id}`));
+      const toCreate = assignmentDesign.panoramas.flatMap((panorama) => selectedClientIds.filter((clientId) => !existingPairs.has(`${panorama.id}:${clientId}`)).map((clientId) => ({ panoramaId: panorama.id, clientId })));
       await Promise.all([
-        ...toCreate.map((clientId) => assignmentMutations.create.mutateAsync({ client_id: clientId, panorama_id: assignmentPanorama.id })),
+        ...toCreate.map(({ panoramaId, clientId }) => assignmentMutations.create.mutateAsync({ client_id: clientId, panorama_id: panoramaId })),
         ...toRemove.map((assignment) => assignmentMutations.remove.mutateAsync(assignment.id))
       ]);
-      toast.success("Assignments updated", `${assignmentPanorama.title} is assigned to ${selectedClientIds.length} client${selectedClientIds.length === 1 ? "" : "s"}.`);
-      setAssignmentPanorama(null);
+      toast.success("Assignments updated", `${assignmentDesign.title} is assigned to ${selectedClientIds.length} client${selectedClientIds.length === 1 ? "" : "s"}.`);
+      setAssignmentDesign(null);
     } catch (error) {
       toast.error("Assignment failed", error instanceof Error ? error.message : "Could not update client assignments.");
     } finally {
@@ -366,37 +374,48 @@ export function PanoramaAdminPage() {
       </div>
 
       <div>
-        <h2 className="text-xl font-black">Published and Draft Interiors</h2>
-        <p className="mt-1 text-sm text-slate-500">{panoramas.length} panorama{panoramas.length === 1 ? "" : "s"} available.</p>
-        {panoramas.length ? (
+        <h2 className="text-xl font-black">360 Design Groups</h2>
+        <p className="mt-1 text-sm text-slate-500">{designs.length} design{designs.length === 1 ? "" : "s"} containing {panoramas.length} panorama{panoramas.length === 1 ? "" : "s"}.</p>
+        {designs.length ? (
           <div className="mt-4 grid gap-4 lg:grid-cols-2">
-            {panoramas.map((panorama) => (
-              <Card key={panorama.id} className="flex gap-4 bg-white p-4">
-                <div className="relative h-28 w-36 shrink-0 overflow-hidden rounded-md bg-slate-100">
-                  <img src={panorama.image_url} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover" />
-                  <div className="absolute inset-0 grid place-items-center bg-slate-950/20"><Eye className="h-7 w-7 text-white" /></div>
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-start justify-between gap-2">
-                    <div>
-                      <h3 className="font-bold text-slate-950">{panorama.design_title}</h3>
-                      <p className="mt-1 text-xs font-semibold uppercase tracking-wide text-brand-primary">{categoryById.get(panorama.category_id)?.name ?? "Unknown space"} · {panorama.title}</p>
-                    </div>
-                    <span className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${panorama.status === "published" && panorama.is_public !== false ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-500"}`}>{panorama.status === "published" && panorama.is_public !== false ? "Website enabled" : "Website disabled"}</span>
+            {designs.map((design) => {
+              const visibleCount = design.panoramas.filter((panorama) => panorama.status === "published" && panorama.is_public !== false).length;
+              const fullyVisible = visibleCount === design.panoramas.length;
+              const partiallyVisible = visibleCount > 0 && !fullyVisible;
+              const clientCount = new Set(assignments.filter((assignment) => design.panoramas.some((panorama) => panorama.id === assignment.panorama_id)).map((assignment) => assignment.client_id)).size;
+              const spaces = [...new Set(design.panoramas.map((panorama) => categoryById.get(panorama.category_id)?.name ?? "Uncategorized"))];
+              return (
+                <Card key={design.id} className="overflow-hidden bg-white p-0">
+                  <div className={`relative grid h-48 bg-slate-100 ${design.panoramas.length > 1 ? "grid-cols-2" : "grid-cols-1"}`}>
+                    {design.panoramas.slice(0, 4).map((panorama, index) => (
+                      <div key={panorama.id} className="relative min-h-0 overflow-hidden border-white/70 [&:nth-child(odd)]:border-r [&:nth-child(-n+2)]:border-b">
+                        <img src={panorama.image_url} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover" />
+                        {index === 3 && design.panoramas.length > 4 && <div className="absolute inset-0 grid place-items-center bg-slate-950/60 text-lg font-black text-white">+{design.panoramas.length - 4}</div>}
+                      </div>
+                    ))}
+                    <div className="pointer-events-none absolute ml-4 mt-4 inline-flex items-center gap-2 rounded-full bg-slate-950/70 px-3 py-1.5 text-xs font-bold text-white backdrop-blur"><Eye className="h-4 w-4" /> {design.panoramas.length} scene{design.panoramas.length === 1 ? "" : "s"}</div>
                   </div>
-                  <p className="mt-2 line-clamp-2 text-sm text-slate-500">{panorama.description || "No description"}</p>
-                  <div className="mt-3 flex items-center justify-between gap-3">
-                    <span className="text-xs text-slate-400">Order {panorama.display_order}</span>
-                    <div className="flex flex-wrap justify-end gap-1">
-                      <Button type="button" className="h-8 px-3" variant="ghost" onClick={() => toggleWebsiteVisibility(panorama)}>{panorama.status === "published" && panorama.is_public !== false ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />} {panorama.status === "published" && panorama.is_public !== false ? "Disable website" : "Enable website"}</Button>
-                      <Button type="button" className="h-8 px-3" variant="ghost" onClick={() => openAssignments(panorama)}><Users className="h-4 w-4" /> Assign ({assignments.filter((assignment) => assignment.panorama_id === panorama.id).length})</Button>
-                      <Button type="button" className="h-8 px-3" variant="ghost" onClick={() => editPanorama(panorama)}><Edit3 className="h-4 w-4" /> Edit</Button>
-                      <Button type="button" className="h-8 px-3" variant="ghost" onClick={() => deletePanorama(panorama)}><Trash2 className="h-4 w-4" /> Delete</Button>
+                  <div className="p-5">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <h3 className="truncate text-lg font-black text-slate-950">{design.title}</h3>
+                        <p className="mt-1 line-clamp-1 text-sm text-slate-500">{spaces.join(" · ")}</p>
+                      </div>
+                      <span className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-bold ${fullyVisible ? "bg-emerald-50 text-emerald-700" : partiallyVisible ? "bg-amber-50 text-amber-700" : "bg-slate-100 text-slate-500"}`}>{fullyVisible ? "Website enabled" : partiallyVisible ? "Partially enabled" : "Website disabled"}</span>
+                    </div>
+                    <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-4">
+                      <span className="text-xs font-semibold text-slate-400">Managed as one design group</span>
+                      <div className="flex flex-wrap justify-end gap-1">
+                        <Button type="button" className="h-8 px-3" variant="ghost" onClick={() => toggleWebsiteVisibility(design)}>{fullyVisible ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />} {fullyVisible ? "Disable website" : "Enable website"}</Button>
+                        <Button type="button" className="h-8 px-3" variant="ghost" onClick={() => openAssignments(design)}><Users className="h-4 w-4" /> Assign ({clientCount})</Button>
+                        <Button type="button" className="h-8 px-3" variant="ghost" onClick={() => editDesign(design)}><Edit3 className="h-4 w-4" /> Manage</Button>
+                        <Button type="button" className="h-8 px-3 text-red-600 hover:bg-red-50" variant="ghost" onClick={() => deleteDesign(design)}><Trash2 className="h-4 w-4" /> Delete</Button>
+                      </div>
                     </div>
                   </div>
-                </div>
-              </Card>
-            ))}
+                </Card>
+              );
+            })}
           </div>
         ) : (
           <Card className="mt-4 grid min-h-48 place-items-center border border-dashed border-slate-300 bg-white text-center">
@@ -414,8 +433,8 @@ export function PanoramaAdminPage() {
             <div className="flex items-start justify-between gap-4 border-b border-slate-200 px-5 py-4 md:px-6">
               <div>
                 <div className="text-xs font-bold uppercase tracking-[0.18em] text-brand-primary">360 Interiors</div>
-                <h2 id="panorama-editor-title" className="mt-1 text-2xl font-black text-slate-950">{panoramaEditingId ? "Edit 360 Space" : "Add 360 Interior Design"}</h2>
-                <p className="mt-1 text-sm text-slate-500">{panoramaEditingId ? "Update this space inside the 360 design." : "Enter one design title, then add all of its panoramic spaces below."}</p>
+                <h2 id="panorama-editor-title" className="mt-1 text-2xl font-black text-slate-950">{panoramaEditingId ? "Manage 360 Design" : "Add 360 Interior Design"}</h2>
+                <p className="mt-1 text-sm text-slate-500">Manage the complete design and all of its panoramic spaces together.</p>
               </div>
               <button type="button" onClick={closePanoramaModal} className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-slate-100 text-slate-700 transition hover:bg-slate-200" aria-label="Close 360 interior editor"><X className="h-5 w-5" /></button>
             </div>
@@ -426,19 +445,7 @@ export function PanoramaAdminPage() {
                 <Input autoFocus required value={panoramaForm.design_title} onChange={(event) => setPanoramaForm({ ...panoramaForm, design_title: event.target.value })} placeholder="Modern Villa Interior" />
                 <span className="mt-1 block text-xs text-slate-500">This title represents the complete 360 design containing all spaces below.</span>
               </label>
-              <div className={`grid gap-4 ${panoramaEditingId ? "md:grid-cols-2" : ""}`}>
-                {panoramaEditingId && (
-                  <div>
-                    <span className="mb-1 block text-sm font-medium">Space</span>
-                    <div className="flex gap-2">
-                      <Select className="min-w-0 flex-1" required value={panoramaForm.category_id} onChange={(event) => setPanoramaForm({ ...panoramaForm, category_id: event.target.value })}>
-                        <option value="">Select space</option>
-                        {categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}
-                      </Select>
-                      <Button type="button" variant="secondary" className="shrink-0 px-3" onClick={() => openQuickCategory({ kind: "edit" })}><FolderPlus className="h-4 w-4" /> New</Button>
-                    </div>
-                  </div>
-                )}
+              <div className="grid gap-4">
                 <label>
                   <span className="mb-1 block text-sm font-medium">Content availability</span>
                   <Select value={panoramaForm.status} onChange={(event) => setPanoramaForm({ ...panoramaForm, status: event.target.value })}>
@@ -462,35 +469,15 @@ export function PanoramaAdminPage() {
                 <span className={`relative h-7 w-12 shrink-0 rounded-full transition ${panoramaForm.is_public ? "bg-emerald-500" : "bg-slate-300"}`}><span className={`absolute top-1 h-5 w-5 rounded-full bg-white shadow transition ${panoramaForm.is_public ? "left-6" : "left-1"}`} /></span>
               </button>
 
-              {panoramaEditingId ? (
-                <div className="grid gap-4 md:grid-cols-2">
-                  <label>
-                    <span className="mb-1 block text-sm font-medium">View label</span>
-                    <Input required value={panoramaForm.title} onChange={(event) => setPanoramaForm({ ...panoramaForm, title: event.target.value })} placeholder="Main view" />
-                  </label>
-                  <label>
-                    <span className="mb-1 block text-sm font-medium">Display order</span>
-                    <Input type="number" min="0" value={panoramaForm.display_order} onChange={(event) => setPanoramaForm({ ...panoramaForm, display_order: event.target.value })} placeholder={String(panoramas.length + 1)} />
-                  </label>
-                  <label className="md:col-span-2">
-                    <span className="mb-1 block text-sm font-medium">Small description</span>
-                    <Textarea value={panoramaForm.description} onChange={(event) => setPanoramaForm({ ...panoramaForm, description: event.target.value })} placeholder="Describe the space, materials, or design idea." />
-                  </label>
-                  <div className="md:col-span-2">
-                    <span className="mb-1 block text-sm font-medium">Panoramic image</span>
-                    <MediaPicker label="Panoramic image" value={panoramaForm.image_url} onChange={(image_url) => setPanoramaForm({ ...panoramaForm, image_url })} />
-                  </div>
-                </div>
-              ) : (
-                <div className="space-y-4">
+              <div className="space-y-4">
                   <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div><h3 className="text-lg font-black text-slate-950">Spaces</h3><p className="text-xs text-slate-500">Add every panoramic space that belongs to this design.</p></div>
-                    <Button type="button" variant="secondary" onClick={addPanoramaDraft}><Plus className="h-4 w-4" /> Add Space</Button>
+                    <div><h3 className="text-lg font-black text-slate-950">Panoramic Scenes</h3><p className="text-xs text-slate-500">Every scene below is managed and published as part of this design group.</p></div>
+                    <Button type="button" variant="secondary" onClick={addPanoramaDraft}><Plus className="h-4 w-4" /> Add Scene</Button>
                   </div>
                   {panoramaDrafts.map((draft, index) => (
                     <div key={draft.localId} className="rounded-xl border border-slate-200 bg-slate-50 p-4 md:p-5">
                       <div className="mb-4 flex items-center justify-between gap-3">
-                        <span className="text-sm font-black text-slate-950">Space {String(index + 1).padStart(2, "0")}</span>
+                        <span className="text-sm font-black text-slate-950">Scene {String(index + 1).padStart(2, "0")}</span>
                         {panoramaDrafts.length > 1 && <Button type="button" className="h-8 px-3 text-red-600" variant="ghost" onClick={() => removePanoramaDraft(draft.localId)}><Trash2 className="h-4 w-4" /> Remove</Button>}
                       </div>
                       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-[1fr_360px_160px]">
@@ -526,7 +513,7 @@ export function PanoramaAdminPage() {
 
                   <div className="rounded-xl border border-slate-200 bg-white">
                     <button type="button" onClick={() => setShowBatchClients((value) => !value)} className="flex w-full items-center justify-between gap-3 p-4 text-left">
-                      <span><span className="flex items-center gap-2 font-bold text-slate-950"><Users className="h-4 w-4 text-brand-primary" /> Assign clients</span><span className="mt-1 block text-xs text-slate-500">Selected clients receive every panorama in this batch.</span></span>
+                      <span><span className="flex items-center gap-2 font-bold text-slate-950"><Users className="h-4 w-4 text-brand-primary" /> Assign clients</span><span className="mt-1 block text-xs text-slate-500">Selected clients receive the complete design and every panorama in it.</span></span>
                       <span className="rounded-full bg-orange-50 px-3 py-1 text-xs font-bold text-brand-primary">{batchClientIds.length} selected</span>
                     </button>
                     {showBatchClients && (
@@ -540,14 +527,13 @@ export function PanoramaAdminPage() {
                     )}
                   </div>
                 </div>
-              )}
 
               <p className="text-xs text-slate-500">JPEG or WebP recommended. Maximum upload size is 50 MB per panorama.</p>
               <div className="flex justify-end gap-3 border-t border-slate-200 pt-4">
                 <Button type="button" variant="secondary" onClick={closePanoramaModal}>Cancel</Button>
-                <Button disabled={savingBatch || panoramaMutations.update.isPending}>
+                <Button disabled={savingBatch}>
                   {savingBatch ? <Loader2 className="h-4 w-4 animate-spin" /> : panoramaEditingId ? <Save className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
-                  {panoramaEditingId ? "Save Changes" : `Create Design with ${panoramaDrafts.length} Space${panoramaDrafts.length === 1 ? "" : "s"}`}
+                  {panoramaEditingId ? `Save Design (${panoramaDrafts.length} scene${panoramaDrafts.length === 1 ? "" : "s"})` : `Create Design with ${panoramaDrafts.length} Scene${panoramaDrafts.length === 1 ? "" : "s"}`}
                 </Button>
               </div>
             </form>
@@ -590,19 +576,19 @@ export function PanoramaAdminPage() {
         </div>
       )}
 
-      {assignmentPanorama && (
+      {assignmentDesign && (
         <div
           className="fixed inset-0 z-[1002] flex items-center justify-center bg-slate-950/75 p-3 backdrop-blur-sm md:p-6"
-          onMouseDown={(event) => event.target === event.currentTarget && setAssignmentPanorama(null)}
+          onMouseDown={(event) => event.target === event.currentTarget && setAssignmentDesign(null)}
         >
           <div role="dialog" aria-modal="true" aria-labelledby="assignment-modal-title" className="flex max-h-[88vh] w-full max-w-3xl flex-col overflow-hidden rounded-xl bg-white shadow-2xl">
             <div className="flex items-start justify-between gap-4 border-b border-slate-200 px-5 py-4 md:px-6">
               <div>
                 <div className="text-xs font-bold uppercase tracking-[0.18em] text-brand-primary">Client Access</div>
                 <h2 id="assignment-modal-title" className="mt-1 text-2xl font-black text-slate-950">Assign 360 Interior</h2>
-                <p className="mt-1 text-sm text-slate-500">Choose the clients who can view “{assignmentPanorama.title}” in their portal.</p>
+                <p className="mt-1 text-sm text-slate-500">Choose the clients who can view the complete “{assignmentDesign.title}” design and all {assignmentDesign.panoramas.length} scenes.</p>
               </div>
-              <button type="button" onClick={() => setAssignmentPanorama(null)} className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-slate-100 text-slate-700 transition hover:bg-slate-200" aria-label="Close assignment manager"><X className="h-5 w-5" /></button>
+              <button type="button" onClick={() => setAssignmentDesign(null)} className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-slate-100 text-slate-700 transition hover:bg-slate-200" aria-label="Close assignment manager"><X className="h-5 w-5" /></button>
             </div>
 
             <div className="flex items-center justify-between gap-3 border-b border-slate-200 bg-slate-50 px-5 py-3 md:px-6">
@@ -639,7 +625,7 @@ export function PanoramaAdminPage() {
             </div>
 
             <div className="flex justify-end gap-3 border-t border-slate-200 bg-slate-50 px-5 py-4 md:px-6">
-              <Button type="button" variant="secondary" onClick={() => setAssignmentPanorama(null)}>Cancel</Button>
+              <Button type="button" variant="secondary" onClick={() => setAssignmentDesign(null)}>Cancel</Button>
               <Button type="button" onClick={saveAssignments} disabled={savingAssignments}><Users className="h-4 w-4" /> Save Assignments</Button>
             </div>
           </div>
