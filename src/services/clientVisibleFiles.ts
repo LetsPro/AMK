@@ -28,6 +28,23 @@ export type ClientVisibleFile = {
   stage: { name: string; color: string | null } | null;
 };
 
+export type ClientVisibleFolder = {
+  id: string;
+  name: string;
+  parent_id: string | null;
+};
+
+export async function loadClientVisibleFolders(clientId: string) {
+  const { data, error } = await supabase
+    .from("folders")
+    .select("id,name,parent_id")
+    .eq("client_id", clientId)
+    .eq("is_client_visible", true)
+    .order("name");
+  if (error) throw error;
+  return (data as ClientVisibleFolder[] | null) ?? [];
+}
+
 export async function loadClientVisibleFiles(clientId: string) {
   const now = new Date().toISOString();
   const [{ data: assignedData, error: assignedError }, { data: folderData, error: folderError }] = await Promise.all([

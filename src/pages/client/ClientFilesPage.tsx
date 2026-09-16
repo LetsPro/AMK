@@ -4,7 +4,7 @@ import { ChevronLeft, Download, Eye, FileText, FolderOpen, Search, X } from "luc
 import { useAuth } from "@/contexts/AuthContext";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/Input";
-import { loadClientVisibleFiles, type ClientVisibleFile } from "@/services/clientVisibleFiles";
+import { loadClientVisibleFiles, loadClientVisibleFolders, type ClientVisibleFile, type ClientVisibleFolder } from "@/services/clientVisibleFiles";
 
 type Assignment = ClientVisibleFile;
 
@@ -33,6 +33,7 @@ export function ClientFilesPage() {
   const { clientId } = useAuth();
   const [searchParams] = useSearchParams();
   const [files, setFiles] = useState<Assignment[]>([]);
+  const [assignedFolders, setAssignedFolders] = useState<ClientVisibleFolder[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState(() => searchParams.get("search") ?? "");
   const [categoryFilter, setCategoryFilter] = useState("");
@@ -43,7 +44,9 @@ export function ClientFilesPage() {
     if (!clientId) return;
     (async () => {
       try {
-        setFiles(await loadClientVisibleFiles(clientId));
+        const [visibleFiles, visibleFolders] = await Promise.all([loadClientVisibleFiles(clientId), loadClientVisibleFolders(clientId)]);
+        setFiles(visibleFiles);
+        setAssignedFolders(visibleFolders);
       } finally {
         setLoading(false);
       }
@@ -61,7 +64,9 @@ export function ClientFilesPage() {
     const matchCat = !categoryFilter || f.category === categoryFilter;
     return matchSearch && matchCat;
   });
-  const folders = Array.from(new Map(files.filter((file) => file.source_folder_id).map((file) => [file.source_folder_id as string, { id: file.source_folder_id as string, name: file.source_folder_name ?? "Client folder" }])).values());
+  const rootFolderIds = new Set(assignedFolders.filter((folder) => folder.parent_id === null).map((folder) => folder.id));
+  const childFolders = assignedFolders.filter((folder) => folder.parent_id && rootFolderIds.has(folder.parent_id));
+  const folders = childFolders.length > 0 ? childFolders : assignedFolders.filter((folder) => folder.parent_id === null);
   const visibleFolders = folders.filter((folder) => {
     if (!search.trim()) return true;
     const term = search.toLowerCase();
@@ -98,10 +103,10 @@ export function ClientFilesPage() {
 
       {loading ? (
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">{Array.from({ length: 4 }).map((_, i) => <div key={i} className="h-24 animate-pulse rounded-xl bg-slate-100" />)}</div>
-      ) : visibleFolders.length === 0 && displayedFiles.length === 0 ? (
+      ) : (!selectedFolder && visibleFolders.length === 0 && displayedFiles.length === 0) || (Boolean(selectedFolder) && displayedFiles.length === 0) ? (
         <div className="rounded-xl border border-dashed border-slate-200 py-16 text-center">
-          <FileText className="mx-auto h-10 w-10 text-slate-300 mb-3" />
-          <p className="text-slate-500">No files found.</p>
+          {selectedFolder ? <FolderOpen className="mx-auto h-10 w-10 text-slate-300 mb-3" /> : <FileText className="mx-auto h-10 w-10 text-slate-300 mb-3" />}
+          <p className="text-slate-500">{selectedFolder ? "This folder is ready for files." : "No files found."}</p>
         </div>
       ) : (
         <div className="space-y-5">

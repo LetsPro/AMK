@@ -25,16 +25,18 @@ function formatBytes(bytes: number | null) {
 
 function MetricCard({ label, value, caption, icon: Icon, tone, action }: { label: string; value: number | string; caption: string; icon: LucideIcon; tone: string; action: () => void }) {
   return (
-    <button onClick={action} className="group rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:border-brand-primary/30 hover:shadow-lg">
+    <button onClick={action} className={cn("group relative overflow-hidden rounded-2xl p-5 text-left text-white shadow-md transition-all hover:-translate-y-1 hover:shadow-xl", tone)}>
+      <span className="pointer-events-none absolute -right-8 -top-10 h-32 w-32 rounded-full bg-white/10" />
+      <span className="pointer-events-none absolute -bottom-12 -left-8 h-28 w-28 rounded-full bg-slate-950/10" />
       <div className="flex items-start justify-between">
-        <span className={cn("grid h-11 w-11 place-items-center rounded-xl", tone)}>
+        <span className="relative grid h-11 w-11 place-items-center rounded-xl bg-white/20 ring-1 ring-white/20">
           <Icon className="h-5 w-5" />
         </span>
-        <ArrowRight className="h-4 w-4 text-slate-300 transition-transform group-hover:translate-x-0.5 group-hover:text-brand-primary" />
+        <ArrowRight className="relative h-5 w-5 text-white/65 transition-transform group-hover:translate-x-1 group-hover:text-white" />
       </div>
-      <div className="mt-4 text-3xl font-black text-slate-950">{value}</div>
-      <div className="mt-1 text-sm font-bold text-slate-800">{label}</div>
-      <div className="mt-1 text-xs text-slate-400">{caption}</div>
+      <div className="relative mt-5 text-4xl font-black">{value}</div>
+      <div className="relative mt-2 text-sm font-black">{label}</div>
+      <div className="relative mt-1 text-xs font-medium text-white/75">{caption}</div>
     </button>
   );
 }
@@ -72,11 +74,11 @@ export function ClientDashboard() {
   }).length;
 
   const metrics = [
-    { label: "Architectural Drawings", value: countMatchingFiles("architect", "blueprint"), caption: "Plans and elevations", icon: LayoutDashboard, tone: "bg-emerald-50 text-emerald-600", action: () => navigate("/client/files?search=architectural") },
-    { label: "Structural Drawings", value: countMatchingFiles("structur"), caption: "Structural documents", icon: FolderOpen, tone: "bg-blue-50 text-blue-600", action: () => navigate("/client/files?search=structural") },
-    { label: "Electrical Drawings", value: countMatchingFiles("electric"), caption: "Electrical documents", icon: Zap, tone: "bg-violet-50 text-violet-600", action: () => navigate("/client/files?search=electrical") },
-    { label: "360 Interiors", value: panoramaCount, caption: "Interactive interior views", icon: Eye, tone: "bg-amber-50 text-amber-600", action: () => navigate("/client/360-interiors") },
-    { label: "Interior Detail Drawings", value: countMatchingFiles("interior"), caption: "Interior detailing", icon: FileText, tone: "bg-rose-50 text-rose-600", action: () => navigate("/client/files?search=interior") },
+    { label: "Architectural Drawings", value: countMatchingFiles("architect", "blueprint"), caption: "Plans and elevations", icon: LayoutDashboard, tone: "bg-emerald-600 hover:bg-emerald-500", action: () => navigate("/client/files?search=architectural") },
+    { label: "Structural Drawings", value: countMatchingFiles("structur"), caption: "Structural documents", icon: FolderOpen, tone: "bg-blue-600 hover:bg-blue-500", action: () => navigate("/client/files?search=structural") },
+    { label: "Electrical Drawings", value: countMatchingFiles("electric"), caption: "Electrical documents", icon: Zap, tone: "bg-violet-600 hover:bg-violet-500", action: () => navigate("/client/files?search=electrical") },
+    { label: "360 Interiors", value: panoramaCount, caption: "Interactive interior views", icon: Eye, tone: "bg-amber-500 hover:bg-amber-400", action: () => navigate("/client/360-interiors") },
+    { label: "Interior Detail Drawings", value: countMatchingFiles("interior"), caption: "Interior detailing", icon: FileText, tone: "bg-rose-600 hover:bg-rose-500", action: () => navigate("/client/files?search=interior") },
   ];
   const coverImageUrl = dashboardCover || projects[0]?.cover_image_url || null;
 

@@ -1,8 +1,7 @@
 import { useEffect, useRef, useState } from "react";
-import { BookOpen, Check, Clock3, Copy, FileText, Link2, Pencil, Plus, Share2, Trash2, Upload, X } from "lucide-react";
+import { BookOpen, Check, Clock3, Copy, FileText, Film, ImageIcon, Link2, Pencil, Plus, Share2, Trash2, Upload, X } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Input, Select, Textarea } from "@/components/ui/Input";
-import { MediaPicker } from "@/components/media/MediaPicker";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/contexts/ToastContext";
 import { supabase } from "@/lib/supabase";
@@ -11,18 +10,17 @@ import type { TableRow } from "@/types/database";
 
 type Category = TableRow<"material_categories">;
 type Recommendation = TableRow<"material_recommendations"> & { category: { name: string } | null };
+type MaterialAttachment = { kind: "image" | "video" | "document"; url: string; name: string };
 
 type RecommendationForm = {
   title: string;
   category_id: string;
   description: string;
-  document_url: string;
-  image_url: string;
-  video_url: string;
+  attachments: MaterialAttachment[];
   status: "draft" | "published";
 };
 
-const emptyForm: RecommendationForm = { title: "", category_id: "", description: "", document_url: "", image_url: "", video_url: "", status: "draft" };
+const emptyForm: RecommendationForm = { title: "", category_id: "", description: "", attachments: [], status: "draft" };
 
 function slugify(value: string) {
   return value.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
@@ -31,7 +29,7 @@ function slugify(value: string) {
 export function MaterialsPage() {
   const { profile } = useAuth();
   const toast = useToast();
-  const documentInput = useRef<HTMLInputElement>(null);
+  const attachmentInput = useRef<HTMLInputElement>(null);
   const [categories, setCategories] = useState<Category[]>([]);
   const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
   const [selectedCategory, setSelectedCategory] = useState("");
@@ -43,8 +41,9 @@ export function MaterialsPage() {
   const [editing, setEditing] = useState<Recommendation | null>(null);
   const [form, setForm] = useState<RecommendationForm>(emptyForm);
   const [saving, setSaving] = useState(false);
-  const [uploadingDocument, setUploadingDocument] = useState(false);
-  const [documentProgress, setDocumentProgress] = useState(0);
+  const [uploadingAttachments, setUploadingAttachments] = useState(false);
+  const [attachmentProgress, setAttachmentProgress] = useState(0);
+  const [uploadStatus, setUploadStatus] = useState("");
   const [shareTarget, setShareTarget] = useState<Recommendation | null>(null);
   const [shareDays, setShareDays] = useState("");
   const [generatedLink, setGeneratedLink] = useState("");
@@ -72,9 +71,9 @@ export function MaterialsPage() {
       title: item.title,
       category_id: item.category_id ?? "",
       description: item.description,
-      document_url: item.document_url ?? "",
-      image_url: item.image_url ?? "",
-      video_url: item.video_url ?? "",
+      attachments: Array.isArray(item.attachments)
+        ? item.attachments.filter((value): value is MaterialAttachment => Boolean(value && typeof value === "object" && "kind" in value && "url" in value && "name" in value))
+        : [],
       status: item.status,
     });
     setShowEditor(true);
@@ -106,20 +105,29 @@ export function MaterialsPage() {
     await load();
   }
 
-  async function uploadDocument(file: File) {
-    setUploadingDocument(true);
-    setDocumentProgress(0);
+  async function uploadAttachments(fileList: FileList | null) {
+    const files = Array.from(fileList ?? []);
+    if (!files.length) return;
+    setUploadingAttachments(true);
+    setAttachmentProgress(0);
+    const uploaded: MaterialAttachment[] = [];
     try {
-      const path = `materials/documents/${Date.now()}-${storageSafeFileName(file.name)}`;
-      const url = await uploadFile("website", path, file, { onProgress: setDocumentProgress });
-      setForm((current) => ({ ...current, document_url: url }));
-      toast.success("Document uploaded");
+      for (const [index, file] of files.entries()) {
+        const kind: MaterialAttachment["kind"] = file.type.startsWith("image/") ? "image" : file.type.startsWith("video/") ? "video" : "document";
+        setUploadStatus(`Uploading ${index + 1} of ${files.length}: ${file.name}`);
+        const path = `materials/${kind}s/${Date.now()}-${index}-${storageSafeFileName(file.name)}`;
+        const url = await uploadFile("website", path, file, { onProgress: (progress) => setAttachmentProgress(Math.round(((index + progress / 100) / files.length) * 100)) });
+        uploaded.push({ kind, url, name: file.name });
+      }
+      setForm((current) => ({ ...current, attachments: [...current.attachments, ...uploaded] }));
+      toast.success(`${uploaded.length} attachment${uploaded.length === 1 ? "" : "s"} uploaded`);
     } catch (error) {
-      toast.error("Document upload failed", error instanceof Error ? error.message : "Could not upload document");
+      toast.error("Attachment upload failed", error instanceof Error ? error.message : "Could not upload attachments");
     } finally {
-      setUploadingDocument(false);
-      setDocumentProgress(0);
-      if (documentInput.current) documentInput.current.value = "";
+      setUploadingAttachments(false);
+      setAttachmentProgress(0);
+      setUploadStatus("");
+      if (attachmentInput.current) attachmentInput.current.value = "";
     }
   }
 
@@ -131,9 +139,10 @@ export function MaterialsPage() {
       slug: `${slugify(form.title)}-${editing?.id.slice(0, 6) ?? Date.now()}`,
       category_id: form.category_id || null,
       description: form.description.trim(),
-      document_url: form.document_url || null,
-      image_url: form.image_url || null,
-      video_url: form.video_url || null,
+      attachments: form.attachments,
+      document_url: form.attachments.find((item) => item.kind === "document")?.url ?? null,
+      image_url: form.attachments.find((item) => item.kind === "image")?.url ?? null,
+      video_url: form.attachments.find((item) => item.kind === "video")?.url ?? null,
       status: form.status,
       published_at: form.status === "published" ? editing?.published_at ?? new Date().toISOString() : null,
       updated_by: profile?.id ?? null,
@@ -208,8 +217,11 @@ export function MaterialsPage() {
         <div><label className="mb-1 block text-sm font-semibold">Title *</label><Input value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} placeholder="Example: Flooring material recommendation" /></div>
         <div><label className="mb-1 block text-sm font-semibold">Category</label><Select value={form.category_id} onChange={(event) => setForm({ ...form, category_id: event.target.value })}><option value="">Uncategorized</option>{categories.filter((category) => category.is_active).map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</Select></div>
         <div><label className="mb-1 block text-sm font-semibold">Complete guidance *</label><Textarea value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} placeholder="Explain the recommended material, applications, installation, care, advantages, limitations, and selection guidance. Use blank lines to create readable sections." className="min-h-64" /></div>
-        <div className="rounded-xl border border-slate-200 p-4"><div className="mb-2 text-sm font-semibold">Document</div><input ref={documentInput} type="file" accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document" className="hidden" onChange={(event) => event.target.files?.[0] && uploadDocument(event.target.files[0])} /><div className="flex flex-wrap items-center gap-2"><Button variant="secondary" onClick={() => documentInput.current?.click()} disabled={uploadingDocument}>{uploadingDocument ? <Clock3 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />} {uploadingDocument ? `Uploading ${documentProgress}%` : form.document_url ? "Replace document" : "Upload document"}</Button>{form.document_url && <><a href={form.document_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-sm font-semibold text-brand-primary"><FileText className="h-4 w-4" /> Open</a><Button variant="ghost" onClick={() => setForm({ ...form, document_url: "" })}>Remove</Button></>}</div>{uploadingDocument && <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-100"><div className="h-full bg-brand-primary" style={{ width: `${documentProgress}%` }} /></div>}</div>
-        <div className="grid gap-4 sm:grid-cols-2"><div className="rounded-xl border border-slate-200 p-4"><div className="mb-2 text-sm font-semibold">Cover image</div><MediaPicker value={form.image_url} onChange={(url) => setForm({ ...form, image_url: url })} label="Image" mediaType="image" /></div><div className="rounded-xl border border-slate-200 p-4"><div className="mb-2 text-sm font-semibold">Guidance video</div><MediaPicker value={form.video_url} onChange={(url) => setForm({ ...form, video_url: url })} label="Video" mediaType="video" /></div></div>
+        <div className="rounded-xl border border-slate-200 p-4">
+          <div className="flex flex-wrap items-start justify-between gap-3"><div><div className="text-sm font-semibold">Images, videos and documents</div><p className="mt-1 text-xs text-slate-500">Select any number of files. Large videos use resumable uploads.</p></div><input ref={attachmentInput} type="file" multiple accept="image/png,image/jpeg,image/webp,video/mp4,video/webm,video/quicktime,.pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document" className="hidden" onChange={(event) => void uploadAttachments(event.target.files)} /><Button variant="secondary" onClick={() => attachmentInput.current?.click()} disabled={uploadingAttachments}>{uploadingAttachments ? <Clock3 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />} {uploadingAttachments ? `Uploading ${attachmentProgress}%` : "Upload multiple files"}</Button></div>
+          {uploadingAttachments && <div className="mt-4"><div className="mb-1 flex justify-between gap-3 text-xs text-slate-500"><span className="truncate">{uploadStatus}</span><span className="font-bold tabular-nums text-brand-primary">{attachmentProgress}%</span></div><div className="h-2 overflow-hidden rounded-full bg-slate-100"><div className="h-full bg-brand-primary transition-[width]" style={{ width: `${attachmentProgress}%` }} /></div></div>}
+          {form.attachments.length > 0 && <div className="mt-4 grid gap-3 sm:grid-cols-2">{form.attachments.map((attachment, index) => <div key={`${attachment.url}-${index}`} className="group relative overflow-hidden rounded-xl border border-slate-200 bg-slate-50">{attachment.kind === "image" ? <img src={attachment.url} alt={attachment.name} className="h-28 w-full object-cover" /> : attachment.kind === "video" ? <video src={attachment.url} muted preload="metadata" className="h-28 w-full bg-slate-950 object-contain" /> : <div className="grid h-28 place-items-center bg-blue-50 text-blue-600"><FileText className="h-9 w-9" /></div>}<div className="flex items-center gap-2 p-3"><span className={`grid h-8 w-8 shrink-0 place-items-center rounded-lg ${attachment.kind === "image" ? "bg-emerald-100 text-emerald-600" : attachment.kind === "video" ? "bg-violet-100 text-violet-600" : "bg-blue-100 text-blue-600"}`}>{attachment.kind === "image" ? <ImageIcon className="h-4 w-4" /> : attachment.kind === "video" ? <Film className="h-4 w-4" /> : <FileText className="h-4 w-4" />}</span><span className="min-w-0 flex-1 truncate text-xs font-semibold text-slate-700">{attachment.name}</span><button type="button" onClick={() => setForm((current) => ({ ...current, attachments: current.attachments.filter((_, attachmentIndex) => attachmentIndex !== index) }))} className="grid h-8 w-8 place-items-center rounded-lg text-red-400 hover:bg-red-50" aria-label={`Remove ${attachment.name}`}><Trash2 className="h-4 w-4" /></button></div></div>)}</div>}
+        </div>
         <div><label className="mb-1 block text-sm font-semibold">Publishing</label><Select value={form.status} onChange={(event) => setForm({ ...form, status: event.target.value as "draft" | "published" })}><option value="draft">Draft — admin only</option><option value="published">Published — share links can open it</option></Select></div>
         <div className="flex gap-3 border-t border-slate-100 pt-5"><Button onClick={saveRecommendation} disabled={saving} className="flex-1">{saving ? "Saving…" : form.status === "published" ? "Save & publish" : "Save draft"}</Button><Button variant="secondary" onClick={() => setShowEditor(false)}>Cancel</Button></div>
       </div></div></div>}

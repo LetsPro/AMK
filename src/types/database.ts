@@ -59,14 +59,14 @@ export type Database = {
       panoramas: T<Base & { design_id: string; design_title: string; category_id: string; title: string; description: string | null; image_url: string; status: "draft" | "published"; is_public: boolean; display_order: number }>;
       client_panorama_assignments: T<Base & { client_id: string; panorama_id: string; assigned_by: string | null }>;
       material_categories: T<Base & { name: string; slug: string; description: string | null; display_order: number; is_active: boolean; created_by: string | null }>;
-      material_recommendations: T<Base & { category_id: string | null; title: string; slug: string; description: string; document_url: string | null; image_url: string | null; video_url: string | null; status: "draft" | "published"; published_at: string | null; created_by: string | null; updated_by: string | null }>;
+      material_recommendations: T<Base & { category_id: string | null; title: string; slug: string; description: string; document_url: string | null; image_url: string | null; video_url: string | null; attachments: Json; status: "draft" | "published"; published_at: string | null; created_by: string | null; updated_by: string | null }>;
       material_share_links: T<{ id: string; recommendation_id: string; token: string; expires_at: string | null; revoked_at: string | null; created_by: string | null; created_at: string }>;
     };
     Views: Record<string, never>;
     Functions: {
       get_material_recommendation_by_token: {
         Args: { share_token: string };
-        Returns: Array<{ id: string; title: string; description: string; document_url: string | null; image_url: string | null; video_url: string | null; category_name: string | null; expires_at: string | null }>;
+        Returns: Array<{ id: string; title: string; description: string; document_url: string | null; image_url: string | null; video_url: string | null; attachments: Json; category_name: string | null; expires_at: string | null }>;
       };
       assign_client_folder_tree: {
         Args: { target_folder_id: string; target_client_id: string | null; target_visible: boolean };
