@@ -195,7 +195,7 @@ function HoverRevealTile({ title, text, image, label }: { title: string; text: s
 
 type PublicProjectGalleryImage = { id: string; image_url: string; media_type?: "image" | "video"; caption?: string | null; display_order?: number | null };
 type PublicProject = { id: string; name: string; slug?: string; description?: string | null; category?: string | null; location?: string | null; cover_image_url?: string | null; progress?: number | null; status?: string | null; budget?: number | null; portfolio_gallery?: PublicProjectGalleryImage[] };
-type PublicGallery = { id: string; title: string; category?: string | null; image_url: string; description?: string | null };
+type PublicGallery = { id: string; title: string; category?: string | null; category_id?: string | null; media_type?: "image" | "video"; image_url: string; description?: string | null };
 type PublicTestimonial = { id: string; name: string; company?: string | null; quote: string; rating?: number | null; avatar_url?: string | null; video_url?: string | null };
 
 function testimonialAutoplaySeconds(value: unknown) {
@@ -507,8 +507,78 @@ function GalleryPreview({ item, onClose }: { item: PublicGallery; onClose: () =>
           <div><h2 className="text-xl font-black">{item.title}</h2><p className="text-sm text-slate-500">{item.category}</p></div>
           <button className="grid h-10 w-10 place-items-center rounded-full hover:bg-slate-100" onClick={onClose} aria-label="Close preview"><X className="h-5 w-5" /></button>
         </div>
-        <img src={item.image_url} alt={item.title} loading="lazy" decoding="async" className="max-h-[72vh] w-full object-contain bg-slate-950" />
+        {item.media_type === "video"
+          ? <video src={item.image_url} controls autoPlay playsInline className="max-h-[72vh] w-full bg-slate-950 object-contain" />
+          : <img src={item.image_url} alt={item.title} loading="lazy" decoding="async" className="max-h-[72vh] w-full bg-slate-950 object-contain" />}
       </motion.div>
+    </div>
+  );
+}
+
+function GalleryCarousel({ items, onPreview }: { items: PublicGallery[]; onPreview: (item: PublicGallery) => void }) {
+  const [activeIndex, setActiveIndex] = useState(0);
+  const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
+
+  useEffect(() => {
+    setActiveIndex(0);
+  }, [items]);
+
+  useEffect(() => {
+    if (items.length <= 1) return;
+    const autoplay = window.setInterval(() => {
+      setActiveIndex((current) => (current + 1) % items.length);
+    }, 3000);
+    return () => window.clearInterval(autoplay);
+  }, [items.length]);
+
+  if (!items.length) return <EmptyState title="No gallery media found" description="Choose another category or add media from the Gallery CMS." />;
+
+  const move = (direction: number) => setActiveIndex((current) => (current + direction + items.length) % items.length);
+
+  return (
+    <div className="mt-10">
+      <div className="relative mx-auto h-[420px] max-w-7xl overflow-hidden sm:h-[500px] lg:h-[570px] [perspective:1400px] [transform-style:preserve-3d]">
+        {items.map((item, index) => {
+          let offset = index - activeIndex;
+          if (offset > items.length / 2) offset -= items.length;
+          if (offset < -items.length / 2) offset += items.length;
+          const visible = Math.abs(offset) <= 2;
+          const baseScale = offset === 0 ? 1 : Math.abs(offset) === 1 ? 0.84 : 0.68;
+          const isHovered = hoveredIndex === index;
+          const scale = baseScale * (isHovered ? 1.035 : 1);
+          const depth = offset === 0 ? 60 : Math.abs(offset) === 1 ? -40 : -120;
+          return (
+            <button
+              key={item.id}
+              type="button"
+              aria-label={`${item.title}${offset === 0 ? ", open preview" : ", bring to center"}`}
+              onClick={() => offset === 0 ? onPreview(item) : setActiveIndex(index)}
+              onMouseEnter={() => setHoveredIndex(index)}
+              onMouseLeave={() => setHoveredIndex(null)}
+              className="group absolute left-1/2 top-2 h-[360px] w-[min(76vw,430px)] overflow-hidden rounded-[22px] bg-slate-950 text-left ring-1 ring-white/20 transition-[transform,opacity,filter,box-shadow] ease-in-out sm:h-[430px] sm:w-[min(62vw,470px)] lg:h-[490px] [backface-visibility:hidden] [transform-style:preserve-3d]"
+              style={{
+                opacity: visible ? (Math.abs(offset) === 2 ? 0.72 : 1) : 0,
+                pointerEvents: visible ? "auto" : "none",
+                zIndex: 30 - Math.abs(offset) * 5,
+                filter: visible ? `brightness(${isHovered ? 1.08 : offset === 0 ? 1 : 0.88}) saturate(${isHovered ? 1.08 : 1})` : "brightness(.7)",
+                boxShadow: isHovered ? "0 34px 80px rgba(15,23,42,.34)" : "0 24px 65px rgba(15,23,42,.24)",
+                transitionDuration: "1000ms",
+                transform: `translateX(calc(-50% + ${offset} * clamp(125px, 22vw, 300px))) translateY(${Math.abs(offset) * 38 - (isHovered ? 12 : 0)}px) translateZ(${depth}px) rotateY(${offset * -13}deg) scale(${scale})`,
+              }}
+            >
+              {item.media_type === "video"
+                ? <video src={item.image_url} muted playsInline preload="metadata" className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-[1.04]" />
+                : <img src={item.image_url} alt={item.title} loading="lazy" decoding="async" className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-[1.04]" />}
+              <div className="absolute inset-0 bg-gradient-to-t from-slate-950/25 via-transparent to-white/5 opacity-60 transition-opacity duration-500 group-hover:opacity-20" />
+              {item.media_type === "video" && <span className="absolute bottom-4 right-4 grid h-12 w-12 place-items-center rounded-full bg-white text-slate-950 shadow-lg transition-transform duration-300 group-hover:scale-110"><Play className="h-5 w-5 fill-current" /></span>}
+            </button>
+          );
+        })}
+      </div>
+      <div className="mt-3 flex items-center justify-center gap-3">
+        <button type="button" onClick={() => move(-1)} className="grid h-12 w-12 place-items-center rounded-full border-2 border-slate-950 bg-white text-slate-950 transition hover:bg-slate-950 hover:text-white" aria-label="Previous gallery item"><ChevronLeft className="h-5 w-5" /></button>
+        <button type="button" onClick={() => move(1)} className="grid h-12 w-12 place-items-center rounded-full border-2 border-slate-950 bg-white text-slate-950 transition hover:bg-slate-950 hover:text-white" aria-label="Next gallery item"><ChevronRight className="h-5 w-5" /></button>
+      </div>
     </div>
   );
 }
@@ -1204,13 +1274,28 @@ export function ListingPage({ type }: { type: "projects" | "services" | "gallery
   const table = type === "services" ? "services" : type === "gallery" ? "gallery" : "portfolio_projects";
   const { data = [] } = useTable(table as never, { orderBy: type === "gallery" ? "display_order" : "created_at", ascending: type === "gallery", eq: type === "projects" || type === "services" ? { status: "published" } : undefined });
   const { data: aboutPages = [] } = useTable("website_pages", { eq: { slug: "about", status: "published" }, limit: 1 });
+  const { data: galleryCategories = [] } = useTable("gallery_categories", { orderBy: "display_order", ascending: true, eq: { is_active: true } });
   const [filter, setFilter] = useState("");
+  const [galleryCategoryFilter, setGalleryCategoryFilter] = useState("");
   const [selectedProject, setSelectedProject] = useState<PublicProject | null>(null);
   const [preview, setPreview] = useState<PublicGallery | null>(null);
   const fallbackRows = type === "services" ? demoServices : demoGallery;
   const sourceRows = type === "services" ? mergeServiceRows(data as typeof demoServices) : type === "gallery" ? (data.length ? data : fallbackRows) : data;
-  const rows = useMemo(() => sourceRows.filter((item: { name?: string; title?: string; category?: string }) => `${item.name ?? item.title ?? ""} ${item.category ?? ""}`.toLowerCase().includes(filter.toLowerCase())), [sourceRows, filter]);
+  const rows = useMemo(() => sourceRows.filter((item: { name?: string; title?: string; category?: string }) => {
+    const matchesSearch = `${item.name ?? item.title ?? ""} ${item.category ?? ""}`.toLowerCase().includes(filter.toLowerCase());
+    const matchesGalleryCategory = type !== "gallery" || !galleryCategoryFilter || item.category === galleryCategoryFilter;
+    return matchesSearch && matchesGalleryCategory;
+  }), [sourceRows, filter, galleryCategoryFilter, type]);
+  const availableGalleryCategories = useMemo(() => {
+    if (galleryCategories.length) return galleryCategories.map((category) => category.name);
+    return Array.from(new Set((sourceRows as Array<{ category?: string | null }>).map((item) => item.category).filter((category): category is string => Boolean(category))));
+  }, [galleryCategories, sourceRows]);
   const aboutPage = aboutPages[0];
+  const savedAboutIntroduction = aboutPage?.content?.trim() && aboutPage.content.trim() !== "Company profile and values." ? aboutPage.content.trim() : "";
+  const founderName = aboutPage?.founder_name?.trim() || "Ar. Andra Manoj Kumar";
+  const founderRoles = aboutPage?.founder_roles?.trim() || "Architect | Computational Designer | BIM Specialist | Architectural Photographer";
+  const founderBio = aboutPage?.founder_bio?.trim() || "The studio is shaped around design clarity, BIM coordination, realistic visualization, and construction-ready decision making.";
+  const founderStatement = aboutPage?.founder_statement?.trim() || "Architecture today demands more than drawings. It requires technology, data, visualization, and execution expertise working together. AMK creates spaces that are intelligent, efficient, sustainable, and timeless.";
   if (type === "about") return (
     <>
       <Seo
@@ -1236,9 +1321,11 @@ export function ListingPage({ type }: { type: "projects" | "services" | "gallery
       <Section title="About Us" description="A technology-led studio model where design intent, engineering coordination, visualization, and site delivery move together.">
         <div className="grid gap-8 rounded-xl bg-slate-50 p-6 lg:grid-cols-[1.05fr_0.95fr] lg:p-8">
           <div className="space-y-5 text-sm leading-7 text-slate-600">
-            <p>Founded by Ar. Andra Manoj Kumar, AMK is a technology-driven architecture and engineering studio based in Mysuru. Our expertise extends beyond conventional architectural practice into Building Information Modelling (BIM), parametric design, computational workflows, 3D visualization, 3D printed buildings, and digital fabrication technologies.</p>
-            <p>We work across residential, commercial, institutional, healthcare, hospitality, and large-scale development projects, delivering innovative solutions that balance design excellence, technical performance, sustainability, and construction efficiency.</p>
-            <p>By combining architectural creativity with advanced engineering and emerging technologies, we help clients transform ambitious ideas into built realities.</p>
+            {savedAboutIntroduction ? savedAboutIntroduction.split(/\n\s*\n/).map((paragraph, index) => <p key={index} className="whitespace-pre-line">{paragraph}</p>) : <>
+              <p>Founded by Ar. Andra Manoj Kumar, AMK is a technology-driven architecture and engineering studio based in Mysuru. Our expertise extends beyond conventional architectural practice into Building Information Modelling (BIM), parametric design, computational workflows, 3D visualization, 3D printed buildings, and digital fabrication technologies.</p>
+              <p>We work across residential, commercial, institutional, healthcare, hospitality, and large-scale development projects, delivering innovative solutions that balance design excellence, technical performance, sustainability, and construction efficiency.</p>
+              <p>By combining architectural creativity with advanced engineering and emerging technologies, we help clients transform ambitious ideas into built realities.</p>
+            </>}
           </div>
           <div className="rounded-lg bg-white p-6 shadow-sm">
             <div className="text-sm font-bold uppercase tracking-wide text-brand-primary">Technology-Led Practice</div>
@@ -1257,7 +1344,7 @@ export function ListingPage({ type }: { type: "projects" | "services" | "gallery
           <Card className="mx-auto w-full max-w-md overflow-hidden p-0">
             <div className="aspect-[4/5] overflow-hidden bg-gradient-to-br from-orange-50 to-slate-100">
               {aboutPage?.image_url ? (
-                <img src={aboutPage.image_url} alt="Ar. Andra Manoj Kumar, founder of AMK Architects & Engineers" loading="eager" decoding="async" className="h-full w-full object-cover object-top" />
+                <img src={aboutPage.image_url} alt={`${founderName}, founder of AMK Architects & Engineers`} loading="eager" decoding="async" className="h-full w-full object-cover object-top" />
               ) : (
                 <div className="grid h-full place-items-center text-brand-primary">
                   <Sparkles className="h-14 w-14" />
@@ -1265,13 +1352,13 @@ export function ListingPage({ type }: { type: "projects" | "services" | "gallery
               )}
             </div>
             <div className="p-6">
-              <h3 className="text-2xl font-black text-slate-950">Ar. Andra Manoj Kumar</h3>
-              <p className="mt-2 text-sm font-semibold text-brand-primary">Architect | Computational Designer | BIM Specialist | Architectural Photographer</p>
-              <p className="mt-4 text-sm leading-7 text-slate-600">The studio is shaped around design clarity, BIM coordination, realistic visualization, and construction-ready decision making.</p>
+              <h3 className="text-2xl font-black text-slate-950">{founderName}</h3>
+              <p className="mt-2 whitespace-pre-line text-sm font-semibold text-brand-primary">{founderRoles}</p>
+              <p className="mt-4 whitespace-pre-line text-sm leading-7 text-slate-600">{founderBio}</p>
             </div>
           </Card>
           <Card>
-            <p className="text-lg leading-8 text-slate-600">Architecture today demands more than drawings. It requires technology, data, visualization, and execution expertise working together. AMK creates spaces that are intelligent, efficient, sustainable, and timeless.</p>
+            <p className="whitespace-pre-line text-lg leading-8 text-slate-600">{founderStatement}</p>
           </Card>
         </div>
       </Section>
@@ -1400,13 +1487,20 @@ export function ListingPage({ type }: { type: "projects" | "services" | "gallery
         keywords={["architecture gallery Mysuru", "project gallery India", "residential elevation photos", "interior design gallery Karnataka", "architecture photos Mysuru", "building design images"]}
         canonical="/gallery"
       />
-      <Section title="Project Gallery Albums" description="Residential, commercial, interior, material, and documentation visuals from AMK projects.">
-        <Input className="mb-6 max-w-md" aria-label="Gallery filter" value={filter} onChange={(event) => setFilter(event.target.value)} />
-        <div className="grid gap-5 md:grid-cols-3">{rows.map((item) => {
-          const gallery = item as PublicGallery;
-          return <button key={gallery.id} className="text-left" onClick={() => setPreview(gallery)}><HoverRevealTile title={gallery.title} text={gallery.description ?? "Open this album for a focused project image preview."} image={gallery.image_url} label={gallery.category ?? "Gallery"} /></button>;
-        })}</div>
-      </Section>
+      <section className="relative isolate overflow-hidden bg-[radial-gradient(circle_at_top,rgba(99,102,241,0.10),transparent_35%),linear-gradient(to_bottom,#fff,#fafafa)] px-3 py-14 md:px-6 md:py-20">
+        <div className="mx-auto max-w-[1500px] bg-white px-3 py-14 sm:px-6 md:py-20">
+          <div className="mx-auto max-w-2xl text-center">
+            <div className="text-xs font-black uppercase tracking-[0.24em] text-brand-primary">Gallery</div>
+            <h1 className="mt-4 text-4xl font-black tracking-tight text-slate-950 md:text-6xl">Our Visual Gallery</h1>
+            <p className="mx-auto mt-4 max-w-xl text-base leading-7 text-slate-600">Explore architecture, interiors, materials, documentation, photos, and videos from our work.</p>
+          </div>
+          <div className="mx-auto mt-10 flex max-w-6xl flex-wrap items-center justify-center gap-2.5" aria-label="Gallery categories">
+            <button type="button" onClick={() => setGalleryCategoryFilter("")} className={`rounded-full border-2 px-5 py-2.5 text-sm font-bold transition ${galleryCategoryFilter === "" ? "border-slate-950 bg-slate-950 text-white" : "border-slate-300 bg-white text-slate-700 hover:border-slate-950"}`}>All</button>
+            {availableGalleryCategories.map((category) => <button key={category} type="button" onClick={() => setGalleryCategoryFilter(category)} className={`rounded-full border-2 px-5 py-2.5 text-sm font-bold transition ${galleryCategoryFilter === category ? "border-slate-950 bg-slate-950 text-white" : "border-slate-300 bg-white text-slate-700 hover:border-slate-950"}`}>{category}</button>)}
+          </div>
+          <GalleryCarousel key={galleryCategoryFilter || "all"} items={rows as PublicGallery[]} onPreview={setPreview} />
+        </div>
+      </section>
       {preview && <GalleryPreview item={preview} onClose={() => setPreview(null)} />}
     </>
   );

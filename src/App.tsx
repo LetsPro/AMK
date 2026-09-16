@@ -31,6 +31,7 @@ const AssignmentsPage = lazy(() => import("@/pages/admin/AssignmentsPage").then(
 const BlueprintsAdminPage = lazy(() => import("@/pages/admin/BlueprintsAdminPage").then((m) => ({ default: m.BlueprintsAdminPage })));
 const ActivityPage = lazy(() => import("@/pages/admin/ActivityPage").then((m) => ({ default: m.ActivityPage })));
 const CmsPage = lazy(() => import("@/pages/admin/CmsPage").then((m) => ({ default: m.CmsPage })));
+const GalleryManagementPage = lazy(() => import("@/pages/admin/CmsPage").then((m) => ({ default: m.GalleryManagementPage })));
 const MediaPage = lazy(() => import("@/pages/admin/MediaPage").then((m) => ({ default: m.MediaPage })));
 const PanoramaAdminPage = lazy(() => import("@/pages/admin/PanoramaAdminPage").then((m) => ({ default: m.PanoramaAdminPage })));
 const SettingsPage = lazy(() => import("@/pages/admin/SettingsPage").then((m) => ({ default: m.SettingsPage })));
@@ -138,6 +139,7 @@ export function App() {
             <Route path="blueprints" element={<Suspense fallback={<PageLoader />}><BlueprintsAdminPage /></Suspense>} />
             <Route path="activity" element={<Suspense fallback={<PageLoader />}><ActivityPage /></Suspense>} />
             <Route path="cms" element={<Suspense fallback={<PageLoader />}><CmsPage /></Suspense>} />
+            <Route path="gallery" element={<Suspense fallback={<PageLoader />}><GalleryManagementPage /></Suspense>} />
             <Route path="media" element={<Suspense fallback={<PageLoader />}><MediaPage /></Suspense>} />
             <Route path="360-interiors" element={<Suspense fallback={<PageLoader />}><PanoramaAdminPage /></Suspense>} />
             <Route path="materials" element={<Suspense fallback={<PageLoader />}><MaterialsPage /></Suspense>} />

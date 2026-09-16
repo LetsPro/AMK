@@ -18,6 +18,7 @@ const navItems = [
   { to: "/app/portfolio", label: "Portfolio", icon: Gauge },
   { to: "/app/files", label: "My Files", icon: FolderOpen },
   { to: "/app/stages", label: "Stages", icon: FileStack },
+  { to: "/app/gallery", label: "Gallery Management", icon: Images },
   { to: "/app/cms", label: "Website CMS", icon: Edit3 },
   { to: "/app/media", label: "Media", icon: Images },
   { to: "/app/360-interiors", label: "360 Interiors", icon: Eye },

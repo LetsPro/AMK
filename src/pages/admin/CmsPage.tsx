@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Clock3, Edit3, ImageIcon, LayoutTemplate, MessageSquareQuote, Plus, Save, Trash2, X } from "lucide-react";
+import { Clock3, Edit3, FolderCog, ImageIcon, LayoutTemplate, MessageSquareQuote, Plus, Save, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Input, Select, Textarea } from "@/components/ui/Input";
@@ -19,7 +19,7 @@ function testimonialSeconds(value: unknown) {
 const tableDetails: Record<CmsTable, { label: string; description: string; icon: React.ElementType }> = {
   banners: { label: "Hero Slider", description: "Manage hero images, messages, visibility, and slide order. Standard website actions appear automatically on every slide.", icon: LayoutTemplate },
   testimonials: { label: "Testimonials", description: "Publish client reviews, ratings, company details, profile images, and videos.", icon: MessageSquareQuote },
-  gallery: { label: "Gallery", description: "Upload, categorize, feature, order, and remove gallery images.", icon: ImageIcon },
+  gallery: { label: "Gallery", description: "Upload, categorize, feature, order, and remove gallery images or videos.", icon: ImageIcon },
   services: { label: "Services", description: "Maintain service copy, images, slugs, and publishing status.", icon: Edit3 },
   website_pages: { label: "About Us", description: "Manage the founder photo and supporting About introduction shown on the website.", icon: ImageIcon }
 };
@@ -55,19 +55,24 @@ function recordPublished(table: CmsTable, record: CmsRecord) {
   return record.status === "published";
 }
 
-export function CmsPage() {
-  const [table, setTable] = useState<CmsTable>("banners");
+export function CmsPage({ galleryOnly = false }: { galleryOnly?: boolean }) {
+  const [table, setTable] = useState<CmsTable>(galleryOnly ? "gallery" : "banners");
   const orderedTable = table === "banners" || table === "testimonials" || table === "gallery";
   const { data = [], refetch } = useTable(table, { orderBy: orderedTable ? "display_order" : "created_at", ascending: orderedTable, ...(table === "website_pages" ? { eq: { slug: "about" } } : {}) });
   const { create, update, remove } = useTableMutations(table);
+  const { data: galleryCategories = [], refetch: refetchGalleryCategories } = useTable("gallery_categories", { orderBy: "display_order", ascending: true });
+  const galleryCategoryMutations = useTableMutations("gallery_categories");
   const { data: testimonialSettings = [] } = useTable("app_settings", { eq: { key: "testimonial_carousel" }, limit: 1 });
   const testimonialSettingMutations = useTableMutations("app_settings");
   const [form, setForm] = useState<Record<string, string>>({});
   const [testimonialInterval, setTestimonialInterval] = useState("3");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editorOpen, setEditorOpen] = useState(false);
+  const [categoryManagerOpen, setCategoryManagerOpen] = useState(false);
+  const [categoryForm, setCategoryForm] = useState({ id: "", name: "", description: "", display_order: "" });
   const details = tableDetails[table];
   const EmptyIcon = details.icon;
+  const visibleTables = galleryOnly ? (["gallery"] as CmsTable[]) : cmsTables.filter((item) => item !== "gallery");
 
   useEffect(() => {
     setTestimonialInterval(String(testimonialSeconds(testimonialSettings[0]?.value)));
@@ -106,19 +111,60 @@ export function CmsPage() {
     setEditorOpen(false);
   }
 
+  function categorySlug(name: string) {
+    return name.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || `category-${Date.now()}`;
+  }
+
+  async function saveGalleryCategory(event: React.FormEvent) {
+    event.preventDefault();
+    const name = categoryForm.name.trim();
+    if (!name) return;
+    const payload = {
+      name,
+      slug: categorySlug(name),
+      description: categoryForm.description.trim() || null,
+      display_order: Number(categoryForm.display_order || galleryCategories.length + 1),
+      is_active: true,
+    };
+    if (categoryForm.id) await galleryCategoryMutations.update.mutateAsync({ id: categoryForm.id, payload });
+    else await galleryCategoryMutations.create.mutateAsync(payload);
+    await refetchGalleryCategories();
+    setCategoryForm({ id: "", name: "", description: "", display_order: "" });
+  }
+
+  async function deleteGalleryCategory(category: CmsRecord) {
+    if (!window.confirm(`Delete category “${value(category, "name")}”? Gallery items will remain uncategorized.`)) return;
+    await galleryCategoryMutations.remove.mutateAsync(category.id);
+    await refetchGalleryCategories();
+    if (form.category_id === category.id) setForm({ ...form, category_id: "" });
+  }
+
   async function submit(event: React.FormEvent) {
     event.preventDefault();
     if (table === "gallery" && !form.image_url) {
-      window.alert("Please choose a gallery image before saving.");
+      window.alert(`Please choose a gallery ${form.media_type === "video" ? "video" : "image"} before saving.`);
       return;
     }
     const displayOrder = Number(form.display_order || data.length + 1);
     const payload = table === "website_pages"
-      ? { slug: "about", title: form.title || "About Us", content: form.content ?? "", image_url: form.image_url || null, status: form.status || "published" }
+      ? {
+          slug: "about",
+          title: form.title || "About Us",
+          content: form.content ?? "",
+          image_url: form.image_url || null,
+          founder_name: form.founder_name?.trim() || null,
+          founder_roles: form.founder_roles?.trim() || null,
+          founder_bio: form.founder_bio?.trim() || null,
+          founder_statement: form.founder_statement?.trim() || null,
+          status: form.status || "published",
+        }
       : table === "services"
         ? { name: form.title, slug: form.slug, description: form.content ?? "", image_url: form.image_url || null, status: form.status || "draft" }
         : table === "gallery"
-          ? { title: form.title, image_url: form.image_url, category: form.category || null, is_featured: form.status === "published", display_order: displayOrder }
+          ? (() => {
+              const selectedCategory = galleryCategories.find((category) => category.id === form.category_id);
+              return { title: form.title, image_url: form.image_url, category_id: form.category_id || null, category: selectedCategory?.name || null, media_type: form.media_type || "image", is_featured: form.status === "published", display_order: displayOrder };
+            })()
           : table === "testimonials"
             ? { name: form.title, company: form.company || null, quote: form.content ?? "", rating: Number(form.rating || 5), avatar_url: form.image_url || null, video_url: form.video_url || null, is_published: form.status === "published", display_order: displayOrder }
             : { title: form.title.trim(), subtitle: form.content?.trim() || null, image_url: form.image_url || null, is_active: form.status === "published", display_order: displayOrder };
@@ -141,9 +187,15 @@ export function CmsPage() {
         : (recordPublished(table, record) ? "published" : "draft"),
       content: recordDescription(table, record),
       category: value(record, "category"),
+      category_id: value(record, "category_id"),
+      media_type: value(record, "media_type") || "image",
       company: value(record, "company"),
       rating: value(record, "rating") || "5",
-      display_order: value(record, "display_order") || "0"
+      display_order: value(record, "display_order") || "0",
+      founder_name: value(record, "founder_name"),
+      founder_roles: value(record, "founder_roles"),
+      founder_bio: value(record, "founder_bio"),
+      founder_statement: value(record, "founder_statement"),
     });
     setEditorOpen(true);
   }
@@ -168,12 +220,12 @@ export function CmsPage() {
   return (
     <div className="space-y-5">
       <div>
-        <h1 className="text-3xl font-black">Website CMS</h1>
-        <p className="text-sm text-slate-500">Manage the live website’s slider, testimonials, gallery, services, and About/Founder content from one place.</p>
+        <h1 className="text-3xl font-black">{galleryOnly ? "Gallery Management" : "Website CMS"}</h1>
+        <p className="text-sm text-slate-500">{galleryOnly ? "Manage public gallery categories, images, videos, ordering, and featured media." : "Manage the live website’s slider, testimonials, services, and About/Founder content from one place."}</p>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-        {cmsTables.map((item) => {
+      {!galleryOnly && <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        {visibleTables.map((item) => {
           const itemDetails = tableDetails[item];
           const Icon = itemDetails.icon;
           return (
@@ -188,14 +240,14 @@ export function CmsPage() {
             </button>
           );
         })}
-      </div>
+      </div>}
 
       {editorOpen && (
         <div className="fixed inset-0 z-40 flex items-center justify-center bg-slate-950/75 p-3 backdrop-blur-sm md:p-6" onMouseDown={(event) => event.target === event.currentTarget && closeEditor()}>
           <Card className="max-h-[92vh] w-full max-w-4xl overflow-y-auto bg-white p-5 shadow-2xl md:p-6" role="dialog" aria-modal="true" aria-labelledby="cms-editor-title">
         <div className="mb-5 flex flex-wrap items-start justify-between gap-3 border-b border-slate-200 pb-4">
           <div>
-            <div className="text-xs font-bold uppercase tracking-[0.18em] text-brand-primary">Website CMS</div>
+            <div className="text-xs font-bold uppercase tracking-[0.18em] text-brand-primary">{galleryOnly ? "Gallery Management" : "Website CMS"}</div>
             <h2 id="cms-editor-title" className="mt-1 text-xl font-black">{editingId ? `Edit ${details.label}` : `Add ${details.label} Item`}</h2>
             <p className="mt-1 text-sm text-slate-500">{details.description}</p>
           </div>
@@ -224,15 +276,28 @@ export function CmsPage() {
 
           {table === "gallery" && (
             <label>
+              <span className="mb-1 block text-sm font-medium">Media type</span>
+              <Select value={form.media_type ?? "image"} onChange={(e) => setForm({ ...form, media_type: e.target.value, image_url: "" })}>
+                <option value="image">Image</option>
+                <option value="video">Video</option>
+              </Select>
+            </label>
+          )}
+
+          {table === "gallery" && (
+            <label>
               <span className="mb-1 block text-sm font-medium">Category</span>
-              <Input value={form.category ?? ""} onChange={(e) => setForm({ ...form, category: e.target.value })} placeholder="Residential, Commercial, Interior…" />
+              <Select required value={form.category_id ?? ""} onChange={(e) => setForm({ ...form, category_id: e.target.value })}>
+                <option value="">Select category</option>
+                {galleryCategories.filter((category) => category.is_active).map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}
+              </Select>
             </label>
           )}
 
           {needsImage && (
             <label className="md:col-span-2">
-              <span className="mb-1 block text-sm font-medium">{table === "testimonials" ? "Client photo (optional)" : table === "website_pages" ? "Founder photo (optional)" : "Image"}</span>
-              <MediaPicker label={table === "testimonials" ? "Client photo" : table === "website_pages" ? "Founder photo" : `${details.label} image`} value={form.image_url ?? ""} onChange={(image_url) => setForm({ ...form, image_url })} />
+              <span className="mb-1 block text-sm font-medium">{table === "testimonials" ? "Client photo (optional)" : table === "website_pages" ? "Founder photo (optional)" : table === "gallery" && form.media_type === "video" ? "Gallery video" : "Image"}</span>
+              <MediaPicker mediaType={table === "gallery" && form.media_type === "video" ? "video" : "image"} label={table === "testimonials" ? "Client photo" : table === "website_pages" ? "Founder photo" : table === "gallery" && form.media_type === "video" ? "Gallery video" : `${details.label} image`} value={form.image_url ?? ""} onChange={(image_url) => setForm({ ...form, image_url })} />
             </label>
           )}
 
@@ -280,6 +345,27 @@ export function CmsPage() {
             </label>
           )}
 
+          {table === "website_pages" && (
+            <>
+              <label>
+                <span className="mb-1 block text-sm font-medium">Founder name</span>
+                <Input required value={form.founder_name ?? ""} onChange={(e) => setForm({ ...form, founder_name: e.target.value })} placeholder="Ar. Andra Manoj Kumar" />
+              </label>
+              <label>
+                <span className="mb-1 block text-sm font-medium">Professional titles / roles</span>
+                <Input required value={form.founder_roles ?? ""} onChange={(e) => setForm({ ...form, founder_roles: e.target.value })} placeholder="Architect | Computational Designer | BIM Specialist" />
+              </label>
+              <label className="md:col-span-2">
+                <span className="mb-1 block text-sm font-medium">Founder biography</span>
+                <Textarea required value={form.founder_bio ?? ""} onChange={(e) => setForm({ ...form, founder_bio: e.target.value })} className="min-h-28" />
+              </label>
+              <label className="md:col-span-2">
+                <span className="mb-1 block text-sm font-medium">Founder statement / supporting content</span>
+                <Textarea required value={form.founder_statement ?? ""} onChange={(e) => setForm({ ...form, founder_statement: e.target.value })} className="min-h-28" />
+              </label>
+            </>
+          )}
+
           <div className="md:col-span-2 flex flex-wrap gap-3">
             <Button disabled={create.isPending || update.isPending}>
               {editingId ? <Save className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
@@ -311,10 +397,13 @@ export function CmsPage() {
             <h2 className="text-xl font-black">Existing {details.label}</h2>
             <p className="text-sm text-slate-500">{data.length} item{data.length === 1 ? "" : "s"}</p>
           </div>
+          <div className="flex flex-wrap gap-2">
+          {table === "gallery" && <Button type="button" variant="secondary" onClick={() => setCategoryManagerOpen(true)}><FolderCog className="h-4 w-4" /> Manage categories</Button>}
           <Button type="button" onClick={() => table === "website_pages" && data[0] ? editRecord(data[0] as CmsRecord) : openNewEditor()}>
             {table === "website_pages" && data[0] ? <Edit3 className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
             {table === "website_pages" && data[0] ? "Edit About Us" : `Add ${details.label}`}
           </Button>
+          </div>
         </div>
 
         {data.length ? (
@@ -326,7 +415,7 @@ export function CmsPage() {
                 <Card key={record.id} className="flex gap-4 bg-white p-4">
                   {needsImage && (
                     <div className="grid h-24 w-28 shrink-0 place-items-center overflow-hidden rounded-md bg-slate-100">
-                      {image ? <img src={image} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover" /> : <ImageIcon className="h-7 w-7 text-slate-300" />}
+                      {image ? (table === "gallery" && record.media_type === "video" ? <video src={image} muted preload="metadata" className="h-full w-full object-cover" /> : <img src={image} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover" />) : <ImageIcon className="h-7 w-7 text-slate-300" />}
                     </div>
                   )}
                   <div className="min-w-0 flex-1">
@@ -361,6 +450,30 @@ export function CmsPage() {
           </Card>
         )}
       </div>
+
+      {categoryManagerOpen && (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/75 p-3 backdrop-blur-sm" onMouseDown={(event) => event.target === event.currentTarget && setCategoryManagerOpen(false)}>
+          <Card className="max-h-[90dvh] w-full max-w-2xl overflow-y-auto bg-white p-5 shadow-2xl" role="dialog" aria-modal="true" aria-labelledby="gallery-categories-title">
+            <div className="flex items-start justify-between gap-3 border-b border-slate-200 pb-4">
+              <div><div className="text-xs font-bold uppercase tracking-wide text-brand-primary">Gallery</div><h2 id="gallery-categories-title" className="mt-1 text-xl font-black">Manage categories</h2><p className="mt-1 text-sm text-slate-500">Create the categories available during image or video upload.</p></div>
+              <button type="button" onClick={() => setCategoryManagerOpen(false)} className="grid h-10 w-10 place-items-center rounded-full bg-slate-100" aria-label="Close category manager"><X className="h-5 w-5" /></button>
+            </div>
+            <form className="mt-5 grid gap-3 sm:grid-cols-[1fr_120px]" onSubmit={saveGalleryCategory}>
+              <Input required placeholder="Category name" value={categoryForm.name} onChange={(event) => setCategoryForm({ ...categoryForm, name: event.target.value })} />
+              <Input type="number" min="0" placeholder="Order" value={categoryForm.display_order} onChange={(event) => setCategoryForm({ ...categoryForm, display_order: event.target.value })} />
+              <Textarea className="sm:col-span-2" placeholder="Short category description (optional)" value={categoryForm.description} onChange={(event) => setCategoryForm({ ...categoryForm, description: event.target.value })} />
+              <div className="flex gap-2 sm:col-span-2"><Button disabled={galleryCategoryMutations.create.isPending || galleryCategoryMutations.update.isPending}>{categoryForm.id ? <Save className="h-4 w-4" /> : <Plus className="h-4 w-4" />}{categoryForm.id ? "Save category" : "Add category"}</Button>{categoryForm.id && <Button type="button" variant="secondary" onClick={() => setCategoryForm({ id: "", name: "", description: "", display_order: "" })}>Cancel edit</Button>}</div>
+            </form>
+            <div className="mt-5 space-y-2">
+              {galleryCategories.length ? galleryCategories.map((category) => <div key={category.id} className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 p-3"><div className="min-w-0"><div className="font-bold">{category.name}</div><div className="truncate text-sm text-slate-500">{category.description || "No description"} · Order {category.display_order}</div></div><div className="flex gap-1"><Button type="button" variant="ghost" className="h-8 px-3" onClick={() => setCategoryForm({ id: category.id, name: category.name, description: category.description || "", display_order: String(category.display_order) })}><Edit3 className="h-4 w-4" /> Edit</Button><Button type="button" variant="ghost" className="h-8 px-3" onClick={() => deleteGalleryCategory(category as CmsRecord)}><Trash2 className="h-4 w-4" /> Delete</Button></div></div>) : <div className="rounded-lg border border-dashed border-slate-300 p-8 text-center text-sm text-slate-500">No gallery categories yet.</div>}
+            </div>
+          </Card>
+        </div>
+      )}
     </div>
   );
+}
+
+export function GalleryManagementPage() {
+  return <CmsPage galleryOnly />;
 }
