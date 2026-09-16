@@ -12,6 +12,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { attachFileAccessUrls } from "@/lib/fileUrls";
 import { normalizePhoneNumber } from "@/lib/phone";
 import { storageSafeFileName } from "@/services/crud";
+import { MediaPicker } from "@/components/media/MediaPicker";
 import type { Database, TableRow, ClientStatus } from "@/types/database";
 
 type Client = TableRow<"clients">;
@@ -42,10 +43,11 @@ type ClientFormData = {
   payment_received: string;
   notes: string;
   admin_notes: string;
+  dashboard_cover_image_url: string;
   status: ClientStatus;
 };
 
-const defaultForm: ClientFormData = { name: "", contact_person: "", email: "", mobile: "", address: "", contract_value: "", payment_received: "", notes: "", admin_notes: "", status: "Active" };
+const defaultForm: ClientFormData = { name: "", contact_person: "", email: "", mobile: "", address: "", contract_value: "", payment_received: "", notes: "", admin_notes: "", dashboard_cover_image_url: "", status: "Active" };
 
 function errorMessage(error: unknown) {
   if (error instanceof Error && error.message && error.message !== "{}") return error.message;
@@ -158,7 +160,12 @@ function formatSize(bytes: number | null) {
 
 function formatCurrency(value: number | null | undefined) {
   if (value === null || value === undefined) return "Not set";
-  return new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(value);
+  return new Intl.NumberFormat("en-IN", { maximumFractionDigits: 0 }).format(value);
+}
+
+function CurrencyText({ value }: { value: string }) {
+  if (value === "Not set") return <>Not set</>;
+  return <span className="inline-flex items-center"><IndianRupee className="mr-0.5 h-[1em] w-[1em] shrink-0" aria-hidden="true" />{value}</span>;
 }
 
 function optionalMoney(value: string) {
@@ -246,8 +253,8 @@ export function ClientsPage() {
       supabase.from("stages").select("*").eq("status", "active").order("display_order"),
     ]);
 
-    setClientFiles(await attachFileAccessUrls((fData as FileAssignment[]) ?? []));
-    setClientBlueprints((bData as BlueprintAssignment[]) ?? []);
+    setClientFiles(await attachFileAccessUrls((fData as unknown as FileAssignment[]) ?? []));
+    setClientBlueprints((bData as unknown as BlueprintAssignment[]) ?? []);
     setStages((sData as Stage[]) ?? []);
     setLoadingDetail(false);
   }
@@ -263,8 +270,8 @@ export function ClientsPage() {
         .eq("client_id", clientId)
         .order("display_order"),
     ]);
-    setClientFiles(await attachFileAccessUrls((fData as FileAssignment[]) ?? []));
-    setClientBlueprints((bData as BlueprintAssignment[]) ?? []);
+    setClientFiles(await attachFileAccessUrls((fData as unknown as FileAssignment[]) ?? []));
+    setClientBlueprints((bData as unknown as BlueprintAssignment[]) ?? []);
   }
 
   function triggerUpload(stageId: string) {
@@ -391,6 +398,7 @@ export function ClientsPage() {
       payment_received: client.payment_received?.toString() ?? "",
       notes: client.notes ?? "",
       admin_notes: client.admin_notes ?? "",
+      dashboard_cover_image_url: client.dashboard_cover_image_url ?? "",
       status: client.status as ClientStatus,
     });
     // Pre-fill portal email with client email so user only needs to enter password
@@ -427,6 +435,7 @@ export function ClientsPage() {
         payment_received: optionalMoney(form.payment_received),
         notes: form.notes.trim() || null,
         admin_notes: form.admin_notes.trim() || null,
+        dashboard_cover_image_url: form.dashboard_cover_image_url || null,
         status: form.status,
       };
       // Resolve portal email: explicit entry or fall back to client email
@@ -471,6 +480,8 @@ export function ClientsPage() {
           name: form.name.trim(),
           parent_id: null,
           path: "/",
+          client_id: clientId,
+          is_client_visible: true,
           created_by: profile?.id ?? null,
         });
         if (folderError) {
@@ -590,8 +601,8 @@ export function ClientsPage() {
                       <div className="text-xs text-slate-400">{client.mobile ?? ""}</div>
                     </td>
                     <td className="px-5 py-3.5">
-                      <div className="text-slate-700">{formatCurrency(client.contract_value)}</div>
-                      <div className="text-xs text-slate-400">Paid {formatCurrency(client.payment_received)}</div>
+                      <div className="text-slate-700"><CurrencyText value={formatCurrency(client.contract_value)} /></div>
+                      <div className="text-xs text-slate-400">Paid <CurrencyText value={formatCurrency(client.payment_received)} /></div>
                     </td>
                     <td className="px-5 py-3.5" onClick={(e) => e.stopPropagation()}>
                       <span className={cn("rounded-full border px-2.5 py-1 text-xs font-semibold", statusColor[client.status as ClientStatus] ?? "bg-slate-100 text-slate-500")}>
@@ -679,7 +690,7 @@ export function ClientsPage() {
                         <div className={cn("mb-3 grid h-9 w-9 place-items-center rounded-lg", tone)}>
                           <IndianRupee className="h-4 w-4" />
                         </div>
-                        <div className="text-lg font-black text-slate-950">{value}</div>
+                        <div className="text-lg font-black text-slate-950"><CurrencyText value={value} /></div>
                         <div className="mt-1 text-xs font-semibold text-slate-400">{label}</div>
                       </div>
                     ))}
@@ -1003,6 +1014,18 @@ export function ClientsPage() {
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">Address</label>
                   <Input value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} placeholder="Project or billing address" />
+                </div>
+                <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                  <div className="mb-2">
+                    <div className="text-sm font-semibold text-slate-700">Dashboard elevation cover</div>
+                    <p className="text-xs text-slate-500">Assigned directly to this client and shown as the dashboard cover image.</p>
+                  </div>
+                  <MediaPicker
+                    value={form.dashboard_cover_image_url}
+                    onChange={(url) => setForm({ ...form, dashboard_cover_image_url: url })}
+                    label="Elevation image"
+                    mediaType="image"
+                  />
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div>

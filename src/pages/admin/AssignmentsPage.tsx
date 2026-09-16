@@ -130,7 +130,7 @@ export function AssignmentsPage() {
       supabase.from("files").select("*").is("deleted_at", null).order("display_name"),
       supabase.from("stages").select("*").eq("status", "active").order("display_order"),
     ]);
-    setAssignments((aData as Assignment[]) ?? []);
+    setAssignments((aData as unknown as Assignment[]) ?? []);
     setClients((cData as Client[]) ?? []);
     setFiles((fData as File[]) ?? []);
     setStages((sData as Stage[]) ?? []);

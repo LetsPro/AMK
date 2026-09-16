@@ -46,7 +46,7 @@ export function BlueprintsAdminPage() {
       supabase.from("blueprint_links").select("*, _assignments:client_blueprint_assignments(client:clients(name))").order("created_at", { ascending: false }),
       supabase.from("clients").select("*").order("name"),
     ]);
-    setBlueprints((bData as Blueprint[]) ?? []);
+    setBlueprints((bData as unknown as Blueprint[]) ?? []);
     setClients((cData as Client[]) ?? []);
     setLoading(false);
   }, []);
@@ -55,7 +55,7 @@ export function BlueprintsAdminPage() {
 
   async function loadAssignments(blueprintId: string) {
     const { data } = await supabase.from("client_blueprint_assignments").select("*, client:clients(name)").eq("blueprint_id", blueprintId);
-    setBlueprintAssignments((data as Assignment[]) ?? []);
+    setBlueprintAssignments((data as unknown as Assignment[]) ?? []);
   }
 
   function openAdd() { setEditItem(null); setForm(defaultForm); setShowForm(true); }

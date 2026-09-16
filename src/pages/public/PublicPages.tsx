@@ -181,7 +181,8 @@ function ServiceExplorer({ items }: { items: Array<{ id: string; name?: string; 
 function HoverRevealTile({ title, text, image, label }: { title: string; text: string; image: string; label?: string }) {
   return (
     <motion.div className="group relative min-h-80 overflow-hidden rounded-lg bg-slate-900 shadow-sm" whileHover={{ y: -5 }} transition={{ duration: 0.22 }}>
-      <img src={image} alt="" loading="lazy" decoding="async" className="absolute inset-0 h-full w-full object-cover transition duration-700 group-hover:scale-110" />
+      <img src={image} alt="" aria-hidden="true" loading="lazy" decoding="async" className="absolute inset-0 h-full w-full scale-110 object-cover opacity-45 blur-xl" />
+      <img src={image} alt={title} loading="lazy" decoding="async" className="absolute inset-0 h-full w-full object-contain transition duration-700 group-hover:scale-[1.03]" />
       <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/45 to-transparent transition group-hover:from-slate-950 group-hover:via-slate-950/70" />
       <div className="absolute inset-x-0 bottom-0 p-6 text-white">
         {label && <div className="mb-2 text-xs font-bold uppercase tracking-wide text-brand-accent">{label}</div>}
@@ -192,7 +193,7 @@ function HoverRevealTile({ title, text, image, label }: { title: string; text: s
   );
 }
 
-type PublicProjectGalleryImage = { id: string; image_url: string; caption?: string | null; display_order?: number | null };
+type PublicProjectGalleryImage = { id: string; image_url: string; media_type?: "image" | "video"; caption?: string | null; display_order?: number | null };
 type PublicProject = { id: string; name: string; slug?: string; description?: string | null; category?: string | null; location?: string | null; cover_image_url?: string | null; progress?: number | null; status?: string | null; budget?: number | null; portfolio_gallery?: PublicProjectGalleryImage[] };
 type PublicGallery = { id: string; title: string; category?: string | null; image_url: string; description?: string | null };
 type PublicTestimonial = { id: string; name: string; company?: string | null; quote: string; rating?: number | null; avatar_url?: string | null; video_url?: string | null };
@@ -407,16 +408,16 @@ function ProjectModal({ project, onClose }: { project: PublicProject; onClose: (
   const images = useMemo(() => {
     const gallery = [...(project.portfolio_gallery ?? [])]
       .sort((a, b) => (a.display_order ?? 0) - (b.display_order ?? 0))
-      .map((image) => ({ url: image.image_url, caption: image.caption }));
+      .map((image) => ({ url: image.image_url, mediaType: image.media_type ?? "image" as const, caption: image.caption }));
     const allImages = project.cover_image_url
-      ? [{ url: project.cover_image_url, caption: project.name }, ...gallery]
+      ? [{ url: project.cover_image_url, mediaType: "image" as const, caption: project.name }, ...gallery]
       : gallery;
-    const uniqueImages = new Map<string, { url: string; caption?: string | null }>();
+    const uniqueImages = new Map<string, { url: string; mediaType: "image" | "video"; caption?: string | null }>();
     allImages.forEach((image) => image.url && !uniqueImages.has(image.url) && uniqueImages.set(image.url, image));
     return [...uniqueImages.values()];
   }, [project]);
   const fallbackImage = "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1400&q=80";
-  const visibleImages = images.length ? images : [{ url: fallbackImage, caption: project.name }];
+  const visibleImages = images.length ? images : [{ url: fallbackImage, mediaType: "image" as const, caption: project.name }];
   const activeImage = visibleImages[imageIndex % visibleImages.length];
   const goToImage = (nextIndex: number) => {
     setImageDirection(nextIndex > imageIndex ? 1 : -1);
@@ -437,20 +438,22 @@ function ProjectModal({ project, onClose }: { project: PublicProject; onClose: (
   return (
     <div className="fixed inset-0 z-[1001] grid place-items-center bg-slate-950/75 p-4" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
       <motion.div initial={{ opacity: 0, y: 20, scale: 0.98 }} animate={{ opacity: 1, y: 0, scale: 1 }} className="max-h-[90vh] w-full max-w-5xl overflow-y-auto rounded-3xl bg-white shadow-2xl">
-        <div className="relative aspect-[16/8] overflow-hidden bg-slate-900">
+        <div className="relative flex min-h-72 max-h-[68vh] items-center justify-center overflow-hidden bg-slate-900 sm:min-h-[440px]">
           <AnimatePresence initial={false} custom={imageDirection} mode="popLayout">
-            <motion.img
-              key={activeImage.url}
-              src={activeImage.url}
-              alt={activeImage.caption || `${project.name} gallery image ${imageIndex + 1}`}
-              loading="eager"
-              decoding="async"
-              initial={reduceMotion ? false : { opacity: 0.65, x: imageDirection * 110 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={reduceMotion ? undefined : { opacity: 0.4, x: imageDirection * -110 }}
-              transition={{ duration: reduceMotion ? 0 : 0.65, ease: [0.22, 1, 0.36, 1] }}
-              className="absolute inset-0 h-full w-full object-cover"
-            />
+            {activeImage.mediaType === "video"
+              ? <motion.video key={activeImage.url} src={activeImage.url} controls playsInline preload="metadata" initial={reduceMotion ? false : { opacity: 0.65, x: imageDirection * 110 }} animate={{ opacity: 1, x: 0 }} exit={reduceMotion ? undefined : { opacity: 0.4, x: imageDirection * -110 }} transition={{ duration: reduceMotion ? 0 : 0.65, ease: [0.22, 1, 0.36, 1] }} className="max-h-[68vh] w-full object-contain" />
+              : <motion.img
+                  key={activeImage.url}
+                  src={activeImage.url}
+                  alt={activeImage.caption || `${project.name} gallery image ${imageIndex + 1}`}
+                  loading="eager"
+                  decoding="async"
+                  initial={reduceMotion ? false : { opacity: 0.65, x: imageDirection * 110 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={reduceMotion ? undefined : { opacity: 0.4, x: imageDirection * -110 }}
+                  transition={{ duration: reduceMotion ? 0 : 0.65, ease: [0.22, 1, 0.36, 1] }}
+                  className="max-h-[68vh] w-full object-contain"
+                />}
           </AnimatePresence>
           <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-slate-950/40 via-transparent to-slate-950/20" />
           <button className="absolute right-4 top-4 z-20 grid h-10 w-10 place-items-center rounded-full bg-white/90 text-slate-900 shadow transition hover:bg-white" onClick={onClose} aria-label="Close project"><X className="h-5 w-5" /></button>
@@ -466,7 +469,7 @@ function ProjectModal({ project, onClose }: { project: PublicProject; onClose: (
           <div className="flex gap-2 overflow-x-auto border-b border-slate-200 px-6 py-4" aria-label={`Gallery image ${imageIndex + 1} of ${visibleImages.length}`}>
             {visibleImages.map((image, index) => (
               <button key={image.url} type="button" onClick={() => goToImage(index)} className={`h-16 w-24 shrink-0 overflow-hidden rounded-lg border-2 transition ${index === imageIndex ? "border-brand-primary opacity-100 shadow-sm" : "border-transparent opacity-55 hover:opacity-100"}`} aria-label={`Show gallery image ${index + 1}`}>
-                <img src={image.url} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover" />
+                {image.mediaType === "video" ? <video src={image.url} muted preload="metadata" className="h-full w-full bg-black object-contain" /> : <img src={image.url} alt="" loading="lazy" decoding="async" className="h-full w-full object-contain" />}
               </button>
             ))}
           </div>
@@ -769,12 +772,13 @@ function ProjectCarousel3D({ items, active, onChange, onOpen }: { items: PublicP
   const [imageIndex, setImageIndex] = useState(0);
   const activeProjectRef = useRef(active);
   const currentProject = items[active % items.length];
-  const currentImages = useMemo(() => {
+  const currentMedia = useMemo(() => {
     if (!currentProject) return [];
-    return [...new Set([
-      currentProject.cover_image_url,
-      ...(currentProject.portfolio_gallery ?? []).sort((a, b) => (a.display_order ?? 0) - (b.display_order ?? 0)).map((image) => image.image_url),
-    ].filter((url): url is string => Boolean(url)))];
+    const media = [
+      ...(currentProject.cover_image_url ? [{ url: currentProject.cover_image_url, mediaType: "image" as const }] : []),
+      ...(currentProject.portfolio_gallery ?? []).sort((a, b) => (a.display_order ?? 0) - (b.display_order ?? 0)).map((item) => ({ url: item.image_url, mediaType: item.media_type ?? "image" as "image" | "video" })),
+    ];
+    return [...new Map(media.map((item) => [item.url, item])).values()];
   }, [currentProject]);
 
   useEffect(() => setImageIndex(0), [active]);
@@ -806,7 +810,9 @@ function ProjectCarousel3D({ items, active, onChange, onOpen }: { items: PublicP
           const projectIndex = indexAt(offset);
           const project = items[projectIndex];
           const isActive = offset === 0;
-          const previewImage = isActive ? (currentImages[imageIndex] ?? project.cover_image_url ?? fallbackImage) : (project.cover_image_url ?? project.portfolio_gallery?.[0]?.image_url ?? fallbackImage);
+          const previewMedia = isActive
+            ? (currentMedia[imageIndex] ?? { url: project.cover_image_url ?? fallbackImage, mediaType: "image" as const })
+            : { url: project.cover_image_url ?? project.portfolio_gallery?.[0]?.image_url ?? fallbackImage, mediaType: project.cover_image_url ? "image" as const : project.portfolio_gallery?.[0]?.media_type ?? "image" as const };
           return (
             <motion.article
               key={project.id}
@@ -835,29 +841,31 @@ function ProjectCarousel3D({ items, active, onChange, onOpen }: { items: PublicP
             >
               <div className="relative aspect-[16/9] overflow-hidden bg-slate-900">
                 <AnimatePresence mode="popLayout" initial={false}>
-                  <motion.img
-                    key={previewImage}
-                    src={previewImage}
-                    alt={project.name}
-                    loading={isActive ? "eager" : "lazy"}
-                    decoding="async"
-                    className="absolute inset-0 h-full w-full object-cover"
-                    initial={reduceMotion ? false : { opacity: 0, scale: 1.06, x: 28 }}
-                    animate={{ opacity: 1, scale: 1, x: 0 }}
-                    exit={reduceMotion ? undefined : { opacity: 0, scale: 0.98, x: -28 }}
-                    transition={{ duration: reduceMotion ? 0 : 0.7, ease: [0.22, 1, 0.36, 1] }}
-                  />
+                  {previewMedia.mediaType === "video"
+                    ? <motion.video key={previewMedia.url} src={previewMedia.url} muted loop autoPlay={isActive} playsInline preload="metadata" className="absolute inset-0 h-full w-full bg-black object-contain" initial={reduceMotion ? false : { opacity: 0, scale: 1.06, x: 28 }} animate={{ opacity: 1, scale: 1, x: 0 }} exit={reduceMotion ? undefined : { opacity: 0, scale: 0.98, x: -28 }} transition={{ duration: reduceMotion ? 0 : 0.7, ease: [0.22, 1, 0.36, 1] }} />
+                    : <motion.img
+                        key={previewMedia.url}
+                        src={previewMedia.url}
+                        alt={project.name}
+                        loading={isActive ? "eager" : "lazy"}
+                        decoding="async"
+                        className="absolute inset-0 h-full w-full bg-slate-900 object-contain"
+                        initial={reduceMotion ? false : { opacity: 0, scale: 1.06, x: 28 }}
+                        animate={{ opacity: 1, scale: 1, x: 0 }}
+                        exit={reduceMotion ? undefined : { opacity: 0, scale: 0.98, x: -28 }}
+                        transition={{ duration: reduceMotion ? 0 : 0.7, ease: [0.22, 1, 0.36, 1] }}
+                      />}
                 </AnimatePresence>
                 <div className="absolute inset-0 bg-gradient-to-t from-slate-950/75 via-transparent to-transparent" />
-                {isActive && currentImages.length > 1 && <div className="absolute right-5 top-5 z-10 rounded-full border border-white/25 bg-slate-950/45 px-3 py-1.5 text-[10px] font-semibold tabular-nums tracking-[0.16em] text-white backdrop-blur">{String(imageIndex + 1).padStart(2, "0")} / {String(currentImages.length).padStart(2, "0")}</div>}
+                {isActive && currentMedia.length > 1 && <div className="absolute right-5 top-5 z-10 rounded-full border border-white/25 bg-slate-950/45 px-3 py-1.5 text-[10px] font-semibold tabular-nums tracking-[0.16em] text-white backdrop-blur">{String(imageIndex + 1).padStart(2, "0")} / {String(currentMedia.length).padStart(2, "0")}</div>}
                 <div className="absolute bottom-5 left-5 right-5 text-white">
                   <div className="text-[10px] font-semibold uppercase tracking-[0.22em] text-brand-accent">{offset === -1 ? "Previous project" : offset === 1 ? "Next project" : project.category || "Featured project"}</div>
                   <h3 className={`${isActive ? "mt-2 text-3xl md:text-4xl" : "mt-1 text-2xl"} font-medium leading-none`}>{project.name}</h3>
                 </div>
-                {isActive && currentImages.length > 1 && (
+                {isActive && currentMedia.length > 1 && (
                   <>
-                    <button type="button" onClick={(event) => { event.stopPropagation(); setImageIndex((index) => (index - 1 + currentImages.length) % currentImages.length); }} className="absolute left-4 top-1/2 z-10 grid h-11 w-11 -translate-y-1/2 place-items-center rounded-full border border-white/30 bg-slate-950/40 text-white backdrop-blur transition hover:bg-white hover:text-slate-950" aria-label="Previous project image"><ChevronLeft className="h-5 w-5" /></button>
-                    <button type="button" onClick={(event) => { event.stopPropagation(); setImageIndex((index) => (index + 1) % currentImages.length); }} className="absolute right-4 top-1/2 z-10 grid h-11 w-11 -translate-y-1/2 place-items-center rounded-full border border-white/30 bg-slate-950/40 text-white backdrop-blur transition hover:bg-white hover:text-slate-950" aria-label="Next project image"><ChevronRight className="h-5 w-5" /></button>
+                    <button type="button" onClick={(event) => { event.stopPropagation(); setImageIndex((index) => (index - 1 + currentMedia.length) % currentMedia.length); }} className="absolute left-4 top-1/2 z-10 grid h-11 w-11 -translate-y-1/2 place-items-center rounded-full border border-white/30 bg-slate-950/40 text-white backdrop-blur transition hover:bg-white hover:text-slate-950" aria-label="Previous project media"><ChevronLeft className="h-5 w-5" /></button>
+                    <button type="button" onClick={(event) => { event.stopPropagation(); setImageIndex((index) => (index + 1) % currentMedia.length); }} className="absolute right-4 top-1/2 z-10 grid h-11 w-11 -translate-y-1/2 place-items-center rounded-full border border-white/30 bg-slate-950/40 text-white backdrop-blur transition hover:bg-white hover:text-slate-950" aria-label="Next project media"><ChevronRight className="h-5 w-5" /></button>
                   </>
                 )}
               </div>
@@ -866,9 +874,9 @@ function ProjectCarousel3D({ items, active, onChange, onOpen }: { items: PublicP
                   <div>
                     <p className="text-sm leading-6 text-slate-500">{project.location}</p>
                     {project.description && <p className="mt-2 line-clamp-2 text-sm leading-6 text-slate-600">{project.description}</p>}
-                    {currentImages.length > 1 && (
-                      <div className="mt-5 flex gap-2 overflow-x-auto pb-1" aria-label={`Image ${imageIndex + 1} of ${currentImages.length}`}>
-                        {currentImages.map((image, index) => <button key={image} type="button" onClick={(event) => { event.stopPropagation(); setImageIndex(index); }} className={`relative h-12 w-20 shrink-0 overflow-hidden border-2 transition-all ${index === imageIndex ? "border-brand-primary opacity-100" : "border-transparent opacity-50 hover:opacity-90"}`} aria-label={`Show project image ${index + 1}`}><img src={image} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover" /></button>)}
+                    {currentMedia.length > 1 && (
+                      <div className="mt-5 flex gap-2 overflow-x-auto pb-1" aria-label={`Media ${imageIndex + 1} of ${currentMedia.length}`}>
+                        {currentMedia.map((media, index) => <button key={media.url} type="button" onClick={(event) => { event.stopPropagation(); setImageIndex(index); }} className={`relative h-12 w-20 shrink-0 overflow-hidden border-2 bg-slate-900 transition-all ${index === imageIndex ? "border-brand-primary opacity-100" : "border-transparent opacity-50 hover:opacity-90"}`} aria-label={`Show project media ${index + 1}`}>{media.mediaType === "video" ? <video src={media.url} muted preload="metadata" className="h-full w-full object-contain" /> : <img src={media.url} alt="" loading="lazy" decoding="async" className="h-full w-full object-contain" />}</button>)}
                       </div>
                     )}
                   </div>
@@ -1258,7 +1266,7 @@ export function ListingPage({ type }: { type: "projects" | "services" | "gallery
             </div>
             <div className="p-6">
               <h3 className="text-2xl font-black text-slate-950">Ar. Andra Manoj Kumar</h3>
-              <p className="mt-2 text-sm font-semibold text-brand-primary">Architect | Computational Designer | BIM Specialist | Architectural Visualizer</p>
+              <p className="mt-2 text-sm font-semibold text-brand-primary">Architect | Computational Designer | BIM Specialist | Architectural Photographer</p>
               <p className="mt-4 text-sm leading-7 text-slate-600">The studio is shaped around design clarity, BIM coordination, realistic visualization, and construction-ready decision making.</p>
             </div>
           </Card>
@@ -1398,9 +1406,6 @@ export function ListingPage({ type }: { type: "projects" | "services" | "gallery
           const gallery = item as PublicGallery;
           return <button key={gallery.id} className="text-left" onClick={() => setPreview(gallery)}><HoverRevealTile title={gallery.title} text={gallery.description ?? "Open this album for a focused project image preview."} image={gallery.image_url} label={gallery.category ?? "Gallery"} /></button>;
         })}</div>
-      </Section>
-      <Section title="Gallery Categories" description="Flip each category to see what kind of work it usually contains.">
-        <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">{["Residential", "Commercial", "Interior", "Documentation"].map((item, index) => <FlipInfoCard key={item} title={item} text="Curated project visuals and design documentation from AMK work." detail="Albums help clients compare material mood, spatial character, execution quality, and technical presentation across project types." icon={index % 2 === 0 ? Eye : ClipboardCheck} />)}</div>
       </Section>
       {preview && <GalleryPreview item={preview} onClose={() => setPreview(null)} />}
     </>

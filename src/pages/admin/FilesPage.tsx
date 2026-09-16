@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { useSearchParams } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  ChevronRight, Download, File, FileText, FolderOpen, FolderPlus, Grid3X3,
+  ChevronRight, Download, Eye, EyeOff, File, FileText, FolderOpen, FolderPlus, Grid3X3,
   List, MoreVertical, MoveRight, Pencil, Plus, Search, Trash2, Upload, X
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
@@ -15,6 +15,7 @@ import { attachStoredFileAccessUrls } from "@/lib/fileUrls";
 import type { TableRow } from "@/types/database";
 
 type Folder = TableRow<"folders">;
+type Client = Pick<TableRow<"clients">, "id" | "name">;
 type FileRecord = TableRow<"files"> & { preview_url?: string; download_url?: string };
 
 const ACCEPTED = "*";
@@ -62,6 +63,7 @@ export function FilesPage() {
   const toast = useToast();
   const { profile } = useAuth();
   const [folders, setFolders] = useState<Folder[]>([]);
+  const [clients, setClients] = useState<Client[]>([]);
   const [files, setFiles] = useState<FileRecord[]>([]);
   const [currentFolder, setCurrentFolder] = useState<Folder | null>(null);
   const [breadcrumb, setBreadcrumb] = useState<Folder[]>([]);
@@ -71,6 +73,8 @@ export function FilesPage() {
   const [typeFilter, setTypeFilter] = useState("all");
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [newFolderName, setNewFolderName] = useState("");
+  const [newFolderClientId, setNewFolderClientId] = useState("");
+  const [newFolderVisible, setNewFolderVisible] = useState(true);
   const [showNewFolder, setShowNewFolder] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -100,6 +104,10 @@ export function FilesPage() {
   useEffect(() => { loadContent(); }, [loadContent]);
 
   useEffect(() => {
+    supabase.from("clients").select("id,name").order("name").then(({ data }) => setClients((data as Client[]) ?? []));
+  }, []);
+
+  useEffect(() => {
     if (searchParams.get("newFolder") === "1") { setShowNewFolder(true); setSearchParams({}); }
     if (searchParams.get("upload") === "1") { fileInputRef.current?.click(); setSearchParams({}); }
   }, [searchParams, setSearchParams]);
@@ -107,11 +115,49 @@ export function FilesPage() {
   async function createFolder() {
     if (!newFolderName.trim()) return;
     const path = currentFolder ? `${currentFolder.path}${currentFolder.name}/` : "/";
-    const { error } = await supabase.from("folders").insert({ name: newFolderName.trim(), parent_id: currentFolder?.id ?? null, path, created_by: profile?.id });
+    const matchingClient = clients.find((client) => client.name.trim().toLocaleLowerCase() === newFolderName.trim().toLocaleLowerCase());
+    const clientId = currentFolder?.client_id ?? (newFolderClientId || matchingClient?.id || null);
+    const isClientVisible = Boolean(clientId) && (currentFolder ? currentFolder.is_client_visible : newFolderVisible);
+    const { error } = await supabase.from("folders").insert({
+      name: newFolderName.trim(),
+      parent_id: currentFolder?.id ?? null,
+      path,
+      client_id: clientId,
+      is_client_visible: isClientVisible,
+      created_by: profile?.id,
+    });
     if (error) { toast.error("Error", error.message); return; }
     setNewFolderName("");
+    setNewFolderClientId("");
+    setNewFolderVisible(true);
     setShowNewFolder(false);
-    toast.success("Folder created");
+    toast.success(clientId ? "Folder created and assigned to client" : "Folder created");
+    loadContent();
+  }
+
+  async function updateFolderClient(folder: Folder, clientId: string) {
+    const { error } = await supabase.rpc("assign_client_folder_tree", {
+      target_folder_id: folder.id,
+      target_client_id: clientId || null,
+      target_visible: clientId ? folder.is_client_visible : false,
+    });
+    if (error) { toast.error("Could not update folder", error.message); return; }
+    toast.success(clientId ? "Complete folder assigned to client" : "Folder tree assignment removed");
+    loadContent();
+  }
+
+  async function toggleFolderVisibility(folder: Folder) {
+    if (!folder.client_id) {
+      toast.error("Assign a client first", "A folder must be assigned before it can be enabled in the client portal.");
+      return;
+    }
+    const { error } = await supabase.rpc("assign_client_folder_tree", {
+      target_folder_id: folder.id,
+      target_client_id: folder.client_id,
+      target_visible: !folder.is_client_visible,
+    });
+    if (error) { toast.error("Could not update visibility", error.message); return; }
+    toast.success(folder.is_client_visible ? "Folder disabled for client" : "Folder enabled for client");
     loadContent();
   }
 
@@ -251,9 +297,19 @@ export function FilesPage() {
       <AnimatePresence>
         {showNewFolder && (
           <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden">
-            <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3">
+            <div className="flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3">
               <FolderOpen className="h-5 w-5 text-amber-500" />
               <Input autoFocus value={newFolderName} onChange={(e) => setNewFolderName(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") createFolder(); if (e.key === "Escape") setShowNewFolder(false); }} placeholder="Folder name" className="flex-1 h-8 border-0 p-0 focus:ring-0 shadow-none" />
+              {!currentFolder && (
+                <Select value={newFolderClientId} onChange={(e) => setNewFolderClientId(e.target.value)} className="h-8 min-w-44 text-xs">
+                  <option value="">Auto-match client name</option>
+                  {clients.map((client) => <option key={client.id} value={client.id}>{client.name}</option>)}
+                </Select>
+              )}
+              <label className="flex items-center gap-2 text-xs font-semibold text-slate-600">
+                <input type="checkbox" checked={newFolderVisible} onChange={(e) => setNewFolderVisible(e.target.checked)} disabled={Boolean(currentFolder && !currentFolder.client_id)} className="accent-brand-primary" />
+                Client portal
+              </label>
               <Button onClick={createFolder} className="h-8 text-xs px-3">Create</Button>
               <button onClick={() => setShowNewFolder(false)} className="text-slate-400 hover:text-slate-600"><X className="h-4 w-4" /></button>
             </div>
@@ -286,7 +342,19 @@ export function FilesPage() {
                 {filteredFolders.map((folder) => (
                   <div key={folder.id} className={cn("group relative", viewMode === "grid" ? "rounded-xl border border-slate-200 bg-white p-4 hover:border-amber-300 hover:shadow-md cursor-pointer transition-all" : "flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 hover:bg-slate-50 cursor-pointer")} onClick={() => navigateToFolder(folder)}>
                     <FolderOpen className={cn("shrink-0 text-amber-500", viewMode === "grid" ? "h-8 w-8 mb-2" : "h-5 w-5")} />
-                    <span className={cn("font-medium text-slate-800 truncate", viewMode === "grid" ? "text-sm block" : "flex-1 text-sm")}>{folder.name}</span>
+                    <div className={cn("min-w-0", viewMode === "grid" ? "space-y-2" : "flex flex-1 items-center gap-3")}>
+                      <span className={cn("font-medium text-slate-800 truncate", viewMode === "grid" ? "text-sm block" : "flex-1 text-sm")}>{folder.name}</span>
+                      <div className={cn("flex items-center gap-1.5", viewMode === "grid" && "flex-col items-stretch")} onClick={(e) => e.stopPropagation()}>
+                        <Select aria-label={`Client for ${folder.name}`} value={folder.client_id ?? ""} onChange={(e) => updateFolderClient(folder, e.target.value)} className="h-7 max-w-full text-[11px]">
+                          <option value="">Not assigned</option>
+                          {clients.map((client) => <option key={client.id} value={client.id}>{client.name}</option>)}
+                        </Select>
+                        <button type="button" onClick={() => toggleFolderVisibility(folder)} disabled={!folder.client_id} className={cn("inline-flex h-7 items-center justify-center gap-1 rounded-md px-2 text-[11px] font-bold transition-colors", folder.is_client_visible && folder.client_id ? "bg-emerald-100 text-emerald-700 hover:bg-emerald-200" : "bg-slate-100 text-slate-500 hover:bg-slate-200", !folder.client_id && "cursor-not-allowed opacity-50")} title={folder.is_client_visible ? "Disable client access" : "Enable client access"}>
+                          {folder.is_client_visible && folder.client_id ? <Eye className="h-3 w-3" /> : <EyeOff className="h-3 w-3" />}
+                          {folder.is_client_visible && folder.client_id ? "Enabled" : "Disabled"}
+                        </button>
+                      </div>
+                    </div>
                     <button onClick={(e) => { e.stopPropagation(); deleteFolder(folder); }} className="absolute right-2 top-2 hidden h-7 w-7 place-items-center rounded-lg text-red-400 hover:bg-red-50 group-hover:grid transition-colors"><Trash2 className="h-3.5 w-3.5" /></button>
                   </div>
                 ))}

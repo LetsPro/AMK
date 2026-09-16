@@ -1,16 +1,12 @@
 import { useState, useEffect } from "react";
-import { Download, Eye, FileText, Search, X } from "lucide-react";
-import { supabase } from "@/lib/supabase";
+import { useSearchParams } from "react-router-dom";
+import { ChevronLeft, Download, Eye, FileText, FolderOpen, Search, X } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/Input";
-import { attachFileAccessUrls } from "@/lib/fileUrls";
-import type { TableRow } from "@/types/database";
+import { loadClientVisibleFiles, type ClientVisibleFile } from "@/services/clientVisibleFiles";
 
-type Assignment = TableRow<"client_file_assignments"> & {
-  file: { display_name: string; public_url: string; preview_url?: string; download_url?: string; mime_type: string | null; size: number | null; storage_path: string; bucket: string } | null;
-  stage: { name: string; color: string | null } | null;
-};
+type Assignment = ClientVisibleFile;
 
 const CATEGORY_COLORS: Record<string, string> = {
   Blueprint: "bg-blue-100 text-blue-700",
@@ -35,42 +31,55 @@ function downloadUrl(file: Assignment["file"]) { return file?.download_url || fi
 
 export function ClientFilesPage() {
   const { clientId } = useAuth();
+  const [searchParams] = useSearchParams();
   const [files, setFiles] = useState<Assignment[]>([]);
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState("");
+  const [search, setSearch] = useState(() => searchParams.get("search") ?? "");
   const [categoryFilter, setCategoryFilter] = useState("");
+  const [selectedFolder, setSelectedFolder] = useState<string | null>(null);
   const [preview, setPreview] = useState<Assignment | null>(null);
 
   useEffect(() => {
     if (!clientId) return;
     (async () => {
-      const now = new Date().toISOString();
-      const { data } = await supabase
-        .from("client_file_assignments")
-        .select("*, file:files(display_name,public_url,mime_type,size,storage_path,bucket), stage:stages(name,color)")
-        .eq("client_id", clientId)
-        .or(`visible_from.is.null,visible_from.lte.${now}`)
-        .or(`expires_at.is.null,expires_at.gte.${now}`)
-        .order("display_order");
-      setFiles(await attachFileAccessUrls((data as Assignment[]) ?? []));
-      setLoading(false);
+      try {
+        setFiles(await loadClientVisibleFiles(clientId));
+      } finally {
+        setLoading(false);
+      }
     })();
   }, [clientId]);
 
-  const categories = [...new Set(files.map((f) => f.category).filter(Boolean))] as string[];
+  useEffect(() => {
+    setSearch(searchParams.get("search") ?? "");
+  }, [searchParams]);
+
+  const categories = [...new Set(files.filter((file) => !file.source_folder_id).map((f) => f.category).filter(Boolean))] as string[];
 
   const filtered = files.filter((f) => {
     const matchSearch = `${f.client_title} ${f.file?.display_name ?? ""} ${f.category ?? ""}`.toLowerCase().includes(search.toLowerCase());
     const matchCat = !categoryFilter || f.category === categoryFilter;
     return matchSearch && matchCat;
   });
+  const folders = Array.from(new Map(files.filter((file) => file.source_folder_id).map((file) => [file.source_folder_id as string, { id: file.source_folder_id as string, name: file.source_folder_name ?? "Client folder" }])).values());
+  const visibleFolders = folders.filter((folder) => {
+    if (!search.trim()) return true;
+    const term = search.toLowerCase();
+    return folder.name.toLowerCase().includes(term) || files.some((file) => file.source_folder_id === folder.id && `${file.client_title} ${file.file?.display_name ?? ""}`.toLowerCase().includes(term));
+  });
+  const displayedFiles = selectedFolder
+    ? filtered.filter((file) => file.source_folder_id === selectedFolder)
+    : filtered.filter((file) => !file.source_folder_id);
+  const selectedFolderName = folders.find((folder) => folder.id === selectedFolder)?.name;
 
   return (
     <div className="space-y-5">
       <div>
         <h1 className="text-2xl font-black text-slate-900">My Files</h1>
-        <p className="text-sm text-slate-500 mt-1">{files.length} file{files.length !== 1 ? "s" : ""} shared with you</p>
+        <p className="text-sm text-slate-500 mt-1">{folders.length} folder{folders.length !== 1 ? "s" : ""} · {files.length} file{files.length !== 1 ? "s" : ""} shared with you</p>
       </div>
+
+      {selectedFolder && <button type="button" onClick={() => setSelectedFolder(null)} className="inline-flex items-center gap-2 text-sm font-bold text-brand-primary hover:underline"><ChevronLeft className="h-4 w-4" /> All folders <span className="text-slate-300">/</span> <span className="text-slate-700">{selectedFolderName}</span></button>}
 
       <div className="flex flex-wrap items-center gap-3">
         <div className="relative flex-1 min-w-48 max-w-xs">
@@ -89,14 +98,19 @@ export function ClientFilesPage() {
 
       {loading ? (
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">{Array.from({ length: 4 }).map((_, i) => <div key={i} className="h-24 animate-pulse rounded-xl bg-slate-100" />)}</div>
-      ) : filtered.length === 0 ? (
+      ) : visibleFolders.length === 0 && displayedFiles.length === 0 ? (
         <div className="rounded-xl border border-dashed border-slate-200 py-16 text-center">
           <FileText className="mx-auto h-10 w-10 text-slate-300 mb-3" />
           <p className="text-slate-500">No files found.</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          {filtered.map((f) => (
+        <div className="space-y-5">
+          {!selectedFolder && visibleFolders.length > 0 && <section><div className="mb-2 text-xs font-black uppercase tracking-wider text-slate-400">Assigned folders</div><div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">{visibleFolders.map((folder) => {
+            const folderFiles = files.filter((file) => file.source_folder_id === folder.id);
+            return <button key={folder.id} type="button" onClick={() => { setSelectedFolder(folder.id); setCategoryFilter(""); }} className="group flex items-center gap-4 rounded-xl border border-slate-200 bg-white p-4 text-left transition-all hover:-translate-y-0.5 hover:border-brand-primary/30 hover:shadow-md"><span className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-amber-50 text-amber-500"><FolderOpen className="h-6 w-6" /></span><span className="min-w-0 flex-1"><span className="block truncate font-black text-slate-900">{folder.name}</span><span className="mt-1 block text-xs text-slate-400">{folderFiles.length} file{folderFiles.length !== 1 ? "s" : ""}</span></span><span className="text-xl text-slate-300 transition-transform group-hover:translate-x-0.5">›</span></button>;
+          })}</div></section>}
+          {displayedFiles.length > 0 && <section><div className="mb-2 text-xs font-black uppercase tracking-wider text-slate-400">{selectedFolder ? `${selectedFolderName} files` : "Individually shared files"}</div><div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          {displayedFiles.map((f) => (
             <div key={f.id} className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white p-4 hover:border-brand-primary/30 hover:shadow-sm transition-all">
               <div className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-slate-100 text-slate-400">
                 {isImage(f.file?.mime_type ?? null)
@@ -129,6 +143,7 @@ export function ClientFilesPage() {
               </div>
             </div>
           ))}
+          </div></section>}
         </div>
       )}
 
@@ -144,6 +159,10 @@ export function ClientFilesPage() {
               <img src={fileUrl(preview.file)} alt={preview.client_title} loading="eager" decoding="async" className="max-w-full max-h-full rounded-lg object-contain" />
             ) : isPdf(preview.file.mime_type) ? (
               <iframe src={fileUrl(preview.file)} loading="lazy" className="w-full h-full rounded-lg" title={preview.client_title} />
+            ) : preview.file.mime_type?.startsWith("video/") ? (
+              <video src={fileUrl(preview.file)} controls autoPlay playsInline className="max-h-full max-w-full rounded-lg object-contain" />
+            ) : preview.file.mime_type?.startsWith("audio/") ? (
+              <audio src={fileUrl(preview.file)} controls autoPlay />
             ) : (
               <div className="text-center text-white">
                 <FileText className="mx-auto h-16 w-16 text-slate-400 mb-4" />

@@ -26,7 +26,7 @@ export function ClientBlueprintsPage() {
         .eq("client_id", clientId)
         .eq("is_visible", true)
         .order("display_order");
-      const visible = ((data as Assignment[]) ?? []).filter((a) => a.blueprint?.is_active);
+      const visible = ((data as unknown as Assignment[]) ?? []).filter((a) => a.blueprint?.is_active);
       setItems(visible);
       setLoading(false);
     })();

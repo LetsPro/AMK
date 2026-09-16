@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useSearchParams } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { GripVertical, Pencil, Plus, Trash2, X } from "lucide-react";
+import { ChevronDown, ChevronUp, GripVertical, Pencil, Plus, Trash2, X } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/Button";
@@ -25,6 +25,8 @@ export function StagesPage() {
   const [showForm, setShowForm] = useState(false);
   const [editStage, setEditStage] = useState<Stage | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Stage | null>(null);
+  const [draggedStageId, setDraggedStageId] = useState<string | null>(null);
+  const [reordering, setReordering] = useState(false);
   const [form, setForm] = useState({ name: "", description: "", default_progress: 0, default_duration_days: 0, color: "#6366f1", icon: "Star", status: "active" as "active" | "inactive" });
 
   const load = useCallback(async () => {
@@ -73,12 +75,49 @@ export function StagesPage() {
     load();
   }
 
+  async function persistOrder(nextStages: Stage[]) {
+    if (reordering) return;
+    const previousStages = stages;
+    const orderedStages = nextStages.map((stage, index) => ({ ...stage, display_order: index + 1 }));
+    setStages(orderedStages);
+    setReordering(true);
+    const results = await Promise.all(orderedStages.map((stage) => supabase.from("stages").update({ display_order: stage.display_order, updated_by: profile?.id }).eq("id", stage.id)));
+    const error = results.find((result) => result.error)?.error;
+    if (error) {
+      setStages(previousStages);
+      toast.error("Could not reorder stages", error.message);
+    } else {
+      toast.success("Stage order updated");
+    }
+    setReordering(false);
+  }
+
+  function moveStage(index: number, direction: -1 | 1) {
+    const nextIndex = index + direction;
+    if (nextIndex < 0 || nextIndex >= stages.length || reordering) return;
+    const nextStages = [...stages];
+    [nextStages[index], nextStages[nextIndex]] = [nextStages[nextIndex], nextStages[index]];
+    void persistOrder(nextStages);
+  }
+
+  function dropStage(targetStageId: string) {
+    if (!draggedStageId || draggedStageId === targetStageId || reordering) return;
+    const fromIndex = stages.findIndex((stage) => stage.id === draggedStageId);
+    const toIndex = stages.findIndex((stage) => stage.id === targetStageId);
+    if (fromIndex < 0 || toIndex < 0) return;
+    const nextStages = [...stages];
+    const [movedStage] = nextStages.splice(fromIndex, 1);
+    nextStages.splice(toIndex, 0, movedStage);
+    setDraggedStageId(null);
+    void persistOrder(nextStages);
+  }
+
   return (
     <div className="space-y-5">
       <div className="flex items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-black text-slate-900">Stages</h1>
-          <p className="text-sm text-slate-500">{stages.length} stage{stages.length !== 1 ? "s" : ""} defined</p>
+          <p className="text-sm text-slate-500">{stages.length} stage{stages.length !== 1 ? "s" : ""} defined · drag the handle or use the arrow buttons to reorder</p>
         </div>
         <Button onClick={openAdd}><Plus className="h-4 w-4" /> Create Stage</Button>
       </div>
@@ -104,9 +143,9 @@ export function StagesPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {stages.map((stage) => (
-                <tr key={stage.id} className="hover:bg-slate-50 transition-colors">
-                  <td className="px-4 py-3 text-slate-300"><GripVertical className="h-4 w-4" /></td>
+              {stages.map((stage, index) => (
+                <tr key={stage.id} draggable={!reordering} onDragStart={() => setDraggedStageId(stage.id)} onDragEnd={() => setDraggedStageId(null)} onDragOver={(event) => event.preventDefault()} onDrop={() => dropStage(stage.id)} className={cn("transition-colors hover:bg-slate-50", draggedStageId === stage.id && "opacity-40")}>
+                  <td className="cursor-grab px-4 py-3 text-slate-300 active:cursor-grabbing" title="Drag to reorder"><GripVertical className="h-4 w-4" /></td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-3">
                       <div className="h-3 w-3 rounded-full shrink-0" style={{ backgroundColor: stage.color ?? "#94a3b8" }} />
@@ -130,6 +169,8 @@ export function StagesPage() {
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center justify-end gap-1">
+                      <button type="button" onClick={() => moveStage(index, -1)} disabled={index === 0 || reordering} className="grid h-8 w-8 place-items-center rounded text-slate-400 hover:bg-slate-100 hover:text-slate-700 disabled:cursor-not-allowed disabled:opacity-25" aria-label={`Move ${stage.name} up`}><ChevronUp className="h-3.5 w-3.5" /></button>
+                      <button type="button" onClick={() => moveStage(index, 1)} disabled={index === stages.length - 1 || reordering} className="grid h-8 w-8 place-items-center rounded text-slate-400 hover:bg-slate-100 hover:text-slate-700 disabled:cursor-not-allowed disabled:opacity-25" aria-label={`Move ${stage.name} down`}><ChevronDown className="h-3.5 w-3.5" /></button>
                       <button onClick={() => openEdit(stage)} className="grid h-8 w-8 place-items-center rounded text-slate-400 hover:bg-blue-50 hover:text-blue-600"><Pencil className="h-3.5 w-3.5" /></button>
                       <button onClick={() => setDeleteTarget(stage)} className="grid h-8 w-8 place-items-center rounded text-slate-400 hover:bg-red-50 hover:text-red-600"><Trash2 className="h-3.5 w-3.5" /></button>
                     </div>

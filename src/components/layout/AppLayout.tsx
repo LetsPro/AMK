@@ -2,7 +2,7 @@ import { Outlet, NavLink, useLocation, useNavigate } from "react-router-dom";
 import { useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
-  Bell, ChevronLeft, ChevronRight, Edit3, Eye, FileStack,
+  Bell, BookOpen, ChevronLeft, ChevronRight, Edit3, Eye, FileStack,
   FolderOpen, Gauge, Images, LayoutDashboard, LogOut, Menu, Search,
   Settings, Users, X,
 } from "lucide-react";
@@ -21,6 +21,7 @@ const navItems = [
   { to: "/app/cms", label: "Website CMS", icon: Edit3 },
   { to: "/app/media", label: "Media", icon: Images },
   { to: "/app/360-interiors", label: "360 Interiors", icon: Eye },
+  { to: "/app/materials", label: "Material Guides", icon: BookOpen },
   { to: "/app/settings", label: "Settings", icon: Settings },
 ];
 

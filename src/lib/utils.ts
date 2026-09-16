@@ -6,7 +6,7 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 export function currency(value?: number | null) {
-  return new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(value ?? 0);
+  return `INR ${new Intl.NumberFormat("en-IN", { maximumFractionDigits: 0 }).format(value ?? 0)}`;
 }
 
 export function initials(name?: string | null) {

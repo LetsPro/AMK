@@ -62,6 +62,19 @@ export function PublicLayout() {
   }, []);
 
   useEffect(() => {
+    const preventContextMenu = (event: MouseEvent) => event.preventDefault();
+    const preventMediaDrag = (event: DragEvent) => {
+      if (event.target instanceof HTMLImageElement || event.target instanceof HTMLVideoElement) event.preventDefault();
+    };
+    document.addEventListener("contextmenu", preventContextMenu);
+    document.addEventListener("dragstart", preventMediaDrag);
+    return () => {
+      document.removeEventListener("contextmenu", preventContextMenu);
+      document.removeEventListener("dragstart", preventMediaDrag);
+    };
+  }, []);
+
+  useEffect(() => {
     if (!enquiryOpen) return;
     const previousOverflow = document.body.style.overflow;
     const closeOnEscape = (event: KeyboardEvent) => event.key === "Escape" && setEnquiryOpen(false);

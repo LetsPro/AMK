@@ -36,12 +36,12 @@ export type Database = {
       banners: T<Base & { title: string; subtitle: string | null; image_url: string | null; cta_label: string | null; cta_url: string | null; is_active: boolean; display_order: number }>;
       services: T<Base & { name: string; slug: string; description: string; image_url: string | null; price_from: number | null; status: "draft" | "published" }>;
       customers: T<Base & { name: string; company: string | null; email: string | null; mobile: string | null; address: string | null; notes: string | null }>;
-      clients: T<Base & { customer_id: string | null; name: string; contact_person: string | null; email: string | null; mobile: string | null; address: string | null; contract_value: number | null; payment_received: number | null; notes: string | null; auth_user_id: string | null; status: ClientStatus; avatar_url: string | null; admin_notes: string | null; created_by: string | null; updated_by: string | null }>;
-      client_projects: T<Base & { client_id: string; name: string; description: string | null; start_date: string | null; expected_completion_date: string | null; current_stage_id: string | null; progress: number; status: ProjectStatus; created_by: string | null; updated_by: string | null }>;
+      clients: T<Base & { customer_id: string | null; name: string; contact_person: string | null; email: string | null; mobile: string | null; address: string | null; contract_value: number | null; payment_received: number | null; notes: string | null; auth_user_id: string | null; status: ClientStatus; avatar_url: string | null; dashboard_cover_image_url: string | null; admin_notes: string | null; created_by: string | null; updated_by: string | null }>;
+      client_projects: T<Base & { client_id: string; name: string; description: string | null; cover_image_url: string | null; start_date: string | null; expected_completion_date: string | null; current_stage_id: string | null; progress: number; status: ProjectStatus; created_by: string | null; updated_by: string | null }>;
       portfolio_categories: T<Base & { name: string; slug: string; description: string | null; display_order: number }>;
       portfolio_projects: T<Base & { title: string; slug: string; short_description: string | null; detailed_description: string | null; client_name: string | null; category_id: string | null; services_provided: string[] | null; technologies_used: string[] | null; location: string | null; completion_date: string | null; cover_image_url: string | null; website_url: string | null; case_study_url: string | null; status: "draft" | "published"; is_featured: boolean; display_order: number; seo_title: string | null; seo_description: string | null; seo_keywords: string | null; created_by: string | null; updated_by: string | null }>;
-      portfolio_gallery: T<Base & { portfolio_project_id: string; image_url: string; caption: string | null; display_order: number }>;
-      folders: T<Base & { name: string; parent_id: string | null; path: string; created_by: string | null; updated_by: string | null }>;
+      portfolio_gallery: T<Base & { portfolio_project_id: string; image_url: string; media_type: "image" | "video"; caption: string | null; display_order: number }>;
+      folders: T<Base & { name: string; parent_id: string | null; path: string; client_id: string | null; is_client_visible: boolean; created_by: string | null; updated_by: string | null }>;
       files: T<Base & { folder_id: string | null; original_name: string; display_name: string; storage_path: string; public_url: string; mime_type: string | null; size: number | null; bucket: string; deleted_at: string | null; created_by: string | null; updated_by: string | null }>;
       stages: T<Base & { name: string; description: string | null; default_progress: number; display_order: number; status: "active" | "inactive"; icon: string | null; color: string | null; default_duration_days: number | null; created_by: string | null; updated_by: string | null }>;
       client_project_stages: T<Base & { client_project_id: string; stage_id: string; status: StageStatus; progress: number; start_date: string | null; expected_completion_date: string | null; completed_date: string | null; client_notes: string | null; admin_notes: string | null; display_order: number; created_by: string | null; updated_by: string | null }>;
@@ -58,9 +58,21 @@ export type Database = {
       panorama_categories: T<Base & { name: string; slug: string; description: string | null; display_order: number; is_active: boolean }>;
       panoramas: T<Base & { design_id: string; design_title: string; category_id: string; title: string; description: string | null; image_url: string; status: "draft" | "published"; is_public: boolean; display_order: number }>;
       client_panorama_assignments: T<Base & { client_id: string; panorama_id: string; assigned_by: string | null }>;
+      material_categories: T<Base & { name: string; slug: string; description: string | null; display_order: number; is_active: boolean; created_by: string | null }>;
+      material_recommendations: T<Base & { category_id: string | null; title: string; slug: string; description: string; document_url: string | null; image_url: string | null; video_url: string | null; status: "draft" | "published"; published_at: string | null; created_by: string | null; updated_by: string | null }>;
+      material_share_links: T<{ id: string; recommendation_id: string; token: string; expires_at: string | null; revoked_at: string | null; created_by: string | null; created_at: string }>;
     };
     Views: Record<string, never>;
-    Functions: Record<string, never>;
+    Functions: {
+      get_material_recommendation_by_token: {
+        Args: { share_token: string };
+        Returns: Array<{ id: string; title: string; description: string; document_url: string | null; image_url: string | null; video_url: string | null; category_name: string | null; expires_at: string | null }>;
+      };
+      assign_client_folder_tree: {
+        Args: { target_folder_id: string; target_client_id: string | null; target_visible: boolean };
+        Returns: undefined;
+      };
+    };
     Enums: Record<string, never>;
     CompositeTypes: Record<string, never>;
   };

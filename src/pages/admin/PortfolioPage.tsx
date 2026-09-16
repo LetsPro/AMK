@@ -1,17 +1,17 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useSearchParams } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { Edit2, Eye, ExternalLink, Globe, Image, Plus, Star, Trash2, Upload, X } from "lucide-react";
+import { Edit2, Eye, ExternalLink, Film, Globe, Image, Plus, Star, Trash2, Upload, X } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { useToast } from "@/contexts/ToastContext";
 import { useAuth } from "@/contexts/AuthContext";
-import { storageSafeFileName } from "@/services/crud";
+import { storageSafeFileName, uploadFile } from "@/services/crud";
 import type { TableRow } from "@/types/database";
 
-type PortfolioGalleryImage = Pick<TableRow<"portfolio_gallery">, "id" | "image_url" | "caption" | "display_order">;
+type PortfolioGalleryImage = Pick<TableRow<"portfolio_gallery">, "id" | "image_url" | "media_type" | "caption" | "display_order">;
 type PortfolioProject = TableRow<"portfolio_projects"> & {
   category?: TableRow<"portfolio_categories"> | null;
   portfolio_gallery?: PortfolioGalleryImage[];
@@ -64,7 +64,10 @@ export function PortfolioPage() {
   const [statusFilter, setStatusFilter] = useState<"all" | "draft" | "published">("all");
   const [previewProject, setPreviewProject] = useState<PortfolioProject | null>(null);
   const [uploadingImage, setUploadingImage] = useState(false);
+  const [coverUploadProgress, setCoverUploadProgress] = useState(0);
   const [uploadingGallery, setUploadingGallery] = useState(false);
+  const [galleryUploadProgress, setGalleryUploadProgress] = useState(0);
+  const [galleryUploadStatus, setGalleryUploadStatus] = useState("");
   const [galleryImages, setGalleryImages] = useState<PortfolioGalleryImage[]>([]);
   const [showCategoryManager, setShowCategoryManager] = useState(false);
   const [categoryName, setCategoryName] = useState("");
@@ -75,34 +78,45 @@ export function PortfolioPage() {
 
   async function uploadCoverImage(file: globalThis.File) {
     setUploadingImage(true);
-    const path = `portfolio/${Date.now()}-${storageSafeFileName(file.name)}`;
-    const { data: uploaded, error } = await supabase.storage.from("website").upload(path, file, { upsert: false });
-    if (error) { toast.error("Upload failed", error.message); setUploadingImage(false); return; }
-    const { data: { publicUrl } } = supabase.storage.from("website").getPublicUrl(uploaded.path);
-    setForm((f) => ({ ...f, cover_image_url: publicUrl }));
-    setUploadingImage(false);
+    setCoverUploadProgress(0);
+    try {
+      const path = `portfolio/${Date.now()}-${storageSafeFileName(file.name)}`;
+      const publicUrl = await uploadFile("website", path, file, { onProgress: setCoverUploadProgress });
+      setForm((f) => ({ ...f, cover_image_url: publicUrl }));
+    } catch (error) {
+      toast.error("Upload failed", errorMessage(error));
+    } finally {
+      setUploadingImage(false);
+      setCoverUploadProgress(0);
+    }
   }
 
-  async function uploadGalleryImages(files: FileList | null) {
+  async function uploadGalleryMedia(files: FileList | null) {
     const selectedFiles = Array.from(files ?? []);
     if (!selectedFiles.length) return;
     setUploadingGallery(true);
+    setGalleryUploadProgress(0);
     try {
-      const uploadedImages: PortfolioGalleryImage[] = [];
+      const uploadedMedia: PortfolioGalleryImage[] = [];
       for (const [index, file] of selectedFiles.entries()) {
+        const mediaType = file.type.startsWith("video/") ? "video" : file.type.startsWith("image/") ? "image" : null;
+        if (!mediaType) throw new Error(`${file.name} is not a supported photo or video.`);
+        setGalleryUploadStatus(`Uploading ${index + 1} of ${selectedFiles.length}: ${file.name}`);
         const cleanName = storageSafeFileName(file.name);
         const path = `portfolio/gallery/${Date.now()}-${index}-${cleanName}`;
-        const { data: uploaded, error } = await supabase.storage.from("website").upload(path, file, { upsert: false });
-        if (error) throw error;
-        const { data: { publicUrl } } = supabase.storage.from("website").getPublicUrl(uploaded.path);
-        uploadedImages.push({ id: `new-${crypto.randomUUID()}`, image_url: publicUrl, caption: file.name.replace(/\.[^.]+$/, ""), display_order: galleryImages.length + index });
+        const publicUrl = await uploadFile("website", path, file, {
+          onProgress: (fileProgress) => setGalleryUploadProgress(Math.round(((index + fileProgress / 100) / selectedFiles.length) * 100)),
+        });
+        uploadedMedia.push({ id: `new-${crypto.randomUUID()}`, image_url: publicUrl, media_type: mediaType, caption: file.name.replace(/\.[^.]+$/, ""), display_order: galleryImages.length + index });
       }
-      setGalleryImages((current) => [...current, ...uploadedImages]);
-      toast.success(`${uploadedImages.length} project image${uploadedImages.length === 1 ? "" : "s"} uploaded`);
+      setGalleryImages((current) => [...current, ...uploadedMedia]);
+      toast.success(`${uploadedMedia.length} project media item${uploadedMedia.length === 1 ? "" : "s"} uploaded`);
     } catch (error) {
       toast.error("Upload failed", error instanceof Error ? error.message : "Could not upload project images");
     } finally {
       setUploadingGallery(false);
+      setGalleryUploadProgress(0);
+      setGalleryUploadStatus("");
       if (galleryInputRef.current) galleryInputRef.current.value = "";
     }
   }
@@ -110,10 +124,10 @@ export function PortfolioPage() {
   const load = useCallback(async () => {
     setLoading(true);
     const [pRes, cRes] = await Promise.all([
-      supabase.from("portfolio_projects").select("*, category:portfolio_categories(*), portfolio_gallery(id,image_url,caption,display_order)").order("display_order").order("created_at", { ascending: false }),
+      supabase.from("portfolio_projects").select("*, category:portfolio_categories(*), portfolio_gallery(id,image_url,media_type,caption,display_order)").order("display_order").order("created_at", { ascending: false }),
       supabase.from("portfolio_categories").select("*").order("display_order"),
     ]);
-    setProjects((pRes.data as PortfolioProject[]) ?? []);
+    setProjects((pRes.data as unknown as PortfolioProject[]) ?? []);
     setCategories((cRes.data as PortfolioCategory[]) ?? []);
     setLoading(false);
   }, []);
@@ -182,12 +196,12 @@ export function PortfolioPage() {
         if (deleteError) throw deleteError;
 
         const existingImages = galleryImages.filter((image) => !image.id.startsWith("new-"));
-        const updateResults = await Promise.all(existingImages.map((image, index) => supabase.from("portfolio_gallery").update({ caption: image.caption || null, display_order: index }).eq("id", image.id)));
+        const updateResults = await Promise.all(existingImages.map((image, index) => supabase.from("portfolio_gallery").update({ caption: image.caption || null, media_type: image.media_type, display_order: index }).eq("id", image.id)));
         const updateError = updateResults.find((result) => result.error)?.error;
         if (updateError) throw updateError;
         const newImages = galleryImages.filter((image) => image.id.startsWith("new-"));
         if (newImages.length) {
-          const { error: galleryError } = await supabase.from("portfolio_gallery").insert(newImages.map((image, index) => ({ portfolio_project_id: projectId, image_url: image.image_url, caption: image.caption || null, display_order: existingImages.length + index })));
+          const { error: galleryError } = await supabase.from("portfolio_gallery").insert(newImages.map((image, index) => ({ portfolio_project_id: projectId, image_url: image.image_url, media_type: image.media_type, caption: image.caption || null, display_order: existingImages.length + index })));
           if (galleryError) throw galleryError;
         }
       }
@@ -293,7 +307,7 @@ export function PortfolioPage() {
             <div key={project.id} className="rounded-xl border border-slate-200 bg-white overflow-hidden shadow-sm hover:shadow-md transition-shadow group">
               <div className="relative aspect-video bg-slate-100 overflow-hidden">
                 {project.cover_image_url ? (
-                  <img src={project.cover_image_url} alt={project.title} loading="lazy" decoding="async" className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />
+                  <img src={project.cover_image_url} alt={project.title} loading="lazy" decoding="async" className="h-full w-full bg-slate-100 object-contain transition-transform duration-500 group-hover:scale-[1.02]" />
                 ) : (
                   <div className="flex h-full w-full items-center justify-center text-slate-300"><Image className="h-12 w-12" /></div>
                 )}
@@ -331,10 +345,12 @@ export function PortfolioPage() {
         {previewProject && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 grid place-items-center bg-slate-950/80 p-4" onClick={() => setPreviewProject(null)}>
             <motion.div initial={{ scale: 0.96 }} animate={{ scale: 1 }} exit={{ scale: 0.96 }} onClick={(e) => e.stopPropagation()} className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-2xl bg-white shadow-2xl">
-              {previewProject.cover_image_url && <img src={previewProject.cover_image_url} alt={previewProject.title} loading="eager" decoding="async" className="w-full aspect-video object-cover" />}
+              {previewProject.cover_image_url && <img src={previewProject.cover_image_url} alt={previewProject.title} loading="eager" decoding="async" className="max-h-[58vh] w-full bg-slate-950 object-contain" />}
               {previewProject.portfolio_gallery?.length ? (
                 <div className="flex gap-2 overflow-x-auto border-b border-slate-200 bg-slate-50 p-3">
-                  {[...previewProject.portfolio_gallery].sort((a, b) => a.display_order - b.display_order).map((image) => <img key={image.id} src={image.image_url} alt={image.caption ?? "Project gallery"} loading="lazy" decoding="async" className="h-20 w-28 shrink-0 rounded-md object-cover" />)}
+                  {[...previewProject.portfolio_gallery].sort((a, b) => a.display_order - b.display_order).map((media) => media.media_type === "video"
+                    ? <video key={media.id} src={media.image_url} controls preload="metadata" className="h-20 w-28 shrink-0 rounded-md bg-black object-contain" />
+                    : <img key={media.id} src={media.image_url} alt={media.caption ?? "Project gallery"} loading="lazy" decoding="async" className="h-20 w-28 shrink-0 rounded-md bg-slate-200 object-contain" />)}
                 </div>
               ) : null}
               <div className="p-6">
@@ -397,34 +413,47 @@ export function PortfolioPage() {
                   <input ref={imageInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => { if (e.target.files?.[0]) uploadCoverImage(e.target.files[0]); }} />
                   {form.cover_image_url ? (
                     <div className="relative rounded-lg overflow-hidden border border-slate-200">
-                      <img src={form.cover_image_url} alt="cover" loading="lazy" decoding="async" className="w-full aspect-video object-cover" />
-                      <div className="absolute inset-0 flex items-center justify-center gap-2 bg-slate-950/40 opacity-0 hover:opacity-100 transition-opacity">
+                      <img src={form.cover_image_url} alt="cover" loading="lazy" decoding="async" className="max-h-80 w-full bg-slate-950 object-contain" />
+                      {uploadingImage && <div className="absolute inset-0 grid place-items-center bg-slate-950/70 p-6 text-white"><div className="w-full max-w-xs"><div className="text-center text-sm font-bold">Uploading {coverUploadProgress}%</div><div className="mt-2 h-2 overflow-hidden rounded-full bg-white/20"><div className="h-full bg-brand-accent transition-[width] duration-200" style={{ width: `${coverUploadProgress}%` }} /></div></div></div>}
+                      {!uploadingImage && <div className="absolute inset-0 flex items-center justify-center gap-2 bg-slate-950/40 opacity-0 hover:opacity-100 transition-opacity">
                         <button type="button" onClick={() => imageInputRef.current?.click()} className="rounded-lg bg-white px-3 py-1.5 text-xs font-semibold text-slate-800 hover:bg-slate-50 flex items-center gap-1.5"><Upload className="h-3.5 w-3.5" /> Replace</button>
                         <button type="button" onClick={() => setForm((f) => ({ ...f, cover_image_url: "" }))} className="rounded-lg bg-red-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-600"><X className="h-3.5 w-3.5" /></button>
-                      </div>
+                      </div>}
                     </div>
                   ) : (
-                    <button type="button" onClick={() => imageInputRef.current?.click()} disabled={uploadingImage} className="flex h-32 w-full items-center justify-center gap-2 rounded-lg border-2 border-dashed border-slate-300 text-slate-400 hover:border-brand-primary/50 hover:text-brand-primary transition-colors disabled:opacity-50">
-                      {uploadingImage ? <div className="h-5 w-5 rounded-full border-2 border-brand-primary border-t-transparent animate-spin" /> : <><Upload className="h-5 w-5" /><span className="text-sm font-medium">Upload cover image</span></>}
-                    </button>
+                    <div>
+                      <button type="button" onClick={() => imageInputRef.current?.click()} disabled={uploadingImage} className="flex h-32 w-full items-center justify-center gap-2 rounded-lg border-2 border-dashed border-slate-300 text-slate-400 hover:border-brand-primary/50 hover:text-brand-primary transition-colors disabled:opacity-50">
+                        {uploadingImage ? <><div className="h-5 w-5 rounded-full border-2 border-brand-primary border-t-transparent animate-spin" /><span className="text-sm font-semibold">Uploading {coverUploadProgress}%</span></> : <><Upload className="h-5 w-5" /><span className="text-sm font-medium">Upload cover image</span></>}
+                      </button>
+                      {uploadingImage && <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-100"><div className="h-full bg-brand-primary transition-[width] duration-200" style={{ width: `${coverUploadProgress}%` }} /></div>}
+                    </div>
                   )}
                 </div>
                 <div>
                   <div className="mb-2 flex items-end justify-between gap-3">
                     <div>
-                      <label className="block text-sm font-medium">Project Gallery</label>
-                      <p className="mt-0.5 text-xs text-slate-500">Select several images at once. They will appear as a gallery on the project page.</p>
+                      <label className="block text-sm font-medium">Project Photos &amp; Videos</label>
+                      <p className="mt-0.5 text-xs text-slate-500">Select multiple portrait or landscape photos and videos. Visitors can open them at full size.</p>
                     </div>
-                    <input ref={galleryInputRef} type="file" accept="image/*" multiple className="hidden" onChange={(event) => uploadGalleryImages(event.target.files)} />
+                    <input ref={galleryInputRef} type="file" accept="image/png,image/jpeg,image/webp,video/mp4,video/webm,video/quicktime" multiple className="hidden" onChange={(event) => uploadGalleryMedia(event.target.files)} />
                     <Button type="button" variant="secondary" className="shrink-0" onClick={() => galleryInputRef.current?.click()} disabled={uploadingGallery}>
-                      <Upload className="h-4 w-4" /> {uploadingGallery ? "Uploading..." : "Add Photos"}
+                      <Upload className="h-4 w-4" /> {uploadingGallery ? `${galleryUploadProgress}%` : "Add Photos / Videos"}
                     </Button>
                   </div>
+                  {uploadingGallery && (
+                    <div className="mb-3 rounded-lg border border-orange-200 bg-orange-50 p-3">
+                      <div className="flex items-center justify-between gap-3 text-xs font-semibold text-slate-700"><span className="truncate">{galleryUploadStatus}</span><span>{galleryUploadProgress}%</span></div>
+                      <div className="mt-2 h-2 overflow-hidden rounded-full bg-white"><div className="h-full bg-brand-primary transition-[width] duration-200" style={{ width: `${galleryUploadProgress}%` }} /></div>
+                    </div>
+                  )}
                   {galleryImages.length ? (
                     <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
                       {galleryImages.map((image, index) => (
                         <div key={image.id} className="group relative overflow-hidden rounded-lg border border-slate-200 bg-slate-50">
-                          <img src={image.image_url} alt={image.caption ?? `Project image ${index + 1}`} loading="lazy" decoding="async" className="aspect-[4/3] w-full object-cover" />
+                          {image.media_type === "video"
+                            ? <video src={image.image_url} controls preload="metadata" className="aspect-[4/3] w-full bg-black object-contain" />
+                            : <img src={image.image_url} alt={image.caption ?? `Project image ${index + 1}`} loading="lazy" decoding="async" className="aspect-[4/3] w-full bg-slate-200 object-contain" />}
+                          <span className="absolute left-2 top-2 inline-flex items-center gap-1 rounded-full bg-slate-950/75 px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-white">{image.media_type === "video" ? <Film className="h-3 w-3" /> : <Image className="h-3 w-3" />}{image.media_type}</span>
                           <button type="button" onClick={() => setGalleryImages((current) => current.filter((item) => item.id !== image.id))} className="absolute right-2 top-2 grid h-8 w-8 place-items-center rounded-full bg-red-500 text-white shadow transition hover:bg-red-600" aria-label={`Remove project image ${index + 1}`}><Trash2 className="h-4 w-4" /></button>
                           <input value={image.caption ?? ""} onChange={(event) => setGalleryImages((current) => current.map((item) => item.id === image.id ? { ...item, caption: event.target.value } : item))} className="w-full border-t border-slate-200 bg-white px-2 py-2 text-xs outline-none focus:border-brand-primary" placeholder={`Caption ${index + 1}`} />
                         </div>
@@ -432,7 +461,7 @@ export function PortfolioPage() {
                     </div>
                   ) : (
                     <button type="button" onClick={() => galleryInputRef.current?.click()} disabled={uploadingGallery} className="flex min-h-24 w-full items-center justify-center gap-2 rounded-lg border-2 border-dashed border-slate-300 text-sm font-medium text-slate-500 transition hover:border-brand-primary/50 hover:text-brand-primary disabled:opacity-50">
-                      <Image className="h-5 w-5" /> Add multiple project photos
+                      <Upload className="h-5 w-5" /> Add project photos or videos
                     </button>
                   )}
                 </div>

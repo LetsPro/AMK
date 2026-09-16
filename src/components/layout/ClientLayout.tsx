@@ -21,7 +21,7 @@ type ClientCommercials = { name: string; contract_value: number | null; payment_
 
 function formatCurrency(value: number | null | undefined) {
   if (value === null || value === undefined) return "Not set";
-  return new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(value);
+  return new Intl.NumberFormat("en-IN", { maximumFractionDigits: 0 }).format(value);
 }
 
 export function ClientLayout() {
@@ -193,7 +193,7 @@ export function ClientLayout() {
                     </span>
                     <span className="min-w-0">
                       <span className="block text-xs font-semibold uppercase tracking-wide text-slate-400">{label}</span>
-                      <span className="block truncate text-lg font-black text-slate-950">{value}</span>
+                      <span className="flex items-center truncate text-lg font-black text-slate-950">{value !== "Not set" && <IndianRupee className="mr-0.5 h-[1em] w-[1em] shrink-0" aria-hidden="true" />}{value}</span>
                     </span>
                   </div>
                 ))}

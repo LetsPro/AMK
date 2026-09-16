@@ -18,6 +18,7 @@ const ContactPage = lazy(() => import("@/pages/public/PublicPages").then((m) => 
 const PortfolioListingPage = lazy(() => import("@/pages/public/PortfolioPages").then((m) => ({ default: m.PortfolioListingPage })));
 const PortfolioDetailPage = lazy(() => import("@/pages/public/PortfolioPages").then((m) => ({ default: m.PortfolioDetailPage })));
 const PanoramaPage = lazy(() => import("@/pages/public/PanoramaPage").then((m) => ({ default: m.PanoramaPage })));
+const MaterialRecommendationPage = lazy(() => import("@/pages/public/MaterialRecommendationPage").then((m) => ({ default: m.MaterialRecommendationPage })));
 
 // Admin pages
 const AdminDashboard = lazy(() => import("@/pages/admin/AdminDashboard").then((m) => ({ default: m.AdminDashboard })));
@@ -33,6 +34,7 @@ const CmsPage = lazy(() => import("@/pages/admin/CmsPage").then((m) => ({ defaul
 const MediaPage = lazy(() => import("@/pages/admin/MediaPage").then((m) => ({ default: m.MediaPage })));
 const PanoramaAdminPage = lazy(() => import("@/pages/admin/PanoramaAdminPage").then((m) => ({ default: m.PanoramaAdminPage })));
 const SettingsPage = lazy(() => import("@/pages/admin/SettingsPage").then((m) => ({ default: m.SettingsPage })));
+const MaterialsPage = lazy(() => import("@/pages/admin/MaterialsPage").then((m) => ({ default: m.MaterialsPage })));
 
 // Client pages
 const ClientDashboard = lazy(() => import("@/pages/client/ClientDashboard").then((m) => ({ default: m.ClientDashboard })));
@@ -115,6 +117,7 @@ export function App() {
           <Route path="gallery" element={<GalleryPage />} />
           <Route path="360-interiors" element={<PanoramaPage />} />
           <Route path="contact" element={<ContactPage />} />
+          <Route path="materials/:token" element={<><Seo title="Private Material Recommendation | AMK Architects & Engineers" description="Private material guidance shared by AMK Architects & Engineers." noIndex /><MaterialRecommendationPage /></>} />
         </Route>
 
         {/* Auth */}
@@ -137,6 +140,7 @@ export function App() {
             <Route path="cms" element={<Suspense fallback={<PageLoader />}><CmsPage /></Suspense>} />
             <Route path="media" element={<Suspense fallback={<PageLoader />}><MediaPage /></Suspense>} />
             <Route path="360-interiors" element={<Suspense fallback={<PageLoader />}><PanoramaAdminPage /></Suspense>} />
+            <Route path="materials" element={<Suspense fallback={<PageLoader />}><MaterialsPage /></Suspense>} />
             <Route path="settings" element={<Suspense fallback={<PageLoader />}><SettingsPage /></Suspense>} />
           </Route>
         </Route>

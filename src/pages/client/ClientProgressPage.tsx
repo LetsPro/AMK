@@ -63,7 +63,7 @@ export function ClientProgressPage() {
       ]);
 
       setStages((stageData as Stage[]) ?? []);
-      setAssignments(await attachFileAccessUrls((fileData as Assignment[]) ?? []));
+      setAssignments(await attachFileAccessUrls((fileData as unknown as Assignment[]) ?? []));
       setLoading(false);
     })();
   }, [clientId]);

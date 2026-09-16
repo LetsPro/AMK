@@ -9,6 +9,7 @@ import { supabase } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
+import { MediaPicker } from "@/components/media/MediaPicker";
 import { useToast } from "@/contexts/ToastContext";
 import { useAuth } from "@/contexts/AuthContext";
 import type { TableRow, ClientStatus, StageStatus, ProjectStatus } from "@/types/database";
@@ -36,7 +37,12 @@ const statusColor: Record<string, string> = {
 
 function formatCurrency(value: number | null | undefined) {
   if (value === null || value === undefined) return "Not set";
-  return new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(value);
+  return new Intl.NumberFormat("en-IN", { maximumFractionDigits: 0 }).format(value);
+}
+
+function CurrencyText({ value }: { value: string }) {
+  if (value === "Not set") return <>Not set</>;
+  return <span className="inline-flex items-center"><IndianRupee className="mr-0.5 h-[1em] w-[1em] shrink-0" aria-hidden="true" />{value}</span>;
 }
 
 export function ClientDetailPage() {
@@ -52,7 +58,8 @@ export function ClientDetailPage() {
   const [loading, setLoading] = useState(true);
   const [expandedProject, setExpandedProject] = useState<string | null>(null);
   const [showProjectForm, setShowProjectForm] = useState(false);
-  const [projectForm, setProjectForm] = useState({ name: "", description: "", start_date: "", expected_completion_date: "", status: "Active" as ProjectStatus });
+  const [editingProjectId, setEditingProjectId] = useState<string | null>(null);
+  const [projectForm, setProjectForm] = useState({ name: "", description: "", cover_image_url: "", start_date: "", expected_completion_date: "", status: "Active" as ProjectStatus });
 
   const load = useCallback(async () => {
     if (!id) return;
@@ -64,21 +71,36 @@ export function ClientDetailPage() {
       supabase.from("client_blueprint_assignments").select("*, blueprint:blueprint_links(title,url)").eq("client_id", id).order("created_at", { ascending: false }),
     ]);
     setClient(clientRes.data as Client | null);
-    setProjects((projectsRes.data as ClientProject[]) ?? []);
-    setFileAssignments((filesRes.data as FileAssignment[]) ?? []);
-    setBlueprints((blueprintsRes.data as BlueprintAssignment[]) ?? []);
+    setProjects((projectsRes.data as unknown as ClientProject[]) ?? []);
+    setFileAssignments((filesRes.data as unknown as FileAssignment[]) ?? []);
+    setBlueprints((blueprintsRes.data as unknown as BlueprintAssignment[]) ?? []);
     setLoading(false);
   }, [id]);
 
   useEffect(() => { load(); }, [load]);
 
-  async function createProject() {
+  function openNewProject() {
+    setEditingProjectId(null);
+    setProjectForm({ name: "", description: "", cover_image_url: "", start_date: "", expected_completion_date: "", status: "Active" });
+    setShowProjectForm(true);
+  }
+
+  function openProjectEditor(project: ClientProject) {
+    setEditingProjectId(project.id);
+    setProjectForm({ name: project.name, description: project.description ?? "", cover_image_url: project.cover_image_url ?? "", start_date: project.start_date ?? "", expected_completion_date: project.expected_completion_date ?? "", status: project.status });
+    setShowProjectForm(true);
+  }
+
+  async function saveProject() {
     if (!id || !projectForm.name.trim()) return;
-    const { error } = await supabase.from("client_projects").insert({ client_id: id, ...projectForm, created_by: profile?.id });
+    const payload = { ...projectForm, cover_image_url: projectForm.cover_image_url || null, updated_by: profile?.id };
+    const { error } = editingProjectId
+      ? await supabase.from("client_projects").update(payload).eq("id", editingProjectId)
+      : await supabase.from("client_projects").insert({ client_id: id, ...payload, created_by: profile?.id });
     if (error) { toast.error("Error", error.message); return; }
-    toast.success("Project created");
+    toast.success(editingProjectId ? "Project updated" : "Project created");
     setShowProjectForm(false);
-    setProjectForm({ name: "", description: "", start_date: "", expected_completion_date: "", status: "Active" });
+    setProjectForm({ name: "", description: "", cover_image_url: "", start_date: "", expected_completion_date: "", status: "Active" });
     load();
   }
 
@@ -139,7 +161,7 @@ export function ClientDetailPage() {
                 <div className={cn("mb-4 grid h-10 w-10 place-items-center rounded-xl", tone)}>
                   <IndianRupee className="h-5 w-5" />
                 </div>
-                <div className="text-2xl font-black text-slate-950">{value}</div>
+                <div className="text-2xl font-black text-slate-950"><CurrencyText value={value} /></div>
                 <div className="mt-1 text-xs font-semibold uppercase tracking-wide text-slate-400">{label}</div>
               </div>
             ))}
@@ -196,13 +218,13 @@ export function ClientDetailPage() {
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <h2 className="font-bold text-slate-800">{projects.length} Project{projects.length !== 1 ? "s" : ""}</h2>
-            <Button onClick={() => setShowProjectForm(true)}><Plus className="h-4 w-4" /> Add Project</Button>
+            <Button onClick={openNewProject}><Plus className="h-4 w-4" /> Add Project</Button>
           </div>
 
           {projects.length === 0 ? (
             <div className="py-16 text-center rounded-xl border border-dashed border-slate-300">
               <p className="text-slate-400">No projects yet.</p>
-              <Button className="mt-4" onClick={() => setShowProjectForm(true)}><Plus className="h-4 w-4" /> Add Project</Button>
+              <Button className="mt-4" onClick={openNewProject}><Plus className="h-4 w-4" /> Add Project</Button>
             </div>
           ) : projects.map((project) => (
             <div key={project.id} className="rounded-xl border border-slate-200 bg-white overflow-hidden">
@@ -230,6 +252,7 @@ export function ClientDetailPage() {
                 {expandedProject === project.id && (
                   <motion.div initial={{ height: 0 }} animate={{ height: "auto" }} exit={{ height: 0 }} className="overflow-hidden border-t border-slate-100">
                     <div className="p-5 space-y-3">
+                      {project.cover_image_url && <img src={project.cover_image_url} alt={`${project.name} elevation`} className="max-h-72 w-full rounded-xl bg-slate-100 object-contain" />}
                       {project.description && <p className="text-sm text-slate-600">{project.description}</p>}
                       <div className="flex flex-wrap gap-4 text-sm text-slate-500">
                         {project.start_date && <span><strong className="text-slate-700">Start:</strong> {project.start_date}</span>}
@@ -248,6 +271,7 @@ export function ClientDetailPage() {
                           ))}
                         </div>
                       )}
+                      <Button type="button" variant="secondary" onClick={() => openProjectEditor(project)}><Pencil className="h-4 w-4" /> Edit project &amp; elevation</Button>
                     </div>
                   </motion.div>
                 )}
@@ -325,7 +349,7 @@ export function ClientDetailPage() {
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 grid place-items-center bg-slate-950/50 p-4">
             <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }} className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="font-bold text-lg">Add Project</h3>
+                <h3 className="font-bold text-lg">{editingProjectId ? "Edit Project" : "Add Project"}</h3>
                 <button onClick={() => setShowProjectForm(false)}><X className="h-5 w-5 text-slate-400" /></button>
               </div>
               <div className="space-y-3">
@@ -336,6 +360,10 @@ export function ClientDetailPage() {
                 <div>
                   <label className="block text-sm font-medium mb-1">Description</label>
                   <textarea value={projectForm.description} onChange={(e) => setProjectForm({ ...projectForm, description: e.target.value })} className="h-16 w-full rounded-md border border-slate-200 px-3 py-2 text-sm resize-none focus:border-brand-primary focus:outline-none" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Elevation picture</label>
+                  <MediaPicker label="elevation picture" value={projectForm.cover_image_url} onChange={(cover_image_url) => setProjectForm({ ...projectForm, cover_image_url })} />
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
@@ -349,7 +377,7 @@ export function ClientDetailPage() {
                 </div>
               </div>
               <div className="mt-4 flex gap-3">
-                <Button onClick={createProject} className="flex-1">Create Project</Button>
+                <Button onClick={saveProject} className="flex-1">{editingProjectId ? "Save Changes" : "Create Project"}</Button>
                 <Button variant="secondary" onClick={() => setShowProjectForm(false)}>Cancel</Button>
               </div>
             </motion.div>

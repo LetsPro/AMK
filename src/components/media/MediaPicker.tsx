@@ -3,7 +3,7 @@ import { Film, ImagePlus, Loader2, Trash2, Upload, X } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { useTable, useTableMutations } from "@/hooks/useSupabaseTable";
-import { removeStoredFile, uploadFile } from "@/services/crud";
+import { removeStoredFile, storageSafeFileName, uploadFile } from "@/services/crud";
 import type { TableRow } from "@/types/database";
 import { useToast } from "@/contexts/ToastContext";
 
@@ -45,6 +45,7 @@ function MediaLibraryContent({ onClose, onSelect, embedded = false, mediaType }:
   const inputRef = useRef<HTMLInputElement | null>(null);
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadStatus, setUploadStatus] = useState("");
   const [preview, setPreview] = useState<MediaAsset | null>(null);
   const [filter, setFilter] = useState<MediaFilter>(mediaType ?? "all");
   const { data = [], refetch } = useTable("media_assets", { orderBy: "created_at" });
@@ -54,22 +55,28 @@ function MediaLibraryContent({ onClose, onSelect, embedded = false, mediaType }:
   const visibleAssets = (data as MediaAsset[]).filter((asset) => !activeMediaType || (asset.mime_type ?? "").startsWith(`${activeMediaType}/`));
 
   async function upload(files: FileList | null) {
-    const file = files?.[0];
-    if (!file) return;
+    const selectedFiles = Array.from(files ?? []);
+    if (!selectedFiles.length) return;
     setUploading(true);
     setUploadProgress(0);
     try {
-      const cleanName = file.name.toLowerCase().replace(/[^a-z0-9.]+/g, "-");
-      const path = `media/${Date.now()}-${cleanName}`;
-      const url = await uploadFile("website", path, file, { onProgress: setUploadProgress });
-      await create.mutateAsync({ bucket: "website", path, url, file_name: file.name, mime_type: file.type, size: file.size });
+      for (const [index, file] of selectedFiles.entries()) {
+        setUploadStatus(`Uploading ${index + 1} of ${selectedFiles.length}: ${file.name}`);
+        const path = `media/${Date.now()}-${index}-${storageSafeFileName(file.name)}`;
+        const url = await uploadFile("website", path, file, {
+          onProgress: (fileProgress) => setUploadProgress(Math.round(((index + fileProgress / 100) / selectedFiles.length) * 100)),
+        });
+        await create.mutateAsync({ bucket: "website", path, url, file_name: file.name, mime_type: file.type, size: file.size });
+      }
       await refetch();
-      toast.success(`${file.type.startsWith("video/") ? "Video" : "Image"} uploaded`, file.name);
+      toast.success(`${selectedFiles.length} media file${selectedFiles.length === 1 ? "" : "s"} uploaded`);
     } catch (error) {
-      toast.error("Upload failed", uploadErrorMessage(error, file));
+      const currentFile = selectedFiles.find((file) => uploadStatus.endsWith(file.name)) ?? selectedFiles[0];
+      toast.error("Upload failed", uploadErrorMessage(error, currentFile));
     } finally {
       setUploading(false);
       setUploadProgress(0);
+      setUploadStatus("");
       if (inputRef.current) inputRef.current.value = "";
     }
   }
@@ -103,9 +110,10 @@ function MediaLibraryContent({ onClose, onSelect, embedded = false, mediaType }:
               ))}
             </div>
           )}
-          <input ref={inputRef} className="hidden" type="file" accept={activeMediaType === "video" ? "video/mp4,video/webm,video/quicktime" : activeMediaType === "image" ? "image/png,image/jpeg,image/webp" : "image/png,image/jpeg,image/webp,video/mp4,video/webm,video/quicktime"} onChange={(event) => upload(event.target.files)} />
+          <input ref={inputRef} className="hidden" type="file" multiple accept={activeMediaType === "video" ? "video/mp4,video/webm,video/quicktime" : activeMediaType === "image" ? "image/png,image/jpeg,image/webp" : "image/png,image/jpeg,image/webp,video/mp4,video/webm,video/quicktime"} onChange={(event) => upload(event.target.files)} />
           <Button type="button" onClick={() => inputRef.current?.click()} disabled={uploading}>{uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : activeMediaType === "video" ? <Film className="h-4 w-4" /> : <Upload className="h-4 w-4" />} {uploading ? `Uploading ${uploadProgress}%` : `Upload ${activeMediaType === "video" ? "Video" : activeMediaType === "image" ? "Image" : "Media"}`}</Button>
-          <span className="text-sm text-slate-500">{activeMediaType === "video" ? "Large videos upload in resumable chunks. Supabase project and bucket limits still apply." : "The upload option stays visible while you browse the library."}</span>
+          <span className="text-sm text-slate-500">{uploading ? uploadStatus : activeMediaType === "video" ? "Large videos use resumable uploads; select any number of files." : "Select any number of files. Large files upload in resumable chunks."}</span>
+          {uploading && <div className="basis-full"><div className="h-2 overflow-hidden rounded-full bg-slate-100"><div className="h-full bg-brand-primary transition-[width] duration-200" style={{ width: `${uploadProgress}%` }} /></div><div className="mt-1 text-right text-xs font-semibold tabular-nums text-brand-primary">{uploadProgress}% complete</div></div>}
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4 [touch-action:pan-y] [-webkit-overflow-scrolling:touch]">
           {visibleAssets.length ? (

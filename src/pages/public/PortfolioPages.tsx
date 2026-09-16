@@ -1,15 +1,17 @@
 import { useState, useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
-import { ArrowLeft, Calendar, ChevronDown, ExternalLink, MapPin, Sparkles, Tag } from "lucide-react";
+import { ArrowLeft, Calendar, ChevronDown, ExternalLink, Film, MapPin, Maximize2, Sparkles, X } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { Seo } from "@/components/seo/Seo";
 import type { TableRow } from "@/types/database";
 
 type Project = TableRow<"portfolio_projects"> & {
   portfolio_categories: { name: string } | null;
-  portfolio_gallery: { image_url: string; caption: string | null; display_order: number }[];
+  portfolio_gallery: PortfolioMedia[];
 };
+
+type PortfolioMedia = { id: string; image_url: string; media_type: "image" | "video"; caption: string | null; display_order: number };
 
 function SectionIntro({ eyebrow, title, text }: { eyebrow: string; title: string; text: string }) {
   return (
@@ -51,12 +53,18 @@ function PortfolioAccordion({ items }: { items: { title: string; text: string; m
 }
 
 function PortfolioCard({ project }: { project: Project }) {
+  const firstGalleryItem = [...(project.portfolio_gallery ?? [])].sort((a, b) => a.display_order - b.display_order)[0];
+  const preview = project.cover_image_url
+    ? { image_url: project.cover_image_url, media_type: "image" as const }
+    : firstGalleryItem;
   return (
     <motion.div whileHover={{ y: -6 }} transition={{ duration: 0.22 }}>
       <Link to={`/projects/${project.slug}`} className="group block overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm transition-all duration-300 hover:border-orange-200 hover:shadow-xl">
       <div className="relative aspect-video overflow-hidden bg-slate-100">
-        {project.cover_image_url ? (
-          <img src={project.cover_image_url} alt={project.title} loading="lazy" decoding="async" className="h-full w-full object-cover group-hover:scale-105 transition-transform duration-500" />
+        {preview ? (
+          preview.media_type === "video"
+            ? <video src={preview.image_url} muted playsInline preload="metadata" className="h-full w-full bg-slate-950 object-contain" aria-label={`${project.title} video preview`} />
+            : <img src={preview.image_url} alt={project.title} loading="lazy" decoding="async" className="h-full w-full bg-slate-100 object-contain transition-transform duration-500 group-hover:scale-[1.02]" />
         ) : (
           <div className="h-full w-full flex items-center justify-center text-slate-300">
             <svg className="h-12 w-12" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
@@ -95,10 +103,10 @@ export function PortfolioListingPage() {
   useEffect(() => {
     (async () => {
       const [{ data: pData }, { data: cData }] = await Promise.all([
-        supabase.from("portfolio_projects").select("*, portfolio_categories(name), portfolio_gallery(image_url,caption,display_order)").eq("status", "published").order("display_order"),
+        supabase.from("portfolio_projects").select("*, portfolio_categories(name), portfolio_gallery(id,image_url,media_type,caption,display_order)").eq("status", "published").order("display_order"),
         supabase.from("portfolio_categories").select("id,name").order("display_order"),
       ]);
-      setProjects((pData as Project[]) ?? []);
+      setProjects((pData as unknown as Project[]) ?? []);
       setCategories((cData as { id: string; name: string }[]) ?? []);
       setLoading(false);
     })();
@@ -151,18 +159,34 @@ export function PortfolioDetailPage() {
   const { slug } = useParams<{ slug: string }>();
   const [project, setProject] = useState<Project | null>(null);
   const [loading, setLoading] = useState(true);
-  const [activeImage, setActiveImage] = useState<string | null>(null);
+  const [activeMedia, setActiveMedia] = useState<PortfolioMedia | null>(null);
+  const [lightboxOpen, setLightboxOpen] = useState(false);
 
   useEffect(() => {
     if (!slug) return;
     (async () => {
-      const { data: rawData } = await supabase.from("portfolio_projects").select("*, portfolio_categories(name), portfolio_gallery(image_url,caption,display_order)").eq("slug", slug).eq("status", "published").maybeSingle();
+      const { data: rawData } = await supabase.from("portfolio_projects").select("*, portfolio_categories(name), portfolio_gallery(id,image_url,media_type,caption,display_order)").eq("slug", slug).eq("status", "published").maybeSingle();
       const data = rawData as Project | null;
       setProject(data);
-      if (data?.cover_image_url) setActiveImage(data.cover_image_url);
+      const firstGalleryItem = [...(data?.portfolio_gallery ?? [])].sort((a, b) => a.display_order - b.display_order)[0];
+      setActiveMedia(data?.cover_image_url
+        ? { id: "cover", image_url: data.cover_image_url, media_type: "image", caption: data.title, display_order: -1 }
+        : firstGalleryItem ?? null);
       setLoading(false);
     })();
   }, [slug]);
+
+  useEffect(() => {
+    if (!lightboxOpen) return;
+    const previousOverflow = document.body.style.overflow;
+    const closeOnEscape = (event: KeyboardEvent) => event.key === "Escape" && setLightboxOpen(false);
+    document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [lightboxOpen]);
 
   if (loading) {
     return (
@@ -186,7 +210,10 @@ export function PortfolioDetailPage() {
   }
 
   const gallery = [...(project.portfolio_gallery ?? [])].sort((a, b) => a.display_order - b.display_order);
-  const allImages = [project.cover_image_url, ...gallery.map((g) => g.image_url)].filter(Boolean) as string[];
+  const allMedia: PortfolioMedia[] = [
+    ...(project.cover_image_url ? [{ id: "cover", image_url: project.cover_image_url, media_type: "image" as const, caption: project.title, display_order: -1 }] : []),
+    ...gallery,
+  ];
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-12 sm:px-6 lg:px-8">
@@ -212,18 +239,25 @@ export function PortfolioDetailPage() {
       <div className="grid gap-8 lg:grid-cols-[1fr_320px]">
         {/* Main content */}
         <div>
-          {/* Active image */}
-          {activeImage && (
-            <motion.div initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} className="aspect-video rounded-lg overflow-hidden bg-slate-100 mb-3">
-              <img src={activeImage} alt={project.title} loading="eager" decoding="async" className="h-full w-full object-cover" />
+          {/* Active photo or video */}
+          {activeMedia && (
+            <motion.div initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} className="relative mb-3 flex min-h-72 max-h-[72vh] items-center justify-center overflow-hidden rounded-lg bg-slate-950 sm:min-h-96">
+              {activeMedia.media_type === "video"
+                ? <video src={activeMedia.image_url} controls playsInline preload="metadata" className="max-h-[72vh] w-full object-contain" aria-label={activeMedia.caption ?? `${project.title} video`} />
+                : <button type="button" className="flex h-full w-full items-center justify-center" onClick={() => setLightboxOpen(true)} aria-label="Open image at full size">
+                    <img src={activeMedia.image_url} alt={activeMedia.caption ?? project.title} loading="eager" decoding="async" className="max-h-[72vh] w-full object-contain" />
+                    <span className="absolute bottom-4 right-4 inline-flex items-center gap-2 rounded-full bg-slate-950/70 px-3 py-2 text-xs font-bold text-white backdrop-blur"><Maximize2 className="h-4 w-4" /> View full size</span>
+                  </button>}
             </motion.div>
           )}
           {/* Thumbnails */}
-          {allImages.length > 1 && (
+          {allMedia.length > 1 && (
             <div className="flex gap-2 overflow-x-auto pb-2 mb-6">
-              {allImages.map((img, i) => (
-                <button key={i} onClick={() => setActiveImage(img)} className={`shrink-0 h-16 w-24 rounded-lg overflow-hidden border-2 transition-all hover:-translate-y-1 ${activeImage === img ? "border-brand-primary" : "border-transparent"}`}>
-                  <img src={img} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover" />
+              {allMedia.map((media, i) => (
+                <button key={media.id} onClick={() => setActiveMedia(media)} className={`relative h-16 w-24 shrink-0 overflow-hidden rounded-lg border-2 bg-slate-900 transition-all hover:-translate-y-1 ${activeMedia?.id === media.id ? "border-brand-primary" : "border-transparent"}`}>
+                  {media.media_type === "video"
+                    ? <><video src={media.image_url} muted preload="metadata" className="h-full w-full object-contain" /><Film className="absolute left-1.5 top-1.5 h-4 w-4 rounded bg-slate-950/70 p-0.5 text-white" /></>
+                    : <img src={media.image_url} alt={media.caption ?? `Project photo ${i + 1}`} loading="lazy" decoding="async" className="h-full w-full object-contain" />}
                 </button>
               ))}
             </div>
@@ -269,6 +303,14 @@ export function PortfolioDetailPage() {
           </div>
         </div>
       </div>
+      <AnimatePresence>
+        {lightboxOpen && activeMedia?.media_type === "image" && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[1001] flex items-center justify-center bg-slate-950/95 p-3 sm:p-6" onMouseDown={(event) => event.target === event.currentTarget && setLightboxOpen(false)}>
+            <img src={activeMedia.image_url} alt={activeMedia.caption ?? project.title} className="max-h-full max-w-full object-contain" />
+            <button type="button" onClick={() => setLightboxOpen(false)} className="absolute right-4 top-4 grid h-11 w-11 place-items-center rounded-full bg-white/10 text-white backdrop-blur hover:bg-white/20" aria-label="Close full-size image"><X className="h-5 w-5" /></button>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

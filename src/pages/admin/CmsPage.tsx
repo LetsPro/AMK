@@ -58,7 +58,7 @@ function recordPublished(table: CmsTable, record: CmsRecord) {
 export function CmsPage() {
   const [table, setTable] = useState<CmsTable>("banners");
   const orderedTable = table === "banners" || table === "testimonials" || table === "gallery";
-  const { data = [] } = useTable(table, { orderBy: orderedTable ? "display_order" : "created_at", ascending: orderedTable, ...(table === "website_pages" ? { eq: { slug: "about" } } : {}) });
+  const { data = [], refetch } = useTable(table, { orderBy: orderedTable ? "display_order" : "created_at", ascending: orderedTable, ...(table === "website_pages" ? { eq: { slug: "about" } } : {}) });
   const { create, update, remove } = useTableMutations(table);
   const { data: testimonialSettings = [] } = useTable("app_settings", { eq: { key: "testimonial_carousel" }, limit: 1 });
   const testimonialSettingMutations = useTableMutations("app_settings");
@@ -121,10 +121,11 @@ export function CmsPage() {
           ? { title: form.title, image_url: form.image_url, category: form.category || null, is_featured: form.status === "published", display_order: displayOrder }
           : table === "testimonials"
             ? { name: form.title, company: form.company || null, quote: form.content ?? "", rating: Number(form.rating || 5), avatar_url: form.image_url || null, video_url: form.video_url || null, is_published: form.status === "published", display_order: displayOrder }
-            : { title: form.title, subtitle: form.content || null, image_url: form.image_url || null, is_active: form.status === "published", display_order: displayOrder };
+            : { title: form.title.trim(), subtitle: form.content?.trim() || null, image_url: form.image_url || null, is_active: form.status === "published", display_order: displayOrder };
 
     if (editingId) await update.mutateAsync({ id: editingId, payload: payload as never });
     else await create.mutateAsync(payload as never);
+    await refetch();
     closeEditor();
   }
 

@@ -47,7 +47,7 @@ export function ActivityPage() {
     if (actionFilter) query = query.eq("action", actionFilter);
     query = query.order("created_at", { ascending: false }).range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
     const { data, count } = await query;
-    setLogs((data as Log[]) ?? []);
+    setLogs((data as unknown as Log[]) ?? []);
     setTotal(count ?? 0);
     setLoading(false);
   }, [page, moduleFilter, actionFilter]);
