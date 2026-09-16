@@ -1121,7 +1121,7 @@ export function HomePage() {
               <span className="tabular-nums">{String(activeSlide % bannerRows.length + 1).padStart(2, "0")}</span><span className="h-px w-12 bg-brand-accent" /> Technology Driven Studio
             </motion.div>
             <motion.h1 key={slide.title} initial={{ opacity: 0, y: 32 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.9, ease: [0.22, 1, 0.36, 1] }} className="mt-8 max-w-4xl text-5xl font-medium leading-[0.94] tracking-[-0.04em] md:text-7xl xl:text-[5.6rem]">{slide.title}</motion.h1>
-            <motion.p key={`${slide.id}-subtitle`} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8, delay: 0.12 }} className="mt-7 max-w-2xl text-base font-light leading-8 text-slate-300 md:text-lg">{slide.subtitle}</motion.p>
+            {slide.subtitle && <motion.p key={`${slide.id}-subtitle`} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8, delay: 0.12 }} className="mt-7 max-w-2xl whitespace-pre-line text-base font-light leading-8 text-slate-300 md:text-lg">{slide.subtitle}</motion.p>}
             <motion.div initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8, delay: 0.22 }} className="mt-10 flex flex-wrap items-center gap-3">
               <button
                 type="button"
